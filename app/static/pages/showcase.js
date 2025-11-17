@@ -1,22 +1,51 @@
 import { onMounted, reactive, ref, watch } from '../js/vue/runtime.js';
+import { createRouter, createWebHistory, useRoute, useRouter } from '../js/vue/router.js';
 import { mountVueApp } from '../js/vue/boot.js';
 import { useApi } from '../js/vue/composables/useApi.js';
-import { useUrlRouter } from '../js/vue/composables/useUrlRouter.js';
 import { ShowcaseCard } from '../js/vue/components/ShowcaseCard.js';
+
+const showcasePageRouter = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: window.location.pathname || '/',
+      component: { template: '<div />' }
+    }
+  ]
+});
+
+const normalizeQuery = (values) => {
+  const query = {};
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query[key] = value;
+    }
+  });
+  return query;
+};
 
 mountVueApp('#showcaseApp', {
   components: { ShowcaseCard },
   setup() {
     const api = useApi();
-    const router = useUrlRouter({ q: '', limit: '100' });
+    const route = useRoute();
+    const router = useRouter();
     const form = reactive({ q: '', limit: '100' });
     const status = ref('Enter a search query to find audiobooks.');
     const groups = ref([]);
     const detailGroup = ref(null);
 
     const syncForm = () => {
-      form.q = router.state.q || '';
-      form.limit = router.state.limit || '100';
+      const getValue = (key, fallback) => {
+        const value = route.query[key];
+        if (Array.isArray(value)) {
+          return value[value.length - 1] ?? fallback;
+        }
+        return value ?? fallback;
+      };
+
+      form.q = getValue('q', '');
+      form.limit = getValue('limit', '100');
     };
 
     const runSearch = async () => {
@@ -33,7 +62,9 @@ mountVueApp('#showcaseApp', {
         const data = await api.getShowcase({ query: form.q.trim(), limit: parseInt(form.limit, 10) });
         groups.value = data.groups || [];
         status.value = groups.value.length ? `Showing ${data.total_groups} titles (${data.total_results} versions)` : 'No audiobooks found.';
-        router.updateUrl({ q: form.q.trim(), limit: form.limit }, true);
+        router.replace({
+          query: normalizeQuery({ q: form.q.trim(), limit: form.limit })
+        });
       } catch (err) {
         status.value = `Failed to load showcase: ${err.message}`;
       }
@@ -64,7 +95,7 @@ mountVueApp('#showcaseApp', {
       }
     });
 
-    watch(() => [router.state.q, router.state.limit], () => {
+    watch(() => [route.query.q, route.query.limit], () => {
       const previous = form.q;
       syncForm();
       if (form.q && form.q !== previous) {
@@ -79,4 +110,4 @@ mountVueApp('#showcaseApp', {
 
     return { form, status, groups, detailGroup, runSearch, showDetail, closeDetail, copyVersion };
   }
-});
+}, { router: showcasePageRouter });
