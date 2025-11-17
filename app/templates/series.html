@@ -5,60 +5,41 @@
 {% block page_script %}/static/pages/series.js?v=5{% endblock %}
 
 {% block content %}
-  <div class="card">
+  <div id="seriesApp" class="card">
     <div class="series-header">
       <h3>Series Discovery</h3>
       <div class="series-controls">
-        <input id="seriesTitle" type="text" placeholder="Book title..." style="width: 250px">
-        <input id="seriesAuthor" type="text" placeholder="Author (optional)" style="width: 200px">
-        <select id="seriesLimit">
+        <input v-model="form.title" type="text" placeholder="Book title..." style="width: 250px" @keyup.enter="runSearch">
+        <input v-model="form.author" type="text" placeholder="Author (optional)" style="width: 200px" @keyup.enter="runSearch">
+        <select v-model="form.limit">
           <option value="5">5 results</option>
           <option value="10">10 results</option>
-          <option value="20" selected>20 results</option>
+          <option value="20">20 results</option>
           <option value="30">30 results</option>
           <option value="40">40 results</option>
           <option value="50">50 results</option>
         </select>
-        <button id="seriesSearchBtn" class="primary">🔍 Search Series</button>
+        <button class="primary" @click="runSearch">🔍 Search Series</button>
       </div>
     </div>
-    <div id="seriesStatus" class="muted" style="margin: 1rem 0;"></div>
+    <div class="muted" style="margin: 1rem 0;" v-text="status"></div>
 
-    <!-- Series search results table -->
-    <div id="seriesTableContainer" style="display:none">
-      <table id="seriesTable">
-        <thead>
-          <tr>
-            <th>Series</th>
-            <th>Author</th>
-            <th class="center">Books</th>
-            <th class="center">Readers</th>
-            <th class="center">Action</th>
-          </tr>
-        </thead>
-        <tbody id="seriesTableBody"></tbody>
-      </table>
+    <div v-if="!detail">
+      <SeriesTable :items="results" @select="loadDetail" />
     </div>
 
-    <!-- Book cards detail view -->
-    <div id="seriesDetailContainer" style="display:none">
-      <div id="seriesBreadcrumb" style="margin: 1rem 0;">
-        <button id="backToSeriesTable" class="secondary">← Back to Series List</button>
+    <div v-else>
+      <div style="margin: 1rem 0;">
+        <button class="secondary" @click="detail = null">← Back to Series List</button>
       </div>
-      <h3 id="seriesDetailTitle"></h3>
-      <div id="seriesDetailGrid" class="showcase-grid"></div>
-    </div>
-  </div>
-
-  <!-- Modal/Drawer for series search from cards -->
-  <div id="seriesDrawer" class="series-drawer" style="display:none">
-    <div class="series-drawer-content">
-      <div class="series-drawer-header">
-        <h3>Series Search</h3>
-        <button id="closeSeriesDrawer" class="secondary">✕ Close</button>
-      </div>
-      <div id="seriesDrawerBody">
-        <!-- Same content as main series tab -->
+      <h3>{{ detail.series_name }}</h3>
+      <div class="showcase-grid">
+        <div class="showcase-card" v-for="book in detail.books" :key="book.book_id">
+          <div class="showcase-title">{{ book.title }}</div>
+          <div class="showcase-author">{{ book.author || book.author_name }}</div>
+          <div class="muted">{{ book.release_year }} • {{ book.page_count || '?' }} pages</div>
+          <div class="showcase-description">{{ book.description || 'No description available.' }}</div>
+        </div>
       </div>
     </div>
   </div>
