@@ -93,16 +93,17 @@ class SeriesPage {
       if (this.elements.seriesAuthor) this.elements.seriesAuthor.value = state.author || '';
       if (this.elements.seriesLimit) this.elements.seriesLimit.value = state.limit || '20';
 
-      // Check if we need to restore detail view
-      if (state.series_id && state.series_name) {
-        // Restore detail view
-        if (state.q) {
-          await this.seriesView.searchSeries();
-        }
+      // Check if we need to restore detail view (book details take priority)
+      if (state.book_title && state.book_position) {
+        // Restore MAM results view (deepest level)
+        const position = parseInt(state.book_position, 10);
+        await this.seriesView.viewBookTorrents(state.book_title, position);
+      } else if (state.series_id && state.series_name) {
+        // Restore books table view
         const seriesId = parseInt(state.series_id, 10);
         await this.seriesView.loadSeriesBooks(seriesId, state.series_name);
       } else if (state.q) {
-        // Re-run search if query exists (but no series selected)
+        // Re-run search if query exists (top level)
         await this.seriesView.searchSeries();
       } else {
         // Clear search results if no query
@@ -185,17 +186,23 @@ class SeriesPage {
       this.elements.seriesLimit.value = state.limit;
     }
 
-    // Check if we should restore detail view (series_id in URL)
-    if (state.series_id && state.series_name) {
-      // First run the search to populate the series table
-      if (state.q) {
-        await this.seriesView.searchSeries();
+    // Restore deepest level first (book torrents > series books > search results)
+    if (state.book_title && state.book_position) {
+      // Restore MAM results view (deepest level)
+      const position = parseInt(state.book_position, 10);
+      // First need to load the series data
+      if (state.series_id && state.series_name) {
+        const seriesId = parseInt(state.series_id, 10);
+        await this.seriesView.loadSeriesBooks(seriesId, state.series_name);
+        // Then view the book torrents
+        await this.seriesView.viewBookTorrents(state.book_title, position);
       }
-      // Then load the specific series books
+    } else if (state.series_id && state.series_name) {
+      // Restore books table view
       const seriesId = parseInt(state.series_id, 10);
       await this.seriesView.loadSeriesBooks(seriesId, state.series_name);
     } else if (state.q) {
-      // Auto-run search if query parameter exists (but no series selected)
+      // Auto-run search if query parameter exists (top level)
       await this.seriesView.searchSeries();
     } else {
       // Focus title input if no state to restore

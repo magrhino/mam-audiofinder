@@ -278,10 +278,8 @@ export class SeriesView {
       // Show detail view, hide series table
       this.showBooksTable();
 
-      // Update URL with series details
-      const currentParams = this.router.getStateFromURL();
+      // Update URL with series details (no search params to avoid re-searching)
       this.router.updateURL({
-        ...currentParams,
         series_id: seriesId.toString(),
         series_name: seriesName
       }, false);
@@ -396,10 +394,10 @@ export class SeriesView {
       // Show MAM results view
       this.showMAMResults();
 
-      // Update URL
-      const currentParams = this.router.getStateFromURL();
+      // Update URL with book details (keep series context, remove search params)
       this.router.updateURL({
-        ...currentParams,
+        series_id: this.currentSeriesData.series_id.toString(),
+        series_name: this.currentSeriesData.series_name,
         book_title: bookTitle,
         book_position: position.toString()
       }, false);
