@@ -74,7 +74,7 @@ class SearchPage {
       // Restore form inputs
       if (this.elements.searchQ) this.elements.searchQ.value = state.q || '';
       if (this.elements.searchSort) this.elements.searchSort.value = state.sort || 'default';
-      if (this.elements.searchPerpage) this.elements.searchPerpage.value = state.perpage || '25';
+      if (this.elements.searchPerpage) this.elements.searchPerpage.value = state.perpage || '20';
 
       // Re-run search if query exists
       if (state.q) {
@@ -136,6 +136,8 @@ class SearchPage {
     }
     if (state.perpage && this.elements.searchPerpage) {
       this.elements.searchPerpage.value = state.perpage;
+    } else if (this.elements.searchPerpage && !this.elements.searchPerpage.value) {
+      this.elements.searchPerpage.value = '20';
     }
 
     // Auto-run search if query parameter exists
