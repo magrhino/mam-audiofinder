@@ -14,6 +14,29 @@ from utils import normalize_title, normalize_author
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
 
+# Allowed limit values (shared whitelist for MAM perpage and Hardcover limit)
+ALLOWED_LIMITS = [5, 10, 20, 30, 40, 50]
+
+
+def coerce_limit(limit: int) -> int:
+    """
+    Coerce limit to nearest allowed value.
+    Logs when coercion occurs for debugging.
+
+    Args:
+        limit: Requested limit value
+
+    Returns:
+        Coerced limit from ALLOWED_LIMITS
+    """
+    if limit in ALLOWED_LIMITS:
+        return limit
+
+    # Find nearest allowed value
+    nearest = min(ALLOWED_LIMITS, key=lambda x: abs(x - limit))
+    logger.info(f"⚠️  Coerced limit {limit} → {nearest} (allowed: {ALLOWED_LIMITS})")
+    return nearest
+
 
 class SeriesSearchRequest(BaseModel):
     """Request model for series search."""
@@ -65,9 +88,8 @@ async def search_series(request: SeriesSearchRequest):
     if not request.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
 
-    # Validate limit parameter (allowed values: 5, 10, 20, 30, 40, 50)
-    ALLOWED_LIMITS = [5, 10, 20, 30, 40, 50]
-    limit = request.limit if request.limit in ALLOWED_LIMITS else 20
+    # Validate and coerce limit parameter to nearest allowed value
+    limit = coerce_limit(request.limit)
 
     # Compute normalized title if not provided
     normalized_title = request.normalized_title or normalize_title(request.title)

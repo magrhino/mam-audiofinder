@@ -40,13 +40,32 @@
       </table>
     </div>
 
-    <!-- Book cards detail view -->
+    <!-- Book table detail view -->
     <div id="seriesDetailContainer" style="display:none">
       <div id="seriesBreadcrumb" style="margin: 1rem 0;">
         <button id="backToSeriesTable" class="secondary">← Back to Series List</button>
       </div>
       <h3 id="seriesDetailTitle"></h3>
-      <div id="seriesDetailGrid" class="showcase-grid"></div>
+      <table id="booksTable">
+        <thead>
+          <tr>
+            <th class="center">Position</th>
+            <th>Title</th>
+            <th>Year</th>
+            <th class="center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="booksTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Grouped MAM results view -->
+    <div id="mamResultsContainer" style="display:none">
+      <div id="mamBreadcrumb" style="margin: 1rem 0;">
+        <button id="backToBooksTable" class="secondary">← Back to Books</button>
+      </div>
+      <h3 id="mamResultsTitle"></h3>
+      <div id="mamResultsGrid" class="showcase-grid"></div>
     </div>
   </div>
 

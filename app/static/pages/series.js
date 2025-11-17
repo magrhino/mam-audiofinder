@@ -71,8 +71,12 @@ class SeriesPage {
       seriesTableBody: document.getElementById('seriesTableBody'),
       seriesDetailContainer: document.getElementById('seriesDetailContainer'),
       seriesDetailTitle: document.getElementById('seriesDetailTitle'),
-      seriesDetailGrid: document.getElementById('seriesDetailGrid'),
+      booksTableBody: document.getElementById('booksTableBody'),
+      mamResultsContainer: document.getElementById('mamResultsContainer'),
+      mamResultsTitle: document.getElementById('mamResultsTitle'),
+      mamResultsGrid: document.getElementById('mamResultsGrid'),
       backToSeriesTable: document.getElementById('backToSeriesTable'),
+      backToBooks: document.getElementById('backToBooksTable'),
       navHealth: document.getElementById('navHealth')
     };
   }

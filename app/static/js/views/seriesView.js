@@ -1,15 +1,16 @@
 /**
  * SeriesView module - Handles Hardcover series discovery and book browsing
+ * Uses table-first layout per Phase 3 requirements
  */
 
 import { api } from '../core/api.js';
 import { escapeHtml } from '../core/utils.js';
-import { createBookCard } from '../components/cardHelper.js';
 import { showToast } from '../components/toast.js';
 import {
   setSeriesSearchButtonSuccess,
   setSeriesSearchButtonError
 } from '../components/seriesSearchButton.js';
+import { addLibraryIndicator } from '../components/libraryIndicator.js';
 
 /**
  * SeriesView handles series search and book detail display
@@ -19,7 +20,9 @@ export class SeriesView {
     this.elements = elements;
     this.router = router;
     this.currentSeriesResults = [];
-    this.currentCardData = null; // Track originating card for event responses
+    this.currentSeriesData = null; // Current series metadata
+    this.currentBooks = [];       // Current books list
+    this.currentCardData = null;  // Track originating card for event responses
 
     this.bindEvents();
   }
@@ -48,12 +51,37 @@ export class SeriesView {
       }
     });
 
-    // Back button
+    // Back to series table button
     if (this.elements.backBtn) {
       this.elements.backBtn.addEventListener('click', () => {
         this.showSeriesTable();
       });
     }
+
+    // Back to books table button
+    if (this.elements.backToBooks) {
+      this.elements.backToBooks.addEventListener('click', () => {
+        this.showBooksTable();
+      });
+    }
+  }
+
+  /**
+   * Validate and coerce limit to allowed values
+   * @param {number} limit - Requested limit
+   * @returns {number} Validated limit
+   */
+  validateLimit(limit) {
+    const ALLOWED_LIMITS = [5, 10, 20, 30, 40, 50];
+    if (ALLOWED_LIMITS.includes(limit)) {
+      return limit;
+    }
+    // Coerce to nearest allowed value
+    const nearest = ALLOWED_LIMITS.reduce((prev, curr) =>
+      Math.abs(curr - limit) < Math.abs(prev - limit) ? curr : prev
+    );
+    console.warn(`Coerced limit ${limit} → ${nearest}`);
+    return nearest;
   }
 
   /**
@@ -63,7 +91,7 @@ export class SeriesView {
   async searchSeries(cardData = null) {
     const title = (this.elements.titleInput?.value || '').trim();
     const author = (this.elements.authorInput?.value || '').trim();
-    const limit = parseInt(this.elements.limitSelect?.value || '20', 10);
+    const limit = this.validateLimit(parseInt(this.elements.limitSelect?.value || '20', 10));
 
     if (!title) {
       this.elements.status.textContent = 'Please enter a book title.';
@@ -221,7 +249,7 @@ export class SeriesView {
    */
   async loadSeriesBooks(seriesId, seriesName) {
     this.elements.status.textContent = `Loading books for ${seriesName}...`;
-    this.elements.detailGrid.innerHTML = '';
+    this.elements.booksTableBody.innerHTML = '';
 
     try {
       const data = await api.getSeriesBooks(seriesId);
@@ -229,18 +257,26 @@ export class SeriesView {
 
       if (!books.length) {
         this.elements.status.textContent = 'No books found in this series.';
+        showToast('No books found in this series', 'warning');
         return;
       }
+
+      // Store series data and books
+      this.currentSeriesData = {
+        series_id: seriesId,
+        series_name: seriesName,
+        author_name: data.author_name || ''
+      };
+      this.currentBooks = books;
 
       // Update detail title
       this.elements.detailTitle.textContent = `${seriesName} (${books.length} books)`;
 
-      // Render book cards (pass series author from API response)
-      const seriesAuthor = data.author_name || '';
-      await this.renderBookCards(books, seriesAuthor);
+      // Render book table
+      this.renderBooksTable(books);
 
-      // Show detail view, hide table
-      this.showDetailView();
+      // Show detail view, hide series table
+      this.showBooksTable();
 
       // Update URL with series details
       const currentParams = this.router.getStateFromURL();
@@ -251,6 +287,7 @@ export class SeriesView {
       }, false);
 
       this.elements.status.textContent = '';
+      showToast(`Loaded ${books.length} books from ${seriesName}`, 'success');
 
     } catch (error) {
       console.error('Failed to load series books:', error);
@@ -267,117 +304,313 @@ export class SeriesView {
   }
 
   /**
-   * Render book cards using CardHelper
+   * Render books table (table-first layout per Phase 3)
    * @param {Array} books - Book list (strings or objects)
-   * @param {string} seriesAuthor - Series author name
    */
-  async renderBookCards(books, seriesAuthor) {
-    this.elements.detailGrid.innerHTML = '';
+  renderBooksTable(books) {
+    this.elements.booksTableBody.innerHTML = '';
 
-    // If books are objects, sort by position; if strings, keep order
-    const sortedBooks = books[0] && typeof books[0] === 'object'
-      ? books.sort((a, b) => (a.position || 0) - (b.position || 0))
-      : books; // Keep original order for string titles
+    // Books are returned as simple string array from Hardcover API
+    books.forEach((book, index) => {
+      const tr = this.createBookRow(book, index + 1);
+      this.elements.booksTableBody.appendChild(tr);
+    });
+  }
 
-    for (let i = 0; i < sortedBooks.length; i++) {
-      const card = await this.createBookCardWithMAM(sortedBooks[i], i, seriesAuthor);
-      this.elements.detailGrid.appendChild(card);
+  /**
+   * Create a book table row
+   * @param {string} bookTitle - Book title (Hardcover returns strings)
+   * @param {number} position - Book position in series
+   * @returns {HTMLTableRowElement}
+   */
+  createBookRow(bookTitle, position) {
+    const tr = document.createElement('tr');
+
+    // Position
+    const tdPosition = document.createElement('td');
+    tdPosition.className = 'center';
+    tdPosition.textContent = position;
+    tr.appendChild(tdPosition);
+
+    // Title
+    const tdTitle = document.createElement('td');
+    tdTitle.textContent = bookTitle;
+    tr.appendChild(tdTitle);
+
+    // Year (not available from current Hardcover API, placeholder)
+    const tdYear = document.createElement('td');
+    tdYear.textContent = '—';
+    tdYear.className = 'muted';
+    tr.appendChild(tdYear);
+
+    // Action button
+    const tdAction = document.createElement('td');
+    tdAction.className = 'center';
+    const btn = document.createElement('button');
+    btn.className = 'primary small';
+    btn.textContent = 'View Torrents';
+    btn.addEventListener('click', () => {
+      this.viewBookTorrents(bookTitle, position);
+    });
+    tdAction.appendChild(btn);
+    tr.appendChild(tdAction);
+
+    return tr;
+  }
+
+  /**
+   * View MAM torrents for a specific book
+   * @param {string} bookTitle - Book title
+   * @param {number} position - Book position
+   */
+  async viewBookTorrents(bookTitle, position) {
+    const searchQuery = `${bookTitle} ${this.currentSeriesData.author_name}`;
+    const limit = this.validateLimit(parseInt(this.elements.limitSelect?.value || '20', 10));
+
+    this.elements.status.textContent = `Searching MAM for "${bookTitle}"...`;
+
+    try {
+      // Search MAM using the perpage limit from the selector
+      const searchResult = await api.search({
+        tor: { text: searchQuery, sortType: 'default' },
+        perpage: limit
+      });
+
+      const results = searchResult.results || [];
+
+      if (!results.length) {
+        showToast(`No torrents found for "${bookTitle}"`, 'warning');
+        this.elements.status.textContent = 'No torrents found';
+        return;
+      }
+
+      // Group results like showcase does (by normalized title)
+      const grouped = this.groupMAMResults(results);
+
+      // Update MAM results title
+      this.elements.mamResultsTitle.textContent = `#${position} - ${bookTitle} (${results.length} torrents)`;
+
+      // Render grouped results
+      await this.renderGroupedMAMResults(grouped);
+
+      // Show MAM results view
+      this.showMAMResults();
+
+      // Update URL
+      const currentParams = this.router.getStateFromURL();
+      this.router.updateURL({
+        ...currentParams,
+        book_title: bookTitle,
+        book_position: position.toString()
+      }, false);
+
+      this.elements.status.textContent = '';
+      showToast(`Found ${results.length} torrents for "${bookTitle}"`, 'success');
+
+    } catch (error) {
+      console.error('Failed to search MAM:', error);
+      showToast(`Failed to search MAM: ${error.message}`, 'error');
+      this.elements.status.textContent = 'Search failed';
     }
   }
 
   /**
-   * Create a book card with MAM matching
-   * @param {Object|string} book - Hardcover book data (object or string title)
-   * @param {number} index - Book index for position
-   * @param {string} seriesAuthor - Series author name for fallback
-   * @returns {Promise<HTMLElement>}
+   * Group MAM results by normalized title (reuse showcase logic)
+   * @param {Array} results - MAM search results
+   * @returns {Array} Grouped results
    */
-  async createBookCardWithMAM(book, index, seriesAuthor) {
-    // Handle both string (title only) and object formats
-    let title, author, coverUrl, position, description;
+  groupMAMResults(results) {
+    const groups = {};
 
-    if (typeof book === 'string') {
-      // Hardcover API returns array of title strings
-      title = book;
-      author = seriesAuthor || 'Unknown Author';
-      coverUrl = '';
-      position = index + 1; // Use array index as position
-      description = '';
-    } else {
-      // Full book object (if API returns this format in future)
-      title = book.title || 'Unknown Title';
-      const authors = book.authors || [];
-      author = authors.length > 0 ? authors.join(', ') : (seriesAuthor || 'Unknown Author');
-      coverUrl = book.cover_url || '';
-      position = book.position || (index + 1);
-      description = book.description || '';
-    }
-
-    // Search MAM for this book to check if available
-    let mamMatch = null;
-    let inLibrary = false;
-
-    try {
-      const searchResult = await api.search({
-        tor: { text: `${title} ${author}`, sortType: 'default' },
-        perpage: 1
-      });
-
-      if (searchResult.results && searchResult.results.length > 0) {
-        mamMatch = searchResult.results[0];
-        inLibrary = mamMatch.in_abs_library || false;
+    results.forEach(item => {
+      const normalizedTitle = this.normalizeTitle(item.title || '');
+      if (!groups[normalizedTitle]) {
+        groups[normalizedTitle] = {
+          normalized_title: normalizedTitle,
+          display_title: item.title,
+          display_author: item.author,
+          versions: []
+        };
       }
-    } catch (error) {
-      console.warn(`Could not search MAM for "${title}":`, error);
+      groups[normalizedTitle].versions.push(item);
+    });
+
+    return Object.values(groups);
+  }
+
+  /**
+   * Normalize title for grouping
+   * @param {string} title - Title to normalize
+   * @returns {string} Normalized title
+   */
+  normalizeTitle(title) {
+    return title
+      .toLowerCase()
+      .replace(/^(the|a|an)\s+/i, '')
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Render grouped MAM results (showcase-style cards)
+   * @param {Array} groups - Grouped results
+   */
+  async renderGroupedMAMResults(groups) {
+    this.elements.mamResultsGrid.innerHTML = '';
+
+    for (const group of groups) {
+      const card = await this.createGroupedCard(group);
+      this.elements.mamResultsGrid.appendChild(card);
+    }
+  }
+
+  /**
+   * Create a grouped card (simplified showcase card)
+   * @param {Object} group - Grouped MAM results
+   * @returns {HTMLElement}
+   */
+  async createGroupedCard(group) {
+    const card = document.createElement('div');
+    card.className = 'showcase-card';
+
+    const firstVersion = group.versions[0];
+
+    // Versions badge
+    const badge = document.createElement('div');
+    badge.className = 'showcase-versions-badge';
+    badge.textContent = `${group.versions.length} version${group.versions.length > 1 ? 's' : ''}`;
+    card.appendChild(badge);
+
+    // Cover skeleton (will load cover)
+    const coverSkeleton = document.createElement('div');
+    coverSkeleton.className = 'showcase-cover-skeleton';
+
+    // Add library indicator if in library
+    if (firstVersion.in_abs_library) {
+      addLibraryIndicator(coverSkeleton, true);
     }
 
-    // Create card using cardHelper
-    const card = createBookCard({
-      title: `#${position} - ${title}`,
-      author: author,
-      coverUrl: coverUrl,
-      mamId: mamMatch ? mamMatch.id : '',
-      formats: mamMatch ? [mamMatch.filetype] : [],
-      versionsCount: 1,
-      inLibrary: inLibrary,
-      description: description,
-      showDescription: !!description,
-      cardClass: 'showcase-card',
-      onClick: mamMatch ? () => this.handleCardClick(mamMatch) : null
+    card.appendChild(coverSkeleton);
+
+    // Load cover asynchronously
+    this.loadCoverForCard(coverSkeleton, firstVersion.id, group.display_title, group.display_author);
+
+    // Title
+    const titleEl = document.createElement('div');
+    titleEl.className = 'showcase-title';
+    titleEl.textContent = group.display_title;
+    card.appendChild(titleEl);
+
+    // Author
+    const authorEl = document.createElement('div');
+    authorEl.className = 'showcase-author';
+    authorEl.textContent = group.display_author;
+    card.appendChild(authorEl);
+
+    // Formats
+    const formatsDiv = document.createElement('div');
+    formatsDiv.className = 'showcase-formats';
+    const uniqueFormats = [...new Set(group.versions.map(v => v.filetype))];
+    uniqueFormats.forEach(format => {
+      const formatBadge = document.createElement('span');
+      formatBadge.className = 'showcase-format-badge';
+      formatBadge.textContent = format;
+      formatsDiv.appendChild(formatBadge);
+    });
+    card.appendChild(formatsDiv);
+
+    // Click to expand versions (TODO: implement expansion)
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => {
+      // TODO: Expand to show all versions with Add buttons
+      console.log('Card clicked:', group);
     });
 
     return card;
   }
 
   /**
-   * Handle card click (for adding to qBittorrent)
-   * @param {Object} item - MAM item data
+   * Load cover for a card
+   * @param {HTMLElement} skeleton - Skeleton element
+   * @param {string} mamId - MAM ID
+   * @param {string} title - Title
+   * @param {string} author - Author
    */
-  handleCardClick(item) {
-    // Show import form or add to queue
-    console.log('Card clicked:', item);
-    // TODO: Implement add-to-queue functionality
+  async loadCoverForCard(skeleton, mamId, title, author) {
+    try {
+      const data = await api.fetchCover({
+        mam_id: mamId,
+        title: title || '',
+        author: author || '',
+        max_retries: '3'
+      });
+
+      if (data.cover_url) {
+        const img = document.createElement('img');
+        img.className = 'showcase-cover';
+        img.src = data.cover_url;
+        img.alt = title || 'Cover';
+        img.loading = 'lazy';
+
+        img.onload = () => {
+          const libraryIndicator = skeleton.querySelector('.in-library-indicator');
+          const wrapper = document.createElement('div');
+          wrapper.style.position = 'relative';
+          wrapper.appendChild(img);
+          if (libraryIndicator) {
+            wrapper.appendChild(libraryIndicator);
+          }
+          skeleton.replaceWith(wrapper);
+        };
+
+        img.onerror = () => {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'showcase-cover-placeholder';
+          placeholder.textContent = '📚';
+          skeleton.replaceWith(placeholder);
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load cover:', error);
+    }
   }
 
   /**
-   * Show series table, hide detail view
+   * Show series table, hide other views
    */
   showSeriesTable() {
     this.elements.tableContainer.style.display = '';
     this.elements.detailContainer.style.display = 'none';
+    this.elements.mamResultsContainer.style.display = 'none';
     this.elements.status.textContent = `Found ${this.currentSeriesResults.length} series`;
 
     // Remove series details from URL, keep search params
     const currentParams = this.router.getStateFromURL();
-    const { series_id, series_name, ...searchParams } = currentParams;
+    const { series_id, series_name, book_title, book_position, ...searchParams } = currentParams;
     this.router.updateURL(searchParams, false);
   }
 
   /**
-   * Show detail view, hide series table
+   * Show books table, hide other views
    */
-  showDetailView() {
+  showBooksTable() {
     this.elements.tableContainer.style.display = 'none';
     this.elements.detailContainer.style.display = '';
+    this.elements.mamResultsContainer.style.display = 'none';
+
+    // Remove book details from URL, keep series params
+    const currentParams = this.router.getStateFromURL();
+    const { book_title, book_position, ...paramsToKeep } = currentParams;
+    this.router.updateURL(paramsToKeep, false);
+  }
+
+  /**
+   * Show MAM results, hide other views
+   */
+  showMAMResults() {
+    this.elements.tableContainer.style.display = 'none';
+    this.elements.detailContainer.style.display = 'none';
+    this.elements.mamResultsContainer.style.display = '';
   }
 }

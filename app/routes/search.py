@@ -72,15 +72,20 @@ async def search(payload: dict):
     tor.setdefault("startNumber", "0")
     tor.setdefault("main_cat", ["13"])  # Audiobooks
 
-    # Validate perpage parameter (allowed values: 5, 10, 20, 30, 40, 50)
+    # Validate and coerce perpage parameter (shared whitelist)
     ALLOWED_PERPAGE = [5, 10, 20, 30, 40, 50]
     perpage_raw = payload.get("perpage", 20)
     try:
-        perpage = int(perpage_raw)
-        if perpage not in ALLOWED_PERPAGE:
-            perpage = 20  # Default fallback
+        perpage_requested = int(perpage_raw)
     except (ValueError, TypeError):
-        perpage = 20  # Default fallback
+        perpage_requested = 20
+
+    # Coerce to nearest allowed value
+    if perpage_requested in ALLOWED_PERPAGE:
+        perpage = perpage_requested
+    else:
+        perpage = min(ALLOWED_PERPAGE, key=lambda x: abs(x - perpage_requested))
+        logger.info(f"⚠️  Coerced perpage {perpage_requested} → {perpage} (allowed: {ALLOWED_PERPAGE})")
     query_text = tor.get("text", "")
     sort_type = tor.get("sortType", "default")
 
