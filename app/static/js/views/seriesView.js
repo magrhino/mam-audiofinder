@@ -235,11 +235,20 @@ export class SeriesView {
       // Update detail title
       this.elements.detailTitle.textContent = `${seriesName} (${books.length} books)`;
 
-      // Render book cards
-      await this.renderBookCards(books);
+      // Render book cards (pass series author from API response)
+      const seriesAuthor = data.author_name || '';
+      await this.renderBookCards(books, seriesAuthor);
 
       // Show detail view, hide table
       this.showDetailView();
+
+      // Update URL with series details
+      const currentParams = this.router.getStateFromURL();
+      this.router.updateURL({
+        ...currentParams,
+        series_id: seriesId.toString(),
+        series_name: seriesName
+      }, false);
 
       this.elements.status.textContent = '';
 
@@ -259,32 +268,50 @@ export class SeriesView {
 
   /**
    * Render book cards using CardHelper
-   * @param {Array} books - Book list
+   * @param {Array} books - Book list (strings or objects)
+   * @param {string} seriesAuthor - Series author name
    */
-  async renderBookCards(books) {
+  async renderBookCards(books, seriesAuthor) {
     this.elements.detailGrid.innerHTML = '';
 
-    // Sort books by position
-    const sortedBooks = books.sort((a, b) => (a.position || 0) - (b.position || 0));
+    // If books are objects, sort by position; if strings, keep order
+    const sortedBooks = books[0] && typeof books[0] === 'object'
+      ? books.sort((a, b) => (a.position || 0) - (b.position || 0))
+      : books; // Keep original order for string titles
 
-    for (const book of sortedBooks) {
-      const card = await this.createBookCardWithMAM(book);
+    for (let i = 0; i < sortedBooks.length; i++) {
+      const card = await this.createBookCardWithMAM(sortedBooks[i], i, seriesAuthor);
       this.elements.detailGrid.appendChild(card);
     }
   }
 
   /**
    * Create a book card with MAM matching
-   * @param {Object} book - Hardcover book data
+   * @param {Object|string} book - Hardcover book data (object or string title)
+   * @param {number} index - Book index for position
+   * @param {string} seriesAuthor - Series author name for fallback
    * @returns {Promise<HTMLElement>}
    */
-  async createBookCardWithMAM(book) {
-    // Extract book info
-    const title = book.title || 'Unknown Title';
-    const authors = book.authors || [];
-    const author = authors.length > 0 ? authors.join(', ') : 'Unknown Author';
-    const coverUrl = book.cover_url || '';
-    const position = book.position || 0;
+  async createBookCardWithMAM(book, index, seriesAuthor) {
+    // Handle both string (title only) and object formats
+    let title, author, coverUrl, position, description;
+
+    if (typeof book === 'string') {
+      // Hardcover API returns array of title strings
+      title = book;
+      author = seriesAuthor || 'Unknown Author';
+      coverUrl = '';
+      position = index + 1; // Use array index as position
+      description = '';
+    } else {
+      // Full book object (if API returns this format in future)
+      title = book.title || 'Unknown Title';
+      const authors = book.authors || [];
+      author = authors.length > 0 ? authors.join(', ') : (seriesAuthor || 'Unknown Author');
+      coverUrl = book.cover_url || '';
+      position = book.position || (index + 1);
+      description = book.description || '';
+    }
 
     // Search MAM for this book to check if available
     let mamMatch = null;
@@ -306,15 +333,15 @@ export class SeriesView {
 
     // Create card using cardHelper
     const card = createBookCard({
-      title: `${position > 0 ? `#${position} - ` : ''}${title}`,
+      title: `#${position} - ${title}`,
       author: author,
       coverUrl: coverUrl,
       mamId: mamMatch ? mamMatch.id : '',
       formats: mamMatch ? [mamMatch.filetype] : [],
       versionsCount: 1,
       inLibrary: inLibrary,
-      description: book.description || '',
-      showDescription: true,
+      description: description,
+      showDescription: !!description,
       cardClass: 'showcase-card',
       onClick: mamMatch ? () => this.handleCardClick(mamMatch) : null
     });
@@ -339,6 +366,11 @@ export class SeriesView {
     this.elements.tableContainer.style.display = '';
     this.elements.detailContainer.style.display = 'none';
     this.elements.status.textContent = `Found ${this.currentSeriesResults.length} series`;
+
+    // Remove series details from URL, keep search params
+    const currentParams = this.router.getStateFromURL();
+    const { series_id, series_name, ...searchParams } = currentParams;
+    this.router.updateURL(searchParams, false);
   }
 
   /**
