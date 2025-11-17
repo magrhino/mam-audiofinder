@@ -31,4 +31,9 @@ test-results/
 *.swo
 *~
 
+# Node.js and Vue build artifacts
+node_modules/
+app/static/dist/
+package-lock.json
+
 AGENTS.md
