@@ -1308,3 +1308,92 @@ a:hover {
     right: -100%;
   }
 }
+
+.action-btn {
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.action-btn--primary {
+  background: var(--btn-primary-bg);
+  border-color: transparent;
+}
+
+.action-btn--secondary {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.action-btn--danger {
+  background: rgba(168, 50, 50, 0.2);
+  border-color: #a83232;
+}
+
+.action-btn--success {
+  background: rgba(45, 122, 62, 0.2);
+  border-color: var(--success);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-badge--success { background: rgba(45, 122, 62, 0.2); color: var(--success); }
+.status-badge--warning { background: rgba(184, 115, 51, 0.2); color: var(--warning); }
+.status-badge--danger { background: rgba(168, 50, 50, 0.2); color: var(--error); }
+.status-badge--info { background: rgba(79, 138, 255, 0.2); color: #9faed6; }
+.status-badge--muted { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+
+.import-form {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.import-form__inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-sm);
+  align-items: end;
+}
+
+.import-form__inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.import-form__status {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.import-form__tree {
+  max-height: 220px;
+  overflow: auto;
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--spacing-sm);
+}

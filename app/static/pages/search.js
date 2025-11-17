@@ -1,167 +1,121 @@
-/**
- * Search Page Entry Point
- * Handles search functionality and URL parameter restoration
- */
+import { reactive, ref, watch, onMounted } from '../js/vue/runtime.js';
+import { createRouter, createWebHistory, useRoute, useRouter } from '../js/vue/router.js';
+import { mountVueApp } from '../js/vue/boot.js';
+import { useApi } from '../js/vue/composables/useApi.js';
+import { ResultRow } from '../js/vue/components/ResultRow.js';
+import { useSharedCoverLoader } from '../js/vue/services/coverLoaderService.js';
 
-import { Router } from '../js/core/router.js';
-import { api } from '../js/core/api.js';
-import { SearchView } from '../js/views/searchView.js';
+const searchPageRouter = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: window.location.pathname || '/',
+      component: { template: '<div />' }
+    }
+  ]
+});
 
-/**
- * Search Page class
- */
-class SearchPage {
-  constructor() {
-    this.router = null;
-    this.searchView = null;
-    this.elements = {};
-  }
+const normalizeQuery = (values) => {
+  const query = {};
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query[key] = value;
+    }
+  });
+  return query;
+};
 
-  /**
-   * Initialize the search page
-   */
-  async init() {
-    // Collect DOM elements
-    this.collectElements();
+mountVueApp('#searchApp', {
+  components: { ResultRow },
+  setup() {
+    const api = useApi();
+    const route = useRoute();
+    const router = useRouter();
+    const form = reactive({ q: '', sort: 'default', perpage: '20' });
+    const results = ref([]);
+    const status = ref('');
+    const loading = ref(false);
+    const coverLoader = useSharedCoverLoader();
 
-    // Initialize router
-    this.router = new Router();
+    const syncForm = () => {
+      const getValue = (key, fallback) => {
+        const value = route.query[key];
+        if (Array.isArray(value)) {
+          return value[value.length - 1] ?? fallback;
+        }
+        return value ?? fallback;
+      };
 
-    // Initialize search view
-    this.searchView = new SearchView({
-      form: this.elements.searchForm,
-      q: this.elements.searchQ,
-      sort: this.elements.searchSort,
-      perpage: this.elements.searchPerpage,
-      status: this.elements.searchStatus,
-      table: this.elements.searchTable,
-      tbody: this.elements.searchTbody
-    }, this.router);
-
-    // Set up router event handlers
-    this.setupRouterHandlers();
-
-    // Check application health
-    await this.checkHealth();
-
-    // Restore state from URL and auto-search if needed
-    await this.restoreStateFromURL();
-  }
-
-  /**
-   * Collect DOM element references
-   */
-  collectElements() {
-    this.elements = {
-      searchForm: document.getElementById('searchForm'),
-      searchQ: document.getElementById('q'),
-      searchSort: document.getElementById('sort'),
-      searchPerpage: document.getElementById('perpage'),
-      searchStatus: document.getElementById('status'),
-      searchTable: document.getElementById('results'),
-      searchTbody: document.querySelector('#results tbody'),
-      navHealth: document.getElementById('navHealth')
+      form.q = getValue('q', '');
+      form.sort = getValue('sort', 'default');
+      form.perpage = getValue('perpage', '20');
     };
-  }
 
-  /**
-   * Set up router event handlers for browser back/forward
-   */
-  setupRouterHandlers() {
-    window.addEventListener('routerStateChange', async (event) => {
-      const state = event.detail;
+    const runSearch = async (silent = false) => {
+      if (!form.q.trim()) {
+        status.value = 'Enter a search query to get started.';
+        results.value = [];
+        return;
+      }
+      loading.value = true;
+      status.value = silent ? status.value : 'Searching…';
+      results.value = [];
+      coverLoader.clearRowState();
+      try {
+        const data = await api.search({
+          tor: { text: form.q.trim(), sortType: form.sort },
+          perpage: parseInt(form.perpage, 10)
+        });
+        results.value = data.results || [];
+        status.value = results.value.length ? `${results.value.length} results shown` : 'No results.';
+        router.replace({
+          query: normalizeQuery({ q: form.q.trim(), sort: form.sort, perpage: form.perpage })
+        });
+      } catch (err) {
+        console.error('Search failed', err);
+        status.value = `Search failed: ${err.message}`;
+      } finally {
+        loading.value = false;
+      }
+    };
 
-      // Restore form inputs
-      if (this.elements.searchQ) this.elements.searchQ.value = state.q || '';
-      if (this.elements.searchSort) this.elements.searchSort.value = state.sort || 'default';
-      if (this.elements.searchPerpage) this.elements.searchPerpage.value = state.perpage || '20';
+    const addTorrent = async (rowState) => {
+      try {
+        await api.addTorrent({
+          id: String(rowState.id ?? ''),
+          title: rowState.title || '',
+          dl: rowState.dl || '',
+          author: rowState.author_info || '',
+          narrator: rowState.narrator_info || '',
+          abs_cover_url: rowState.abs_cover_url || '',
+          abs_item_id: rowState.abs_item_id || ''
+        });
+        status.value = '✓ Added to qBittorrent';
+        window.dispatchEvent(new CustomEvent('torrentAdded'));
+      } catch (err) {
+        status.value = `Add failed: ${err.message}`;
+      }
+    };
 
-      // Re-run search if query exists
-      if (state.q) {
-        await this.searchView.search();
-      } else {
-        // Clear search results if no query
-        this.elements.searchTable.style.display = 'none';
-        this.elements.searchTbody.innerHTML = '';
-        this.elements.searchStatus.textContent = '';
+    onMounted(() => {
+      syncForm();
+      if (form.q) {
+        runSearch(true);
       }
     });
-  }
 
-  /**
-   * Check application health status
-   */
-  async checkHealth() {
-    try {
-      const health = await api.health();
-      this.updateHealthIndicator(health.ok);
-    } catch {
-      this.updateHealthIndicator(false);
-    }
-  }
-
-  /**
-   * Update health indicator in navigation bar
-   * @param {boolean} ok - Health status
-   */
-  updateHealthIndicator(ok) {
-    const healthIndicator = this.elements.navHealth;
-    const healthDot = healthIndicator?.querySelector('.health-dot');
-    const healthText = healthIndicator?.querySelector('.health-text');
-
-    if (healthIndicator && healthDot && healthText) {
-      healthText.textContent = ok ? 'OK' : 'Error';
-      if (ok) {
-        healthIndicator.classList.add('ok');
-        healthIndicator.classList.remove('error');
-      } else {
-        healthIndicator.classList.add('error');
-        healthIndicator.classList.remove('ok');
+    watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
+      const previousQuery = form.q;
+      syncForm();
+      if (form.q && form.q !== previousQuery) {
+        runSearch(true);
       }
-    }
-  }
-
-  /**
-   * Restore application state from URL parameters
-   */
-  async restoreStateFromURL() {
-    const state = this.router.getStateFromURL();
-
-    // Pre-populate form inputs from URL
-    if (state.q && this.elements.searchQ) {
-      this.elements.searchQ.value = state.q;
-    }
-    if (state.sort && this.elements.searchSort) {
-      this.elements.searchSort.value = state.sort;
-    }
-    if (state.perpage && this.elements.searchPerpage) {
-      this.elements.searchPerpage.value = state.perpage;
-    } else if (this.elements.searchPerpage && !this.elements.searchPerpage.value) {
-      this.elements.searchPerpage.value = '20';
-    }
-
-    // Auto-run search if query parameter exists
-    if (state.q) {
-      await this.searchView.search();
-    } else {
-      // Focus search box if no state to restore
-      if (this.elements.searchQ) this.elements.searchQ.focus();
-    }
-  }
-}
-
-// Initialize page when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    window.searchPage = new SearchPage();
-    window.searchPage.init().catch(err => {
-      console.error('Failed to initialize search page:', err);
+      if (!form.q) {
+        results.value = [];
+        status.value = '';
+      }
     });
-  });
-} else {
-  // DOM already loaded
-  window.searchPage = new SearchPage();
-  window.searchPage.init().catch(err => {
-    console.error('Failed to initialize search page:', err);
-  });
-}
+
+    return { form, results, status, loading, runSearch, addTorrent };
+  }
+}, { router: searchPageRouter });
