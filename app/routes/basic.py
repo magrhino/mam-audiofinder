@@ -10,7 +10,7 @@ from config import IMPORT_MODE, FLATTEN_DISCS, HARDCOVER_SERIES_LIMIT
 router = APIRouter()
 
 # Path to the Vue build output
-DIST_PATH = Path("app/static/dist")
+DIST_PATH = Path("static/dist")
 INDEX_HTML = DIST_PATH / "index.html"
 
 
