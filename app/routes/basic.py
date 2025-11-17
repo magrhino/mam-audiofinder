@@ -35,6 +35,12 @@ async def logs_page(request: Request):
     return templates.TemplateResponse("logs.html", {"request": request})
 
 
+@router.get("/series", response_class=HTMLResponse)
+async def series_page(request: Request):
+    """Serve the series page."""
+    return templates.TemplateResponse("series.html", {"request": request})
+
+
 @router.get("/health")
 async def health():
     """Health check endpoint."""

@@ -72,7 +72,15 @@ async def search(payload: dict):
     tor.setdefault("startNumber", "0")
     tor.setdefault("main_cat", ["13"])  # Audiobooks
 
-    perpage = payload.get("perpage", 25)
+    # Validate perpage parameter (allowed values: 5, 10, 20, 30, 40, 50)
+    ALLOWED_PERPAGE = [5, 10, 20, 30, 40, 50]
+    perpage_raw = payload.get("perpage", 20)
+    try:
+        perpage = int(perpage_raw)
+        if perpage not in ALLOWED_PERPAGE:
+            perpage = 20  # Default fallback
+    except (ValueError, TypeError):
+        perpage = 20  # Default fallback
     query_text = tor.get("text", "")
     sort_type = tor.get("sortType", "default")
 
