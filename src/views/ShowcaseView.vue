@@ -56,29 +56,27 @@
       <table class="showcase-versions-table">
         <thead>
           <tr>
+            <th style="width: 80px">Cover</th>
             <th>Title</th>
-            <th>Format</th>
+            <th>Author</th>
+            <th>Narrator</th>
+            <th>Filetype</th>
             <th class="right">Size</th>
-            <th class="right">Seeders/Leechers</th>
-            <th>Added</th>
+            <th class="right">Seeders</th>
+            <th>Uploaded</th>
             <th class="center">Link</th>
             <th>Add</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="version in detailGroup.versions" :key="version.id">
-            <td>{{ version.title }}</td>
-            <td>{{ version.format }}</td>
-            <td class="right">{{ formatSize(version.size) }}</td>
-            <td class="right">{{ version.seeders || 0 }} / {{ version.leechers || 0 }}</td>
-            <td>{{ version.added }}</td>
-            <td class="center">
-              <a v-if="version.id" :href="`https://www.myanonamouse.net/t/${version.id}`" target="_blank" rel="noopener" title="Open on MAM">🔗</a>
-            </td>
-            <td>
-              <ActionButton label="Add" variant="primary" @click.stop="addVersion(version)" />
-            </td>
-          </tr>
+          <ResultRow
+            v-for="version in versionsWithIds"
+            :key="version.rowId"
+            :item="version"
+            :cover-loader="coverLoader"
+            :row-id="version.rowId"
+            @add="addTorrent"
+          />
         </tbody>
       </table>
     </div>
@@ -86,15 +84,18 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ShowcaseCard from '@components/ShowcaseCard.vue'
+import ResultRow from '@components/ResultRow.vue'
 import ActionButton from '@components/ActionButton.vue'
 import { useApi } from '@composables/useApi'
+import { useCoverLoader, generateRowId } from '@composables/useCoverLoader'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
+const coverLoader = useCoverLoader()
 const form = reactive({ q: '', limit: '100' })
 const status = ref('Enter a search query to find audiobooks.')
 const groups = ref([])
@@ -102,6 +103,15 @@ const detailGroup = ref(null)
 const detailCoverUrl = ref('')
 const detailDescription = ref('')
 const descriptionCollapsed = ref(true)
+
+// Add unique row IDs for ResultRow components
+const versionsWithIds = computed(() => {
+  if (!detailGroup.value?.versions) return []
+  return detailGroup.value.versions.map(version => ({
+    ...version,
+    rowId: `${version.id}-${version.added}-${generateRowId()}`
+  }))
+})
 
 const normalizeQuery = (values) => {
   const query = {}
@@ -154,6 +164,7 @@ const showDetail = async (group) => {
   detailCoverUrl.value = ''
   detailDescription.value = ''
   descriptionCollapsed.value = true
+  coverLoader.clearRowState()
 
   // Load cover for detail view
   if (group.mam_id && group.display_title) {
@@ -182,36 +193,21 @@ const closeDetail = () => {
   detailDescription.value = ''
 }
 
-const formatSize = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
-}
-
-const addVersion = async (version) => {
-  if (!version.dl || !version.id) {
-    status.value = 'Cannot add: missing download link'
-    return
-  }
-
+const addTorrent = async (rowState) => {
   try {
     await api.addTorrent({
-      id: version.id,
-      dl: version.dl,
-      title: version.title,
-      author: version.author_info,
-      narrator: version.narrator_info
+      id: String(rowState.id ?? ''),
+      title: rowState.title || '',
+      dl: rowState.dl || '',
+      author: rowState.author_info || '',
+      narrator: rowState.narrator_info || '',
+      abs_cover_url: rowState.abs_cover_url || '',
+      abs_item_id: rowState.abs_item_id || ''
     })
-    status.value = `✓ Added "${version.title}" to qBittorrent`
-
-    // Dispatch event for history refresh
-    window.dispatchEvent(new CustomEvent('torrentAdded', {
-      detail: { item: version }
-    }))
+    status.value = `✓ Added "${rowState.title}" to qBittorrent`
+    window.dispatchEvent(new CustomEvent('torrentAdded'))
   } catch (err) {
-    status.value = `Failed to add torrent: ${err.message}`
+    status.value = `Add failed: ${err.message}`
   }
 }
 
