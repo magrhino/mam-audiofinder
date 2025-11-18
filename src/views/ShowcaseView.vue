@@ -1,12 +1,12 @@
 <template>
-  <div class="debug-view">
+  <div class="showcase-view">
     <!-- Hero Panel - Audible/Jellyseerr Style -->
     <n-card class="hero-panel" :bordered="false">
       <n-space vertical :size="24">
         <!-- Hero Header -->
         <div class="hero-header">
           <n-text tag="h1" class="hero-title" :depth="1">
-            Audiobook Showcase (Debug)
+            Audiobook Showcase
           </n-text>
           <n-text :depth="2" class="hero-subtitle">
             Discover audiobooks grouped by title with advanced search powered by Naive UI components
@@ -522,7 +522,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 </script>
 
 <style scoped>
-.debug-view {
+.showcase-view {
   max-width: 1400px;
   margin: 0 auto;
   padding: var(--spacing-md, 1rem);

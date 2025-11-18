@@ -8,7 +8,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // Lazy load views for code splitting
 const SearchView = () => import('@views/SearchView.vue')
 const HistoryView = () => import('@views/HistoryView.vue')
-const DebugView = () => import('@views/DebugView.vue')
+const ShowcaseView = () => import('@views/ShowcaseView.vue')
 const LogsView = () => import('@views/LogsView.vue')
 const SeriesView = () => import('@views/SeriesView.vue')
 
@@ -28,7 +28,7 @@ const routes = [
   {
     path: '/showcase',
     name: 'showcase',
-    component: DebugView,
+    component: ShowcaseView,
     meta: { title: 'Showcase - Audiobook Finder' }
   },
   {
