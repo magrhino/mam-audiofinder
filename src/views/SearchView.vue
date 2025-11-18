@@ -26,7 +26,7 @@
         :pagination="pagination"
         :bordered="false"
         :loading="loading"
-        :scroll-x="1500"
+        :scroll-x="1200"
         striped
       />
     </div>
