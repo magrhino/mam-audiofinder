@@ -167,8 +167,8 @@ const showDetail = async (group) => {
       detailCoverUrl.value = data.cover_url || ''
 
       // Also fetch description if available
-      if (data.abs_description) {
-        detailDescription.value = data.abs_description
+      if (data.description) {
+        detailDescription.value = data.description
       }
     } catch (err) {
       console.warn('Failed to load detail cover:', err)
