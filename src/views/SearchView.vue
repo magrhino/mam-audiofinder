@@ -26,7 +26,7 @@
         :pagination="pagination"
         :bordered="false"
         :loading="loading"
-        :scroll-x="1200"
+        :scroll-x="scrollX"
         striped
       />
     </div>
@@ -34,8 +34,9 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, onMounted } from 'vue'
+import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useBreakpoints } from '@vueuse/core'
 import { NDataTable } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
@@ -43,6 +44,24 @@ import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
+
+// Responsive breakpoints for dynamic scroll-x
+const breakpoints = useBreakpoints({
+  mobile: 0,
+  tablet: 768,
+  desktop: 1024
+})
+
+// Dynamic scroll-x based on screen size
+const scrollX = computed(() => {
+  if (breakpoints.greater('desktop').value) {
+    return 1400 // Desktop: More space for expanded columns
+  } else if (breakpoints.greater('tablet').value) {
+    return 1200 // Tablet: Standard layout
+  } else {
+    return 900 // Mobile: Compact layout
+  }
+})
 
 // Initialize data table with search configuration
 const {
