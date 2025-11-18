@@ -18,29 +18,50 @@
 
     <div class="muted" v-text="status"></div>
 
-    <n-data-table
-      v-if="data.length"
-      ref="tableRef"
-      :columns="columns"
-      :data="data"
-      :pagination="pagination"
-      :bordered="false"
-      :loading="loading"
-      striped
-    />
+    <div class="table-responsive" v-if="data.length">
+      <n-data-table
+        ref="tableRef"
+        :columns="columns"
+        :data="data"
+        :pagination="pagination"
+        :bordered="false"
+        :loading="loading"
+        :scroll-x="scrollX"
+        striped
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, watch, onMounted } from 'vue'
+import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useBreakpoints } from '@vueuse/core'
 import { NDataTable } from 'naive-ui'
 import { useApi } from '@composables/useApi'
-import { useDataTable } from '@composables/naive/useDataTable'
+import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
+
+// Responsive breakpoints for dynamic scroll-x
+const breakpoints = useBreakpoints({
+  mobile: 0,
+  tablet: 768,
+  desktop: 1024
+})
+
+// Dynamic scroll-x based on screen size
+const scrollX = computed(() => {
+  if (breakpoints.greater('desktop').value) {
+    return 1400 // Desktop: More space for expanded columns
+  } else if (breakpoints.greater('tablet').value) {
+    return 1200 // Tablet: Standard layout
+  } else {
+    return 900 // Mobile: Compact layout
+  }
+})
 
 // Initialize data table with search configuration
 const {
@@ -52,7 +73,7 @@ const {
   setData,
   clearData,
   sort
-} = useDataTable({
+} = useMAMSearchDataTable({
   viewType: 'search',
   defaultPageSize: 25,
   onAdd: addTorrent
@@ -103,6 +124,9 @@ const runSearch = async (silent = false) => {
     })
     setData(results.results || [])
     status.value = data.value.length ? `${data.value.length} results shown` : 'No results.'
+
+    // Sync table pagination with form dropdown
+    pagination.value.pageSize = parseInt(form.perpage, 10)
 
     // Apply default sort if specified
     if (form.sort === 'seedersDesc') {
@@ -164,4 +188,35 @@ watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
 
 <style scoped>
 /* Uses main.css styles */
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  margin-top: var(--spacing-md, 1rem);
+}
+
+/* Desktop: Full width, no constraints */
+@media (min-width: 1024px) {
+  .table-responsive {
+    max-width: 100%;
+  }
+}
+
+/* Tablet: Comfortable scrolling */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .table-responsive {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* Mobile: Optimized padding and scroll */
+@media (max-width: 767px) {
+  .table-responsive {
+    margin-left: calc(-1 * var(--spacing-md, 1rem));
+    margin-right: calc(-1 * var(--spacing-md, 1rem));
+    padding: 0 var(--spacing-md, 1rem);
+  }
+}
 </style>

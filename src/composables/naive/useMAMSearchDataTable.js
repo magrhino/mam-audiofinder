@@ -1,13 +1,17 @@
 /**
- * useDataTable Composable
- * Reusable table logic for Search, History, and Showcase views
- * Provides column definitions, pagination, sorting, and filtering
+ * useMAMSearchDataTable Composable
+ * Customized table logic for MAM Audiobook Finder search functionality
+ * Provides column definitions, pagination, sorting, and filtering optimized for search results
  */
 
 import { ref, computed, h } from 'vue'
-import { NButton, NTag } from 'naive-ui'
+import { NButton, NTag, NTooltip } from 'naive-ui'
 import { formatSize, escapeHtml } from '../../../app/static/js/core/utils.js'
 import CoverImage from '../../components/CoverImage.vue'
+import AudiobookFormatIcon from '../../components/icons/AudiobookFormatIcon.vue'
+import FileSizeIcon from '../../components/icons/FileSizeIcon.vue'
+import SeedersIcon from '../../components/icons/SeedersIcon.vue'
+import DateUploadedIcon from '../../components/icons/DateUploadedIcon.vue'
 
 /**
  * Create column definitions based on view type
@@ -54,6 +58,7 @@ function createColumns(viewType, callbacks) {
     author: {
       title: 'Author',
       key: 'author',
+      minWidth: 150,
       sorter: (a, b) => {
         const authorA = a.author_info || a.author || ''
         const authorB = b.author_info || b.author || ''
@@ -73,6 +78,7 @@ function createColumns(viewType, callbacks) {
     narrator: {
       title: 'Narrator',
       key: 'narrator',
+      minWidth: 150,
       sorter: (a, b) => {
         const narratorA = a.narrator_info || a.narrator || ''
         const narratorB = b.narrator_info || b.narrator || ''
@@ -88,10 +94,14 @@ function createColumns(viewType, callbacks) {
       }
     },
 
-    // Filetype/Format column with filtering
+    // Filetype/Format column with filtering (no sorting - uses filter dropdown)
     format: {
-      title: 'Filetype',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(AudiobookFormatIcon, { size: 20 }),
+        default: () => 'Filetype - Filter Only'
+      }),
       key: 'format',
+      minWidth: 90,
       filterOptions: [
         { label: 'MP3', value: 'MP3' },
         { label: 'M4B', value: 'M4B' },
@@ -109,10 +119,19 @@ function createColumns(viewType, callbacks) {
 
     // Size column
     size: {
-      title: 'Size',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(FileSizeIcon, { size: 20 }),
+        default: () => 'Size - Click to Sort'
+      }),
       key: 'size',
+      minWidth: 100,
       align: 'right',
-      sorter: (a, b) => (a.size || 0) - (b.size || 0),
+      sorter: (row1, row2) => (row1.size || 0) - (row2.size || 0),
+      customNextSortOrder: (order) => {
+        // Only toggle between ascend and descend (no unsorted state)
+        if (order === 'ascend') return 'descend'
+        return 'ascend'
+      },
       render(row) {
         return h('span', {}, formatSize(row.size))
       }
@@ -120,11 +139,19 @@ function createColumns(viewType, callbacks) {
 
     // Seeders/Leechers column (search view)
     seeders: {
-      title: 'Seeders',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(SeedersIcon, { size: 20 }),
+        default: () => 'Seeders - Click to Sort'
+      }),
       key: 'seeders',
+      minWidth: 110,
       align: 'right',
       defaultSortOrder: 'descend',
-      sorter: (a, b) => (a.seeders || 0) - (b.seeders || 0),
+      sorter: (rowA, rowB) => {
+        const seedersA = rowA.seeders ?? 0
+        const seedersB = rowB.seeders ?? 0
+        return seedersA - seedersB
+      },
       render(row) {
         const s = row.seeders ?? '-'
         const l = row.leechers ?? '-'
@@ -134,12 +161,16 @@ function createColumns(viewType, callbacks) {
 
     // Uploaded/Added date column
     uploaded: {
-      title: 'Uploaded',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(DateUploadedIcon, { size: 20 }),
+        default: () => 'Date Uploaded - Click to Sort'
+      }),
       key: 'added',
-      sorter: (a, b) => {
-        const dateA = new Date(a.added || 0)
-        const dateB = new Date(b.added || 0)
-        return dateA - dateB
+      minWidth: 140,
+      sorter: (rowA, rowB) => {
+        const dateA = new Date(rowA.added || 0)
+        const dateB = new Date(rowB.added || 0)
+        return dateA.getTime() - dateB.getTime()
       },
       render(row) {
         return h('span', {}, escapeHtml(row.added || ''))
@@ -303,7 +334,7 @@ function createColumns(viewType, callbacks) {
 }
 
 /**
- * Main composable for data table functionality
+ * Main composable for MAM search data table functionality
  * @param {object} config - Configuration object
  * @param {string} config.viewType - Type of view ('search' | 'history' | 'showcase')
  * @param {function} config.onAdd - Callback for Add button
@@ -312,7 +343,7 @@ function createColumns(viewType, callbacks) {
  * @param {number} config.defaultPageSize - Default pagination size (default: 25)
  * @returns {object} Table state and methods
  */
-export function useDataTable(config = {}) {
+export function useMAMSearchDataTable(config = {}) {
   const {
     viewType = 'search',
     onAdd = null,
@@ -332,7 +363,7 @@ export function useDataTable(config = {}) {
   const pagination = ref({
     pageSize: defaultPageSize,
     pageSizes: [25, 50, 100],
-    showSizePicker: true,
+    showSizePicker: false,  // Disabled - use search form dropdown instead
     showQuickJumper: true
   })
 

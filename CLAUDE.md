@@ -7,7 +7,7 @@
 ## Tech Stack
 
 **Backend:** Python 3.12, FastAPI, Uvicorn, SQLite, httpx, Jinja2
-**Frontend:** Vue 3 (Composition API), Vue Router, Vite, ES6 modules
+**Frontend:** Vue 3 (Composition API), Vue Router, Vite, NaiveUI, @vueuse/core, ES6 modules
 **Infrastructure:** Docker, Docker Compose
 **Testing:** pytest (223 test functions)
 
@@ -166,6 +166,8 @@ For detailed workflows, see [BACKEND.md](BACKEND.md).
 - `useApi()` - API wrapper (reuses legacy app/static/js/core/api.js)
 - `useCoverLoader()` - Lazy image loading with IntersectionObserver
 - `useHistoryLiveUpdates()` - Real-time history updates (auto-refresh)
+- `useMAMSearchDataTable()` - NaiveUI table configuration for search results
+- `useBreakpoints()` - (@vueuse/core) Responsive breakpoint detection
 
 **Patterns:** Composition API, reactive refs, async/await, component-based design
 
@@ -369,6 +371,46 @@ except Exception:
 
 **Backend:** Always use `sanitize()` before filesystem operations
 **Frontend:** Always use `escapeHtml()` for user input
+
+### Responsive Design
+
+**Use @vueuse/core for breakpoint detection:**
+
+```javascript
+import { useBreakpoints } from '@vueuse/core'
+import { computed } from 'vue'
+
+// Define breakpoints
+const breakpoints = useBreakpoints({
+  mobile: 0,
+  tablet: 768,
+  desktop: 1024
+})
+
+// Create responsive computed properties
+const scrollX = computed(() => {
+  if (breakpoints.greater('desktop').value) {
+    return 1400 // Desktop
+  } else if (breakpoints.greater('tablet').value) {
+    return 1200 // Tablet
+  } else {
+    return 900 // Mobile
+  }
+})
+```
+
+**Best Practices:**
+- Use `useBreakpoints` for JavaScript-based responsive behavior
+- Use CSS media queries for styling
+- Define consistent breakpoints: mobile (0), tablet (768), desktop (1024)
+- Prefer reactive computed properties over direct window.innerWidth checks
+- Component props and table settings should adapt to screen size
+
+**Common Patterns:**
+- Dynamic `scroll-x` values for NaiveUI tables
+- Conditional column rendering based on screen size
+- Adaptive spacing and padding in CSS
+- Mobile-first approach with progressive enhancement
 
 ### Database Migrations
 
