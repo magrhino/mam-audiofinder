@@ -54,32 +54,34 @@
 
       <!-- Versions table -->
       <h3>Available Versions ({{ detailGroup.total_versions }})</h3>
-      <table class="showcase-versions-table">
-        <thead>
-          <tr>
-            <th style="width: 80px">Cover</th>
-            <th>Title</th>
-            <th>Author</th>
-            <th>Narrator</th>
-            <th>Filetype</th>
-            <th class="right">Size</th>
-            <th class="right">Seeders</th>
-            <th>Uploaded</th>
-            <th class="center">Link</th>
-            <th>Add</th>
-          </tr>
-        </thead>
-        <tbody>
-          <ResultRow
-            v-for="version in versionsWithIds"
-            :key="version.rowId"
-            :item="version"
-            :cover-loader="coverLoader"
-            :row-id="version.rowId"
-            @add="addTorrent"
-          />
-        </tbody>
-      </table>
+      <div class="showcase-versions-container">
+        <table class="showcase-versions-table">
+          <thead>
+            <tr>
+              <th style="width: 80px">Cover</th>
+              <th>Title</th>
+              <th>Author</th>
+              <th>Narrator</th>
+              <th>Filetype</th>
+              <th class="right">Size</th>
+              <th class="right">Seeders</th>
+              <th>Uploaded</th>
+              <th class="center">Link</th>
+              <th>Add</th>
+            </tr>
+          </thead>
+          <tbody>
+            <ResultRow
+              v-for="version in versionsWithIds"
+              :key="version.rowId"
+              :item="version"
+              :cover-loader="coverLoader"
+              :row-id="version.rowId"
+              @add="addTorrent"
+            />
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
