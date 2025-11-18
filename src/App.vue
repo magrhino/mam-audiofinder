@@ -1,19 +1,24 @@
 <template>
-  <div id="app">
-    <NavBar :health="healthStatus" />
+  <n-config-provider :theme="darkTheme" :theme-overrides="customTheme">
+    <n-global-style />
+    <div id="app">
+      <NavBar :health="healthStatus" />
 
-    <header>
-      <h1>📚 Audiobook Finder</h1>
-      <span class="muted">Download Audiobooks and Import to Audiobookshelf</span>
-    </header>
+      <header>
+        <h1>📚 Audiobook Finder</h1>
+        <span class="muted">Download Audiobooks and Import to Audiobookshelf</span>
+      </header>
 
-    <RouterView />
-  </div>
+      <RouterView />
+    </div>
+  </n-config-provider>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
+import { darkTheme, NConfigProvider, NGlobalStyle } from 'naive-ui'
+import { customTheme } from './theme/naive'
 import NavBar from '@components/NavBar.vue'
 import { useApi } from '@composables/useApi'
 

@@ -9,71 +9,58 @@
         <option value="sizeDesc">Size ↓</option>
       </select>
       <select v-model="form.perpage">
-        <option value="5">5</option>
-        <option value="10">10</option>
-        <option value="20">20</option>
-        <option value="30">30</option>
-        <option value="40">40</option>
+        <option value="25">25</option>
         <option value="50">50</option>
+        <option value="100">100</option>
       </select>
       <button type="submit">Search</button>
     </form>
 
     <div class="muted" v-text="status"></div>
 
-    <table v-if="results.length">
-      <thead>
-        <tr>
-          <th style="width: 80px">Cover</th>
-          <th>Title</th>
-          <th>Author</th>
-          <th>Narrator</th>
-          <th>Filetype</th>
-          <th class="right">Size</th>
-          <th class="right">Seeders</th>
-          <th>Uploaded</th>
-          <th class="center">Link</th>
-          <th>Add</th>
-        </tr>
-      </thead>
-      <tbody>
-        <ResultRow
-          v-for="(row, index) in resultsWithIds"
-          :key="row.rowId"
-          :item="row"
-          :cover-loader="coverLoader"
-          :row-id="row.rowId"
-          @add="addTorrent"
-        />
-      </tbody>
-    </table>
+    <n-data-table
+      v-if="data.length"
+      ref="tableRef"
+      :columns="columns"
+      :data="data"
+      :pagination="pagination"
+      :bordered="false"
+      :loading="loading"
+      striped
+    />
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch, onMounted } from 'vue'
+import { reactive, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import ResultRow from '@components/ResultRow.vue'
+import { NDataTable } from 'naive-ui'
 import { useApi } from '@composables/useApi'
-import { useCoverLoader, generateRowId } from '@composables/useCoverLoader'
+import { useDataTable } from '@composables/useDataTable'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
-const coverLoader = useCoverLoader()
 
-const form = reactive({ q: '', sort: 'default', perpage: '20' })
-const results = ref([])
+// Initialize data table with search configuration
+const {
+  tableRef,
+  data,
+  columns,
+  pagination,
+  loading: tableLoading,
+  setData,
+  clearData,
+  sort
+} = useDataTable({
+  viewType: 'search',
+  defaultPageSize: 25,
+  onAdd: addTorrent
+})
+
+const form = reactive({ q: '', sort: 'default', perpage: '25' })
 const status = ref('')
 const loading = ref(false)
-
-// Add unique row IDs for key tracking
-const resultsWithIds = computed(() =>
-  results.value.map(row => ({
-    ...row,
-    rowId: `${row.id}-${row.added}-${generateRowId()}`
-  }))
-)
 
 const normalizeQuery = (values) => {
   const query = {}
@@ -96,27 +83,35 @@ const syncForm = () => {
 
   form.q = getValue('q', '')
   form.sort = getValue('sort', 'default')
-  form.perpage = getValue('perpage', '20')
+  form.perpage = getValue('perpage', '25')
 }
 
 const runSearch = async (silent = false) => {
   if (!form.q.trim()) {
     status.value = 'Enter a search query to get started.'
-    results.value = []
+    clearData()
     return
   }
   loading.value = true
   status.value = silent ? status.value : 'Searching…'
-  results.value = []
-  coverLoader.clearRowState()
+  clearData()
 
   try {
-    const data = await api.search({
+    const results = await api.search({
       tor: { text: form.q.trim(), sortType: form.sort },
       perpage: parseInt(form.perpage, 10)
     })
-    results.value = data.results || []
-    status.value = results.value.length ? `${results.value.length} results shown` : 'No results.'
+    setData(results.results || [])
+    status.value = data.value.length ? `${data.value.length} results shown` : 'No results.'
+
+    // Apply default sort if specified
+    if (form.sort === 'seedersDesc') {
+      sort('seeders', 'descend')
+    } else if (form.sort === 'dateDesc') {
+      sort('added', 'descend')
+    } else if (form.sort === 'sizeDesc') {
+      sort('size', 'descend')
+    }
 
     router.replace({
       query: normalizeQuery({ q: form.q.trim(), sort: form.sort, perpage: form.perpage })
@@ -129,7 +124,7 @@ const runSearch = async (silent = false) => {
   }
 }
 
-const addTorrent = async (rowState) => {
+async function addTorrent(rowState) {
   try {
     await api.addTorrent({
       id: String(rowState.id ?? ''),
@@ -161,7 +156,7 @@ watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
     runSearch(true)
   }
   if (!form.q) {
-    results.value = []
+    clearData()
     status.value = ''
   }
 })
