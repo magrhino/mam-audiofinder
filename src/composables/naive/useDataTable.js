@@ -332,7 +332,7 @@ export function useDataTable(config = {}) {
   const pagination = ref({
     pageSize: defaultPageSize,
     pageSizes: [25, 50, 100],
-    showSizePicker: true,
+    showSizePicker: false,  // Disabled - use search form dropdown instead
     showQuickJumper: true
   })
 

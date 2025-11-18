@@ -18,16 +18,18 @@
 
     <div class="muted" v-text="status"></div>
 
-    <n-data-table
-      v-if="data.length"
-      ref="tableRef"
-      :columns="columns"
-      :data="data"
-      :pagination="pagination"
-      :bordered="false"
-      :loading="loading"
-      striped
-    />
+    <div class="table-responsive" v-if="data.length">
+      <n-data-table
+        ref="tableRef"
+        :columns="columns"
+        :data="data"
+        :pagination="pagination"
+        :bordered="false"
+        :loading="loading"
+        :scroll-x="1200"
+        striped
+      />
+    </div>
   </div>
 </template>
 
@@ -104,6 +106,9 @@ const runSearch = async (silent = false) => {
     setData(results.results || [])
     status.value = data.value.length ? `${data.value.length} results shown` : 'No results.'
 
+    // Sync table pagination with form dropdown
+    pagination.value.pageSize = parseInt(form.perpage, 10)
+
     // Apply default sort if specified
     if (form.sort === 'seedersDesc') {
       sort('seeders', 'descend')
@@ -164,4 +169,20 @@ watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
 
 <style scoped>
 /* Uses main.css styles */
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  margin-top: var(--spacing-md, 1rem);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .table-responsive {
+    margin-left: calc(-1 * var(--spacing-md, 1rem));
+    margin-right: calc(-1 * var(--spacing-md, 1rem));
+    padding: 0 var(--spacing-md, 1rem);
+  }
+}
 </style>
