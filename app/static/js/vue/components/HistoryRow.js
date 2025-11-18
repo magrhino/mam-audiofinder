@@ -1,5 +1,7 @@
-import { computed, reactive, ref, watch } from '../runtime.js';
-import { useApi } from '../composables/useApi.js';
+import { computed, ref, watch } from '../runtime.js';
+import { useImport } from '../composables/useImport.js';
+import { useVerifyAction, useDeleteAction } from '../composables/useActionButtons.js';
+import { useVerificationBadge } from '../composables/useLibraryCheck.js';
 
 export const HistoryRow = {
   name: 'HistoryRow',
@@ -9,131 +11,55 @@ export const HistoryRow = {
   },
   emits: ['updated'],
   setup(props, { emit }) {
-    const api = useApi();
     const showForm = ref(false);
-    const loading = ref(false);
-    const verifyLoading = ref(false);
-    const removeLoading = ref(false);
-    const formLoaded = ref(false);
-    const torrents = ref([]);
-    const torrentTree = ref(null);
-    const buttonLabel = ref('Copy to Library');
-    const form = reactive({
-      author: props.item.author || '',
-      title: props.item.title || '',
-      selectedHash: props.item.qb_hash || '',
-      flatten: false
-    });
-    const statusMessage = ref('');
-    const showTree = ref(false);
 
-    const loadFormData = async () => {
-      if (formLoaded.value) return;
-      formLoaded.value = true;
-      loading.value = true;
-      try {
-        const cfg = await api.getConfig();
-        if (cfg.import_mode === 'link') {
-          buttonLabel.value = 'Link to Library';
-        } else if (cfg.import_mode === 'move') {
-          buttonLabel.value = 'Move to Library';
-        }
-      } catch (err) {
-        console.warn('Failed to fetch config', err);
-      }
+    // Use composables for import, verify, and delete actions
+    const importComposable = useImport(props.item);
+    const verifyAction = useVerifyAction(computed(() => props.item));
+    const deleteAction = useDeleteAction(computed(() => props.item));
+    const { badgeConfig: verifyBadgeConfig } = useVerificationBadge(computed(() => props.item));
 
-      try {
-        const data = await api.getCompletedTorrents();
-        torrents.value = data.items || [];
-        if (!form.selectedHash) {
-          const match = torrents.value.find(t => t.hash === props.item.qb_hash || String(t.mam_id || '') === String(props.item.mam_id || ''));
-          if (match) {
-            form.selectedHash = match.hash;
-            statusMessage.value = '✓ Auto-selected matching torrent';
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load torrents', err);
-        statusMessage.value = 'Failed to load torrents';
-      } finally {
-        loading.value = false;
-      }
-    };
-
+    // Watch for form visibility to load data
     watch(showForm, (val) => {
-      if (val) loadFormData();
+      if (val) importComposable.loadFormData();
     });
 
     const toggleForm = () => {
       showForm.value = !showForm.value;
     };
 
-    const performImport = async () => {
-      if (!form.selectedHash) {
-        statusMessage.value = 'Select a torrent to import';
-        return;
-      }
-      loading.value = true;
-      statusMessage.value = 'Importing…';
-      try {
-        await api.importTorrent({
-          author: form.author,
-          title: form.title,
-          hash: form.selectedHash,
-          history_id: props.item.id,
-          flatten: form.flatten
-        });
-        statusMessage.value = '✓ Import requested';
+    const handleImport = async () => {
+      const result = await importComposable.performImport();
+      if (result.success) {
         showForm.value = false;
         emit('updated');
-      } catch (err) {
-        statusMessage.value = `Import failed: ${err.message}`;
-      } finally {
-        loading.value = false;
       }
     };
 
-    const verifyItem = async () => {
-      verifyLoading.value = true;
-      try {
-        await api.verifyHistoryItem(props.item.id);
+    const handleVerify = async () => {
+      const result = await verifyAction.performVerify();
+      if (result.success) {
         emit('updated');
-      } catch (err) {
-        statusMessage.value = `Verify failed: ${err.message}`;
-      } finally {
-        verifyLoading.value = false;
       }
     };
 
-    const removeItem = async () => {
+    const handleRemove = async () => {
       if (!confirm('Remove this history item?')) return;
-      removeLoading.value = true;
-      try {
-        await api.deleteHistoryItem(props.item.id);
+      const result = await deleteAction.performDelete();
+      if (result.success) {
         emit('updated');
-      } catch (err) {
-        statusMessage.value = `Remove failed: ${err.message}`;
-      } finally {
-        removeLoading.value = false;
       }
     };
 
     const loadTree = async () => {
-      if (!form.selectedHash) return;
-      showTree.value = !showTree.value;
-      if (!showTree.value) return;
-      loading.value = true;
-      try {
-        const data = await api.getTorrentTree(form.selectedHash);
-        torrentTree.value = data;
-      } catch (err) {
-        statusMessage.value = `Tree failed: ${err.message}`;
-        showTree.value = false;
-      } finally {
-        loading.value = false;
+      if (!importComposable.form.selectedHash) return;
+      importComposable.showTree.value = !importComposable.showTree.value;
+      if (importComposable.showTree.value) {
+        await importComposable.loadTorrentTree(importComposable.form.selectedHash);
       }
     };
 
+    // Computed properties
     const formattedWhen = computed(() => {
       if (!props.item.added_at) return '';
       return new Date(props.item.added_at.replace(' ', 'T') + 'Z').toLocaleString();
@@ -153,52 +79,60 @@ export const HistoryRow = {
     const statusTooltip = computed(() => props.item.path_warning || '');
 
     const verifyBadge = computed(() => {
-      if (!props.item.imported_at || !props.item.abs_verify_status) return null;
-      const note = props.item.abs_verify_note || '';
-      if (props.item.abs_verify_status === 'verified') {
-        return { label: 'Verified', variant: 'success', title: note };
-      }
-      if (props.item.abs_verify_status === 'mismatch') {
-        return { label: 'Mismatch', variant: 'warning', title: note };
-      }
-      if (props.item.abs_verify_status === 'not_found') {
-        return { label: 'Missing', variant: 'danger', title: note };
-      }
-      return { label: props.item.abs_verify_status, variant: 'muted', title: note };
+      if (!props.item.imported_at || !verifyBadgeConfig.value) return null;
+      const config = verifyBadgeConfig.value;
+      const labelMap = {
+        'verified': 'Verified',
+        'mismatch': 'Mismatch',
+        'not_found': 'Missing',
+        'unreachable': 'Unreachable',
+        'not_configured': 'Not configured'
+      };
+      return {
+        label: labelMap[config.variant] || config.variant,
+        variant: config.variant === 'success' ? 'success' :
+                 config.variant === 'warning' ? 'warning' :
+                 config.variant === 'error' ? 'danger' : 'muted',
+        title: config.title
+      };
     });
 
-    const detailUrl = computed(() => props.item.mam_id ? `https://www.myanonamouse.net/t/${encodeURIComponent(props.item.mam_id)}` : '');
+    const detailUrl = computed(() =>
+      props.item.mam_id ? `https://www.myanonamouse.net/t/${encodeURIComponent(props.item.mam_id)}` : ''
+    );
 
-    const toggleTreeLabel = computed(() => showTree.value ? 'Hide Files' : '📁 View Files');
+    const toggleTreeLabel = computed(() =>
+      importComposable.showTree.value ? 'Hide Files' : '📁 View Files'
+    );
 
     const treeContents = computed(() => {
-      if (!torrentTree.value?.files) return [];
-      return torrentTree.value.files;
+      if (!importComposable.torrentTree.value?.files) return [];
+      return importComposable.torrentTree.value.files;
     });
 
     return {
       showForm,
       toggleForm,
-      performImport,
-      verifyItem,
-      removeItem,
+      performImport: handleImport,
+      verifyItem: handleVerify,
+      removeItem: handleRemove,
       formattedWhen,
       statusVariant,
       statusTooltip,
       verifyBadge,
       detailUrl,
-      buttonLabel,
-      form,
-      torrents,
-      statusMessage,
-      loading,
-      verifyLoading,
-      removeLoading,
+      buttonLabel: importComposable.buttonLabel,
+      form: importComposable.form,
+      torrents: importComposable.torrents,
+      statusMessage: importComposable.statusMessage,
+      loading: importComposable.loading,
+      verifyLoading: verifyAction.verifying,
+      removeLoading: deleteAction.deleting,
       loadTree,
       toggleTreeLabel,
-      showTree,
+      showTree: importComposable.showTree,
       treeContents,
-      formLoaded
+      formLoaded: importComposable.formLoaded
     };
   },
   template: `
