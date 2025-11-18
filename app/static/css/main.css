@@ -949,9 +949,42 @@ a:hover {
   background: var(--accent-maroon-light);
 }
 
+.showcase-search-button {
+  float: right;
+  margin-right: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent-blue, #4a90e2);
+  border: none;
+  color: white;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.showcase-search-button:hover {
+  background: var(--accent-blue-light, #5ca3f5);
+}
+
+.showcase-versions-container {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: auto;
+  margin-top: var(--spacing-md);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
 .showcase-versions-table {
   width: 100%;
-  margin-top: var(--spacing-md);
+  margin-top: 0;
+}
+
+.showcase-versions-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* ========================================
@@ -1074,6 +1107,10 @@ a:hover {
 
   .showcase-detail-author {
     font-size: 1rem;
+  }
+
+  .showcase-versions-container {
+    max-height: 400px;
   }
 }
 
