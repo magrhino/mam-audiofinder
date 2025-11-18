@@ -126,11 +126,7 @@ function createColumns(viewType, callbacks) {
       key: 'size',
       minWidth: 100,
       align: 'right',
-      sorter: (rowA, rowB) => {
-        const sizeA = rowA.size ?? 0
-        const sizeB = rowB.size ?? 0
-        return sizeA - sizeB
-      },
+      sorter: true,  // Use NaiveUI's default numeric sorting
       render(row) {
         return h('span', {}, formatSize(row.size))
       }
