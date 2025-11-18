@@ -128,9 +128,9 @@ header {
   align-items: center;
 }
 
-/* Form Elements - Scoped to legacy views only (ShowcaseView, non-Naive UI forms) */
-.showcase-view input[type="text"],
-.showcase-view input[type="search"],
+/* Form Elements - Scoped to legacy views only (SearchView uses plain HTML, others use Naive UI) */
+.search-view input[type="text"],
+.search-view input[type="search"],
 .logs-view input[type="text"],
 .logs-view input[type="search"],
 .series-view input[type="text"],
@@ -145,8 +145,8 @@ header {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.showcase-view input[type="text"]:focus,
-.showcase-view input[type="search"]:focus,
+.search-view input[type="text"]:focus,
+.search-view input[type="search"]:focus,
 .logs-view input[type="text"]:focus,
 .logs-view input[type="search"]:focus,
 .series-view input[type="text"]:focus,
@@ -156,8 +156,8 @@ header {
   box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.2);
 }
 
-.showcase-view input[type="text"]::placeholder,
-.showcase-view input[type="search"]::placeholder,
+.search-view input[type="text"]::placeholder,
+.search-view input[type="search"]::placeholder,
 .logs-view input[type="text"]::placeholder,
 .logs-view input[type="search"]::placeholder,
 .series-view input[type="text"]::placeholder,
@@ -165,7 +165,7 @@ header {
   color: var(--text-subtle);
 }
 
-.showcase-view select,
+.search-view select,
 .logs-view select,
 .series-view select {
   padding: 0.6rem;
@@ -177,7 +177,7 @@ header {
   transition: border-color 0.2s;
 }
 
-.showcase-view select:focus,
+.search-view select:focus,
 .logs-view select:focus,
 .series-view select:focus {
   outline: none;
@@ -200,7 +200,7 @@ header {
 }
 
 /* Buttons - Scoped to legacy views only (avoid conflicts with Naive UI) */
-.showcase-view button:not([class*="n-"]),
+.search-view button:not([class*="n-"]),
 .logs-view button:not([class*="n-"]),
 .series-view button:not([class*="n-"]),
 .import-form button {
@@ -215,7 +215,7 @@ header {
   white-space: nowrap;
 }
 
-.showcase-view button:hover:not(:disabled):not([class*="n-"]),
+.search-view button:hover:not(:disabled):not([class*="n-"]),
 .logs-view button:hover:not(:disabled):not([class*="n-"]),
 .series-view button:hover:not(:disabled):not([class*="n-"]),
 .import-form button:hover:not(:disabled) {
@@ -224,14 +224,14 @@ header {
   transform: translateY(-1px);
 }
 
-.showcase-view button:active:not(:disabled):not([class*="n-"]),
+.search-view button:active:not(:disabled):not([class*="n-"]),
 .logs-view button:active:not(:disabled):not([class*="n-"]),
 .series-view button:active:not(:disabled):not([class*="n-"]),
 .import-form button:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.showcase-view button:disabled:not([class*="n-"]),
+.search-view button:disabled:not([class*="n-"]),
 .logs-view button:disabled:not([class*="n-"]),
 .series-view button:disabled:not([class*="n-"]),
 .import-form button:disabled {
@@ -240,8 +240,8 @@ header {
 }
 
 /* Primary buttons (submit, import, etc.) - Scoped to legacy views */
-.showcase-view button[type="submit"]:not([class*="n-"]),
-.showcase-view button.primary:not([class*="n-"]),
+.search-view button[type="submit"]:not([class*="n-"]),
+.search-view button.primary:not([class*="n-"]),
 .logs-view button[type="submit"]:not([class*="n-"]),
 .logs-view button.primary:not([class*="n-"]),
 .series-view button[type="submit"]:not([class*="n-"]),
@@ -253,8 +253,8 @@ header {
   color: white;
 }
 
-.showcase-view button[type="submit"]:hover:not(:disabled):not([class*="n-"]),
-.showcase-view button.primary:hover:not(:disabled):not([class*="n-"]),
+.search-view button[type="submit"]:hover:not(:disabled):not([class*="n-"]),
+.search-view button.primary:hover:not(:disabled):not([class*="n-"]),
 .logs-view button[type="submit"]:hover:not(:disabled):not([class*="n-"]),
 .logs-view button.primary:hover:not(:disabled):not([class*="n-"]),
 .series-view button[type="submit"]:hover:not(:disabled):not([class*="n-"]),
