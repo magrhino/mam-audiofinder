@@ -457,7 +457,18 @@ a:hover {
   background: var(--accent-maroon-light);
 }
 
-/* Task Bar - Top-level navigation */
+/* ========================================
+   DEPRECATED: Legacy Task Bar Styles
+   ========================================
+   These styles are no longer used in the Vue SPA.
+   Navigation is now handled by src/components/NavBar.vue
+   using Naive UI's NLayoutHeader, NSpace, NButton, NBadge, and NPopover.
+
+   Kept for backward compatibility with Jinja2 templates only.
+   Safe to remove after full Vue migration is verified.
+   ======================================== */
+
+/*
 .task-bar {
   display: flex;
   align-items: center;
@@ -529,6 +540,7 @@ a:hover {
 .health-indicator.error .health-dot {
   background: var(--error);
 }
+*/
 
 /* Logs View Styles */
 .logs-header {
