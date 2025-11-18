@@ -5,9 +5,13 @@
  */
 
 import { ref, computed, h } from 'vue'
-import { NButton, NTag } from 'naive-ui'
+import { NButton, NTag, NTooltip } from 'naive-ui'
 import { formatSize, escapeHtml } from '../../../app/static/js/core/utils.js'
 import CoverImage from '../../components/CoverImage.vue'
+import AudiobookFormatIcon from '../../components/icons/AudiobookFormatIcon.vue'
+import FileSizeIcon from '../../components/icons/FileSizeIcon.vue'
+import SeedersIcon from '../../components/icons/SeedersIcon.vue'
+import DateUploadedIcon from '../../components/icons/DateUploadedIcon.vue'
 
 /**
  * Create column definitions based on view type
@@ -90,7 +94,10 @@ function createColumns(viewType, callbacks) {
 
     // Filetype/Format column with filtering
     format: {
-      title: 'Filetype',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(AudiobookFormatIcon, { size: 20 }),
+        default: () => 'Filetype - Click to Sort'
+      }),
       key: 'format',
       minWidth: 90,
       filterOptions: [
@@ -110,7 +117,10 @@ function createColumns(viewType, callbacks) {
 
     // Size column
     size: {
-      title: 'Size',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(FileSizeIcon, { size: 20 }),
+        default: () => 'Size - Click to Sort'
+      }),
       key: 'size',
       minWidth: 100,
       align: 'right',
@@ -122,7 +132,10 @@ function createColumns(viewType, callbacks) {
 
     // Seeders/Leechers column (search view)
     seeders: {
-      title: 'Seeders',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(SeedersIcon, { size: 20 }),
+        default: () => 'Seeders - Click to Sort'
+      }),
       key: 'seeders',
       minWidth: 110,
       align: 'right',
@@ -137,7 +150,10 @@ function createColumns(viewType, callbacks) {
 
     // Uploaded/Added date column
     uploaded: {
-      title: 'Uploaded',
+      title: () => h(NTooltip, {}, {
+        trigger: () => h(DateUploadedIcon, { size: 20 }),
+        default: () => 'Date Uploaded - Click to Sort'
+      }),
       key: 'added',
       minWidth: 140,
       sorter: (a, b) => {
