@@ -177,9 +177,10 @@ const navigateTo = (path) => {
 
 /* Three-column centered layout */
 .nav-container {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
+  gap: 1rem;
   width: 100%;
   max-width: 100%;
 }
@@ -190,17 +191,14 @@ const navigateTo = (path) => {
 }
 
 .nav-left {
-  flex: 0 0 180px;
   justify-content: flex-start;
 }
 
 .nav-center {
-  flex: 1 1 auto;
   justify-content: center;
 }
 
 .nav-right {
-  flex: 0 0 180px;
   justify-content: flex-end;
 }
 
@@ -409,14 +407,8 @@ const navigateTo = (path) => {
     padding: 0.4rem 0.6rem;
   }
 
-  .nav-left,
-  .nav-right {
-    flex: 0 0 auto;
-  }
-
-  .nav-center {
-    flex: 1 1 auto;
-    justify-content: center;
+  .nav-container {
+    gap: 0.5rem;
   }
 
   .brand-title {
@@ -431,16 +423,15 @@ const navigateTo = (path) => {
   .glass-pill :deep(.n-button__content) {
     gap: 4px;
   }
+
+  .health-label {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {
-  .nav-left {
-    flex: 0 0 auto;
-    min-width: 0;
-  }
-
-  .nav-right {
-    flex: 0 0 auto;
+  .nav-container {
+    gap: 0.25rem;
   }
 
   .glass-brand {
@@ -449,6 +440,11 @@ const navigateTo = (path) => {
 
   .brand-icon {
     font-size: 1.2rem;
+  }
+
+  .glass-pill {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
   }
 }
 </style>
