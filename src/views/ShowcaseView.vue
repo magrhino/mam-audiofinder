@@ -19,7 +19,7 @@
       <ShowcaseCard v-for="group in groups" :key="group.mam_id" :group="group" @select="showDetail" />
     </div>
 
-    <div class="showcase-detail" v-if="detailGroup">
+    <div class="showcase-detail" v-if="detailGroup" ref="detailElement">
       <button class="showcase-detail-close" @click="closeDetail">✕ Close</button>
       <button class="showcase-search-button" @click="searchThisTitle" title="Search MAM for this title (25 results)">🔍 Search MAM</button>
 
@@ -85,7 +85,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch, computed } from 'vue'
+import { onMounted, reactive, ref, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ShowcaseCard from '@components/ShowcaseCard.vue'
 import ResultRow from '@components/ResultRow.vue'
@@ -101,6 +101,7 @@ const form = reactive({ q: '', limit: '100' })
 const status = ref('Enter a search query to find audiobooks.')
 const groups = ref([])
 const detailGroup = ref(null)
+const detailElement = ref(null)
 const detailCoverUrl = ref('')
 const detailDescription = ref('')
 const descriptionCollapsed = ref(true)
@@ -186,6 +187,12 @@ const showDetail = async (group) => {
     }
   })
 
+  // Scroll to detail view after DOM updates
+  await nextTick()
+  if (detailElement.value) {
+    detailElement.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   // Load cover for detail view
   if (group.mam_id && group.display_title) {
     try {
@@ -237,7 +244,7 @@ const searchThisTitle = () => {
   runSearch()
 }
 
-const restoreDetailFromUrl = () => {
+const restoreDetailFromUrl = async () => {
   const detailId = route.query.detail
   if (!detailId || !groups.value.length) return
 
@@ -254,6 +261,12 @@ const restoreDetailFromUrl = () => {
     detailDescription.value = ''
     descriptionCollapsed.value = true
     coverLoader.clearRowState()
+
+    // Scroll to detail view after DOM updates
+    await nextTick()
+    if (detailElement.value) {
+      detailElement.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
 
     // Load cover
     if (group.mam_id && group.display_title) {
