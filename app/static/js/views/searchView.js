@@ -280,6 +280,11 @@ export class SearchView {
 
     // Map sort keys to data fields
     switch (sortKey) {
+      case 'title':
+        aVal = a.title || '';
+        bVal = b.title || '';
+        return this.compareStrings(aVal, bVal, direction);
+
       case 'author':
         aVal = a.author_info || '';
         bVal = b.author_info || '';
