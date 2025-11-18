@@ -149,7 +149,7 @@ const performImport = async () => {
   loading.value = true
   statusMessage.value = 'Importing…'
   try {
-    await api.importTorrent({
+    const result = await api.importTorrent({
       author: form.author,
       title: form.title,
       hash: form.selectedHash,
@@ -158,6 +158,15 @@ const performImport = async () => {
     })
     statusMessage.value = '✓ Import requested'
     showForm.value = false
+
+    // Dispatch importCompleted event for live status updates
+    window.dispatchEvent(new CustomEvent('importCompleted', {
+      detail: {
+        historyId: props.item.id,
+        verification: result.verification
+      }
+    }))
+
     emit('updated')
   } catch (err) {
     statusMessage.value = `Import failed: ${err.message}`
