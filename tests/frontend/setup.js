@@ -27,6 +27,33 @@ global.fetch = vi.fn();
 const originalDispatchEvent = window.dispatchEvent;
 window.dispatchEvent = vi.fn(originalDispatchEvent);
 
+// Mock document.createElement to auto-trigger onload for images
+const originalCreateElement = document.createElement.bind(document);
+document.createElement = (tagName, ...args) => {
+  const element = originalCreateElement(tagName, ...args);
+
+  if (tagName.toLowerCase() === 'img') {
+    // Override src property to trigger onload when set
+    let _src = '';
+    Object.defineProperty(element, 'src', {
+      get() {
+        return _src;
+      },
+      set(value) {
+        _src = value;
+        // Trigger onload asynchronously
+        setTimeout(() => {
+          if (element.onload && typeof element.onload === 'function') {
+            element.onload();
+          }
+        }, 0);
+      }
+    });
+  }
+
+  return element;
+};
+
 // Console helpers for debugging tests
 global.console = {
   ...console,

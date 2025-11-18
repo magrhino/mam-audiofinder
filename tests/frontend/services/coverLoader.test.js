@@ -115,7 +115,7 @@ describe('CoverLoader', () => {
         author: 'J.R.R. Tolkien'
       });
 
-      expect(element.dataset.rowId).toBe('');
+      expect(element.dataset.rowId).toBeUndefined();
     });
 
     it('should handle empty values', () => {

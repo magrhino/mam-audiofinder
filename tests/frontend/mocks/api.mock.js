@@ -199,10 +199,11 @@ export function createMockApi() {
 }
 
 /**
- * Mock fetch responses for various endpoints
+ * Create a fetch handler function for mocking
+ * Returns a function that can be used as fetch or called directly
  */
-export function mockFetchResponses() {
-  global.fetch = vi.fn((url, options) => {
+export function createFetchHandler() {
+  return (url, options) => {
     const method = options?.method || 'GET';
 
     // Health endpoint
@@ -267,7 +268,14 @@ export function mockFetchResponses() {
       status: 404,
       json: async () => ({ error: 'Not found' })
     });
-  });
+  };
+}
+
+/**
+ * Mock fetch responses for various endpoints
+ */
+export function mockFetchResponses() {
+  global.fetch = vi.fn(createFetchHandler());
 }
 
 /**
