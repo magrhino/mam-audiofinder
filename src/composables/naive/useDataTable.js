@@ -6,8 +6,8 @@
 
 import { ref, computed, h } from 'vue'
 import { NButton, NTag } from 'naive-ui'
-import { formatSize, escapeHtml } from '../../app/static/js/core/utils.js'
-import CoverImage from '../components/CoverImage.vue'
+import { formatSize, escapeHtml } from '../../../app/static/js/core/utils.js'
+import CoverImage from '../../components/CoverImage.vue'
 
 /**
  * Create column definitions based on view type

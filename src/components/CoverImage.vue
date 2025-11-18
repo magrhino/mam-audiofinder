@@ -43,7 +43,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { NImage } from 'naive-ui'
-import { useCover } from '@composables/useCover'
+import { useCover } from '@composables/naive/useCover'
 
 const props = defineProps({
   mamId: { type: String, required: true },
