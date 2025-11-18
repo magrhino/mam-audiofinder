@@ -15,7 +15,7 @@
 
       <!-- Navigation Pills (Centered) -->
       <div class="nav-section nav-center">
-        <n-space :size="isMobile ? 4 : 8" :wrap="false" class="nav-pills">
+        <n-flex class="nav-pills">
           <router-link
             v-for="link in navLinks"
             :key="link.path"
@@ -35,7 +35,7 @@
               <span v-if="!isMobile" class="nav-pill-text">{{ link.label }}</span>
             </n-button>
           </router-link>
-        </n-space>
+        </n-flex>
       </div>
 
       <!-- Health Indicator -->
@@ -64,7 +64,7 @@ import { computed } from 'vue'
 import { useBreakpoints } from '@vueuse/core'
 import {
   NLayoutHeader,
-  NSpace,
+  NFlex,
   NButton,
   NThing,
   NPopover
@@ -199,7 +199,6 @@ const healthText = computed(() => {
 
 /* Navigation Pills - Glass buttons */
 .nav-pills {
-  display: flex;
   justify-content: center;
 }
 
@@ -228,7 +227,10 @@ const healthText = computed(() => {
   /* Icon-only pills on mobile get square padding */
   padding: 0.5rem;
   min-width: 40px;
+  min-height: 40px;
   justify-content: center;
+  display: flex;
+  align-items: center;
 }
 
 .nav-pill-text {
@@ -287,6 +289,7 @@ const healthText = computed(() => {
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
   cursor: pointer;
+  min-height: 40px;
 }
 
 .health-indicator:hover {
@@ -396,6 +399,13 @@ const healthText = computed(() => {
 
   .glass-pill :deep(.n-button__content) {
     gap: 4px;
+  }
+
+  /* Match health indicator to nav pill sizing on mobile */
+  .health-indicator {
+    padding: 0.5rem;
+    min-width: 40px;
+    justify-content: center;
   }
 }
 
