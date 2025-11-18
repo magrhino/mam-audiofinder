@@ -58,6 +58,7 @@ function createColumns(viewType, callbacks) {
     author: {
       title: 'Author',
       key: 'author',
+      minWidth: 150,
       sorter: (a, b) => {
         const authorA = a.author_info || a.author || ''
         const authorB = b.author_info || b.author || ''
@@ -77,6 +78,7 @@ function createColumns(viewType, callbacks) {
     narrator: {
       title: 'Narrator',
       key: 'narrator',
+      minWidth: 150,
       sorter: (a, b) => {
         const narratorA = a.narrator_info || a.narrator || ''
         const narratorB = b.narrator_info || b.narrator || ''
