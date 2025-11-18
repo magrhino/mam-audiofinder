@@ -21,6 +21,7 @@
 
     <div class="showcase-detail" v-if="detailGroup">
       <button class="showcase-detail-close" @click="closeDetail">✕ Close</button>
+      <button class="showcase-search-button" @click="searchThisTitle" title="Search MAM for this title (25 results)">🔍 Search MAM</button>
 
       <div class="showcase-detail-header">
         <!-- Cover -->
@@ -215,6 +216,25 @@ const closeDetail = () => {
   const query = { ...route.query }
   delete query.detail
   router.replace({ query })
+}
+
+const searchThisTitle = () => {
+  if (!detailGroup.value?.display_title) return
+
+  // Capture title before closing detail view
+  const titleToSearch = detailGroup.value.display_title
+
+  // Close detail view
+  detailGroup.value = null
+  detailCoverUrl.value = ''
+  detailDescription.value = ''
+
+  // Set search parameters
+  form.q = titleToSearch
+  form.limit = '25'
+
+  // Run the search
+  runSearch()
 }
 
 const restoreDetailFromUrl = () => {

@@ -949,6 +949,22 @@ a:hover {
   background: var(--accent-maroon-light);
 }
 
+.showcase-search-button {
+  float: right;
+  margin-right: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent-blue, #4a90e2);
+  border: none;
+  color: white;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.showcase-search-button:hover {
+  background: var(--accent-blue-light, #5ca3f5);
+}
+
 .showcase-versions-table {
   width: 100%;
   margin-top: var(--spacing-md);
