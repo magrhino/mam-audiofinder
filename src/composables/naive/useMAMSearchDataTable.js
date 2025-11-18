@@ -94,15 +94,14 @@ function createColumns(viewType, callbacks) {
       }
     },
 
-    // Filetype/Format column with filtering
+    // Filetype/Format column with filtering (no sorting - uses filter dropdown)
     format: {
       title: () => h(NTooltip, {}, {
         trigger: () => h(AudiobookFormatIcon, { size: 20 }),
-        default: () => 'Filetype - Click to Sort'
+        default: () => 'Filetype - Filter Only'
       }),
       key: 'format',
       minWidth: 90,
-      sorter: true,  // Enable sorting for format column
       filterOptions: [
         { label: 'MP3', value: 'MP3' },
         { label: 'M4B', value: 'M4B' },
@@ -127,7 +126,11 @@ function createColumns(viewType, callbacks) {
       key: 'size',
       minWidth: 100,
       align: 'right',
-      sorter: true,  // Use default sorting (fixes ascending/descending toggle)
+      sorter: (rowA, rowB) => {
+        const sizeA = rowA.size ?? 0
+        const sizeB = rowB.size ?? 0
+        return sizeA - sizeB
+      },
       render(row) {
         return h('span', {}, formatSize(row.size))
       }
@@ -143,7 +146,11 @@ function createColumns(viewType, callbacks) {
       minWidth: 110,
       align: 'right',
       defaultSortOrder: 'descend',
-      sorter: true,  // Use default sorting (fixes ascending/descending toggle)
+      sorter: (rowA, rowB) => {
+        const seedersA = rowA.seeders ?? 0
+        const seedersB = rowB.seeders ?? 0
+        return seedersA - seedersB
+      },
       render(row) {
         const s = row.seeders ?? '-'
         const l = row.leechers ?? '-'
@@ -159,7 +166,11 @@ function createColumns(viewType, callbacks) {
       }),
       key: 'added',
       minWidth: 140,
-      sorter: true,  // Use default sorting (works for ISO date strings)
+      sorter: (rowA, rowB) => {
+        const dateA = new Date(rowA.added || 0)
+        const dateB = new Date(rowB.added || 0)
+        return dateA.getTime() - dateB.getTime()
+      },
       render(row) {
         return h('span', {}, escapeHtml(row.added || ''))
       }
