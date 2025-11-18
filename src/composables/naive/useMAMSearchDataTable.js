@@ -102,6 +102,7 @@ function createColumns(viewType, callbacks) {
       }),
       key: 'format',
       minWidth: 90,
+      sorter: true,  // Enable sorting for format column
       filterOptions: [
         { label: 'MP3', value: 'MP3' },
         { label: 'M4B', value: 'M4B' },
@@ -126,7 +127,7 @@ function createColumns(viewType, callbacks) {
       key: 'size',
       minWidth: 100,
       align: 'right',
-      sorter: (a, b) => (a.size || 0) - (b.size || 0),
+      sorter: true,  // Use default sorting (fixes ascending/descending toggle)
       render(row) {
         return h('span', {}, formatSize(row.size))
       }
@@ -142,7 +143,7 @@ function createColumns(viewType, callbacks) {
       minWidth: 110,
       align: 'right',
       defaultSortOrder: 'descend',
-      sorter: (a, b) => (a.seeders || 0) - (b.seeders || 0),
+      sorter: true,  // Use default sorting (fixes ascending/descending toggle)
       render(row) {
         const s = row.seeders ?? '-'
         const l = row.leechers ?? '-'
@@ -158,11 +159,7 @@ function createColumns(viewType, callbacks) {
       }),
       key: 'added',
       minWidth: 140,
-      sorter: (a, b) => {
-        const dateA = new Date(a.added || 0)
-        const dateB = new Date(b.added || 0)
-        return dateA - dateB
-      },
+      sorter: true,  // Use default sorting (works for ISO date strings)
       render(row) {
         return h('span', {}, escapeHtml(row.added || ''))
       }
