@@ -16,6 +16,11 @@ export class SearchView {
     this.router = router;
     this.coverLoader = new CoverLoader();
 
+    // Client-side sorting state
+    this.currentResults = [];
+    this.sortBy = null;
+    this.sortDir = 'asc';
+
     this.bindEvents();
   }
 
@@ -29,6 +34,39 @@ export class SearchView {
         this.search();
       });
     }
+
+    // Bind sortable header click handlers
+    this.bindSortableHeaders();
+  }
+
+  /**
+   * Bind click handlers to sortable table headers
+   */
+  bindSortableHeaders() {
+    const table = this.elements.table;
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    headers.forEach(header => {
+      header.addEventListener('click', () => {
+        const sortKey = header.dataset.sort;
+        if (!sortKey) return;
+
+        // Toggle direction if clicking same column, otherwise default to asc
+        if (this.sortBy === sortKey) {
+          this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          this.sortBy = sortKey;
+          this.sortDir = 'asc';
+        }
+
+        // Re-sort and render
+        this.sortAndRender();
+
+        // Update URL with sort parameters
+        this.updateSortURL();
+      });
+    });
   }
 
   /**
@@ -56,6 +94,13 @@ export class SearchView {
         return;
       }
 
+      // Store results for client-side sorting
+      this.currentResults = rows;
+
+      // Reset client-side sort state on new search
+      this.sortBy = null;
+      this.sortDir = 'asc';
+
       this.renderResults(rows);
 
       // Update URL with search parameters
@@ -69,6 +114,9 @@ export class SearchView {
       // Show table immediately with skeleton placeholders
       this.elements.table.style.display = '';
       this.elements.status.textContent = `${rows.length} results shown`;
+
+      // Update sort indicators
+      this.updateSortIndicators();
 
     } catch (e) {
       console.error(e);
@@ -201,6 +249,137 @@ export class SearchView {
   }
 
   /**
+   * Sort current results and re-render
+   */
+  sortAndRender() {
+    if (!this.sortBy || !this.currentResults.length) return;
+
+    const sorted = [...this.currentResults].sort((a, b) => {
+      return this.compareItems(a, b, this.sortBy, this.sortDir);
+    });
+
+    // Clear and re-render
+    this.elements.tbody.innerHTML = '';
+    this.coverLoader.clearRowState();
+    this.renderResults(sorted);
+
+    // Update sort indicators
+    this.updateSortIndicators();
+  }
+
+  /**
+   * Compare two items for sorting
+   * @param {Object} a - First item
+   * @param {Object} b - Second item
+   * @param {string} sortKey - Key to sort by
+   * @param {string} direction - 'asc' or 'desc'
+   * @returns {number} Comparison result
+   */
+  compareItems(a, b, sortKey, direction) {
+    let aVal, bVal;
+
+    // Map sort keys to data fields
+    switch (sortKey) {
+      case 'author':
+        aVal = a.author_info || '';
+        bVal = b.author_info || '';
+        return this.compareStrings(aVal, bVal, direction);
+
+      case 'narrator':
+        aVal = a.narrator_info || '';
+        bVal = b.narrator_info || '';
+        return this.compareStrings(aVal, bVal, direction);
+
+      case 'format':
+        aVal = a.format || '';
+        bVal = b.format || '';
+        return this.compareStrings(aVal, bVal, direction);
+
+      case 'size':
+        aVal = a.size || 0;
+        bVal = b.size || 0;
+        return this.compareNumbers(aVal, bVal, direction);
+
+      case 'seeders':
+        aVal = a.seeders ?? 0;
+        bVal = b.seeders ?? 0;
+        return this.compareNumbers(aVal, bVal, direction);
+
+      case 'uploaded':
+        aVal = a.added || '';
+        bVal = b.added || '';
+        return this.compareDates(aVal, bVal, direction);
+
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Compare strings (case-insensitive)
+   */
+  compareStrings(a, b, direction) {
+    const result = a.toLowerCase().localeCompare(b.toLowerCase());
+    return direction === 'asc' ? result : -result;
+  }
+
+  /**
+   * Compare numbers
+   */
+  compareNumbers(a, b, direction) {
+    const result = a - b;
+    return direction === 'asc' ? result : -result;
+  }
+
+  /**
+   * Compare dates (as strings for now)
+   */
+  compareDates(a, b, direction) {
+    // For now, treat as strings since format is unknown
+    // MAM dates are typically in a sortable format
+    const result = a.localeCompare(b);
+    return direction === 'asc' ? result : -result;
+  }
+
+  /**
+   * Update visual indicators for sorted columns
+   */
+  updateSortIndicators() {
+    const table = this.elements.table;
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    headers.forEach(header => {
+      const sortKey = header.dataset.sort;
+
+      // Remove all sort classes
+      header.classList.remove('sort-active', 'sort-asc', 'sort-desc');
+
+      // Add classes to active sorted column
+      if (sortKey === this.sortBy) {
+        header.classList.add('sort-active', `sort-${this.sortDir}`);
+      }
+    });
+  }
+
+  /**
+   * Update URL with current sort parameters
+   */
+  updateSortURL() {
+    const params = this.router.getParams();
+
+    if (this.sortBy) {
+      params.sortBy = this.sortBy;
+      params.sortDir = this.sortDir;
+    } else {
+      delete params.sortBy;
+      delete params.sortDir;
+    }
+
+    this.router.updateURL(params, true);
+  }
+
+  /**
    * Restore search state from URL parameters
    * @param {Object} state - State object with q, sort, perpage
    */
@@ -215,9 +394,20 @@ export class SearchView {
       if (this.elements.perpage) this.elements.perpage.value = state.perpage;
     }
 
+    // Restore client-side sort state
+    if (state.sortBy) {
+      this.sortBy = state.sortBy;
+      this.sortDir = state.sortDir || 'asc';
+    }
+
     // Auto-run search if query parameter exists
     if (state.q) {
-      this.search();
+      this.search().then(() => {
+        // Apply client-side sort after search completes
+        if (this.sortBy && this.currentResults.length > 0) {
+          this.sortAndRender();
+        }
+      });
     }
   }
 
