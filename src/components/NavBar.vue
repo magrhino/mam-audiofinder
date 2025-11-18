@@ -149,6 +149,7 @@ const healthText = computed(() => {
   gap: 1rem;
   width: 100%;
   max-width: 100%;
+  padding: 0 0.5rem;
 }
 
 .nav-section {
@@ -158,6 +159,7 @@ const healthText = computed(() => {
 
 .nav-left {
   justify-content: flex-start;
+  padding-left: 0.5rem;
 }
 
 .nav-center {
@@ -166,6 +168,7 @@ const healthText = computed(() => {
 
 .nav-right {
   justify-content: flex-end;
+  padding-right: 0.5rem;
 }
 
 /* Brand Section - Glass card */
@@ -390,11 +393,20 @@ const healthText = computed(() => {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .glass-header {
-    padding: 0.4rem 0.6rem;
+    padding: 0.4rem 0;
   }
 
   .nav-container {
     gap: 0.5rem;
+    padding: 0 0.25rem;
+  }
+
+  .nav-left {
+    padding-left: 0.25rem;
+  }
+
+  .nav-right {
+    padding-right: 0.25rem;
   }
 
   .glass-pill :deep(.n-button__content) {
@@ -411,11 +423,20 @@ const healthText = computed(() => {
 
 @media (max-width: 480px) {
   .glass-header {
-    padding: 0.3rem 0.4rem;
+    padding: 0.3rem 0;
   }
 
   .nav-container {
     gap: 0.25rem;
+    padding: 0 0.15rem;
+  }
+
+  .nav-left {
+    padding-left: 0.15rem;
+  }
+
+  .nav-right {
+    padding-right: 0.15rem;
   }
 
   .glass-brand {
