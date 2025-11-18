@@ -1,94 +1,44 @@
 <template>
   <n-layout-header bordered class="nav-header glass-header">
     <div class="nav-container">
-      <!-- Brand/Logo Section (Fixed Width) -->
+      <!-- Brand/Logo Section -->
       <div class="nav-section nav-left">
         <n-thing class="brand-section glass-brand">
           <template #avatar>
             <span class="brand-icon">📚</span>
           </template>
           <template #header>
-            <span class="brand-title">MAM Finder</span>
+            <span v-if="!isMobile" class="brand-title">MAM Finder</span>
           </template>
         </n-thing>
       </div>
 
       <!-- Navigation Pills (Centered) -->
       <div class="nav-section nav-center">
-        <n-space :size="8" :wrap="false" class="nav-pills">
-          <n-button
-            text
-            tag="a"
-            @click.prevent="navigateTo('/')"
-            :type="currentRoute === 'search' ? 'primary' : 'default'"
-            :class="{ 'nav-active': currentRoute === 'search' }"
-            class="nav-pill glass-pill"
+        <n-space :size="isMobile ? 4 : 8" :wrap="false" class="nav-pills">
+          <router-link
+            v-for="link in navLinks"
+            :key="link.path"
+            :to="link.path"
+            custom
+            v-slot="{ navigate, isActive }"
           >
-            <template #icon>
-              <span>🔍</span>
-            </template>
-            Search
-          </n-button>
-
-          <n-button
-            text
-            tag="a"
-            @click.prevent="navigateTo('/history')"
-            :type="currentRoute === 'history' ? 'primary' : 'default'"
-            :class="{ 'nav-active': currentRoute === 'history' }"
-            class="nav-pill glass-pill"
-          >
-            <template #icon>
-              <span>📋</span>
-            </template>
-            History
-          </n-button>
-
-          <n-button
-            text
-            tag="a"
-            @click.prevent="navigateTo('/showcase')"
-            :type="currentRoute === 'showcase' ? 'primary' : 'default'"
-            :class="{ 'nav-active': currentRoute === 'showcase' }"
-            class="nav-pill glass-pill"
-          >
-            <template #icon>
-              <span>🎭</span>
-            </template>
-            Showcase
-          </n-button>
-
-          <n-button
-            text
-            tag="a"
-            @click.prevent="navigateTo('/series')"
-            :type="currentRoute === 'series' ? 'primary' : 'default'"
-            :class="{ 'nav-active': currentRoute === 'series' }"
-            class="nav-pill glass-pill"
-          >
-            <template #icon>
-              <span>📚</span>
-            </template>
-            Series
-          </n-button>
-
-          <n-button
-            text
-            tag="a"
-            @click.prevent="navigateTo('/logs')"
-            :type="currentRoute === 'logs' ? 'primary' : 'default'"
-            :class="{ 'nav-active': currentRoute === 'logs' }"
-            class="nav-pill glass-pill"
-          >
-            <template #icon>
-              <span>📄</span>
-            </template>
-            Logs
-          </n-button>
+            <n-button
+              text
+              @click="navigate"
+              :class="{ 'nav-active': isActive }"
+              class="nav-pill glass-pill"
+            >
+              <template #icon>
+                <span>{{ link.icon }}</span>
+              </template>
+              <span v-if="!isMobile" class="nav-pill-text">{{ link.label }}</span>
+            </n-button>
+          </router-link>
         </n-space>
       </div>
 
-      <!-- Health Indicator (Fixed Width) -->
+      <!-- Health Indicator -->
       <div class="nav-section nav-right">
         <n-popover trigger="hover" placement="bottom-end">
           <template #trigger>
@@ -96,7 +46,7 @@
               <span v-if="health.checking" class="health-spinner"></span>
               <span v-else-if="health.ok" class="health-dot"></span>
               <span v-else class="health-x">✗</span>
-              <span class="health-label">{{ healthStatusText }}</span>
+              <span v-if="!isMobile" class="health-label">{{ healthStatusText }}</span>
             </div>
           </template>
           <div class="health-popover glass-popover">
@@ -111,7 +61,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useBreakpoints } from '@vueuse/core'
 import {
   NLayoutHeader,
   NSpace,
@@ -130,9 +80,24 @@ const props = defineProps({
   }
 })
 
-const route = useRoute()
-const router = useRouter()
-const currentRoute = computed(() => route.name)
+// Responsive breakpoints matching SearchView pattern
+const breakpoints = useBreakpoints({
+  mobile: 0,
+  tablet: 768,
+  desktop: 1024
+})
+
+// Check if mobile (< 768px)
+const isMobile = computed(() => !breakpoints.greater('tablet').value)
+
+// Navigation links configuration
+const navLinks = [
+  { path: '/', icon: '🔍', label: 'Search' },
+  { path: '/history', icon: '📋', label: 'History' },
+  { path: '/showcase', icon: '🎭', label: 'Showcase' },
+  { path: '/series', icon: '📚', label: 'Series' },
+  { path: '/logs', icon: '📄', label: 'Logs' }
+]
 
 const healthClass = computed(() => {
   if (props.health.checking) return 'checking'
@@ -148,10 +113,6 @@ const healthText = computed(() => {
   if (props.health.checking) return 'Checking system health...'
   return props.health.ok ? 'All systems operational' : 'Service unavailable'
 })
-
-const navigateTo = (path) => {
-  router.push(path)
-}
 </script>
 
 <style scoped>
@@ -250,6 +211,23 @@ const navigateTo = (path) => {
   color: var(--text-secondary);
   position: relative;
   overflow: hidden;
+}
+
+/* Icon-only mobile layout */
+.glass-pill:has(.nav-pill-text:not(:empty)) {
+  /* Pills with text get normal padding */
+  padding: 0.5rem 1rem;
+}
+
+.glass-pill:not(:has(.nav-pill-text)) {
+  /* Icon-only pills on mobile get square padding */
+  padding: 0.5rem;
+  min-width: 40px;
+  justify-content: center;
+}
+
+.nav-pill-text {
+  white-space: nowrap;
 }
 
 .glass-pill::before {
@@ -411,25 +389,16 @@ const navigateTo = (path) => {
     gap: 0.5rem;
   }
 
-  .brand-title {
-    display: none;
-  }
-
-  .glass-pill {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.85rem;
-  }
-
   .glass-pill :deep(.n-button__content) {
     gap: 4px;
-  }
-
-  .health-label {
-    display: none;
   }
 }
 
 @media (max-width: 480px) {
+  .glass-header {
+    padding: 0.3rem 0.4rem;
+  }
+
   .nav-container {
     gap: 0.25rem;
   }
@@ -440,11 +409,6 @@ const navigateTo = (path) => {
 
   .brand-icon {
     font-size: 1.2rem;
-  }
-
-  .glass-pill {
-    padding: 0.3rem 0.5rem;
-    font-size: 0.8rem;
   }
 }
 </style>
