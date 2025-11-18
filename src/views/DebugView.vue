@@ -157,37 +157,17 @@
           Available Versions ({{ detailGroup.total_versions }})
         </n-text>
 
-        <!-- Table Wrapper with NCard -->
-        <n-card :bordered="false" embedded class="table-card">
-          <div class="table-wrapper">
-            <table class="versions-table">
-              <thead>
-                <tr>
-                  <th style="width: 80px">Cover</th>
-                  <th>Title</th>
-                  <th>Author</th>
-                  <th>Narrator</th>
-                  <th>Filetype</th>
-                  <th class="right">Size</th>
-                  <th class="right">Seeders</th>
-                  <th>Uploaded</th>
-                  <th class="center">Link</th>
-                  <th>Add</th>
-                </tr>
-              </thead>
-              <tbody>
-                <ResultRow
-                  v-for="version in versionsWithIds"
-                  :key="version.rowId"
-                  :item="version"
-                  :cover-loader="coverLoader"
-                  :row-id="version.rowId"
-                  @add="addTorrent"
-                />
-              </tbody>
-            </table>
-          </div>
-        </n-card>
+        <!-- Table Wrapper with NDataTable -->
+        <n-data-table
+          ref="versionsTableRef"
+          :columns="versionsColumns"
+          :data="versionsData"
+          :pagination="versionsPagination"
+          :bordered="false"
+          :scroll-x="1400"
+          striped
+          class="versions-data-table"
+        />
       </div>
     </n-card>
   </div>
@@ -208,17 +188,16 @@ import {
   NButton,
   NTag,
   NDivider,
-  NSpin
+  NSpin,
+  NDataTable
 } from 'naive-ui'
 import ShowcaseCard from '@components/ShowcaseCard.vue'
-import ResultRow from '@components/ResultRow.vue'
 import { useApi } from '@composables/useApi'
-import { useCoverLoader, generateRowId } from '@composables/useCoverLoader'
+import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
-const coverLoader = useCoverLoader()
 
 // Responsive breakpoints for dynamic input width
 const breakpoints = useBreakpoints({
@@ -256,13 +235,37 @@ const detailCoverUrl = ref('')
 const detailDescription = ref('')
 const descriptionCollapsed = ref(true)
 
-// Add unique row IDs for ResultRow components
-const versionsWithIds = computed(() => {
-  if (!detailGroup.value?.versions) return []
-  return detailGroup.value.versions.map(version => ({
-    ...version,
-    rowId: `${version.id}-${version.added}-${generateRowId()}`
-  }))
+// Add torrent handler - defined before data table initialization
+const addTorrent = async (rowState) => {
+  try {
+    await api.addTorrent({
+      id: String(rowState.id ?? ''),
+      title: rowState.title || '',
+      dl: rowState.dl || '',
+      author: rowState.author_info || '',
+      narrator: rowState.narrator_info || '',
+      abs_cover_url: rowState.abs_cover_url || '',
+      abs_item_id: rowState.abs_item_id || ''
+    })
+    status.value = `✓ Added "${rowState.title}" to qBittorrent`
+    window.dispatchEvent(new CustomEvent('torrentAdded'))
+  } catch (err) {
+    status.value = `Add failed: ${err.message}`
+  }
+}
+
+// Initialize versions data table with search configuration
+const {
+  tableRef: versionsTableRef,
+  data: versionsData,
+  columns: versionsColumns,
+  pagination: versionsPagination,
+  setData: setVersionsData,
+  clearData: clearVersionsData
+} = useMAMSearchDataTable({
+  viewType: 'search',
+  defaultPageSize: 10,
+  onAdd: addTorrent
 })
 
 const normalizeQuery = (values) => {
@@ -338,7 +341,9 @@ const showDetail = async (group) => {
   detailCoverUrl.value = ''
   detailDescription.value = ''
   descriptionCollapsed.value = true
-  coverLoader.clearRowState()
+
+  // Populate versions table with group versions
+  setVersionsData(group.versions || [])
 
   // Update URL with detail parameter
   router.push({
@@ -379,6 +384,7 @@ const closeDetail = () => {
   detailGroup.value = null
   detailCoverUrl.value = ''
   detailDescription.value = ''
+  clearVersionsData()
 
   // Remove detail parameter from URL
   const query = { ...route.query }
@@ -421,7 +427,9 @@ const restoreDetailFromUrl = async () => {
     detailCoverUrl.value = ''
     detailDescription.value = ''
     descriptionCollapsed.value = true
-    coverLoader.clearRowState()
+
+    // Populate versions table with group versions
+    setVersionsData(group.versions || [])
 
     // Scroll to detail view after DOM updates
     await nextTick()
@@ -445,24 +453,6 @@ const restoreDetailFromUrl = async () => {
         console.warn('Failed to load detail cover:', err)
       })
     }
-  }
-}
-
-const addTorrent = async (rowState) => {
-  try {
-    await api.addTorrent({
-      id: String(rowState.id ?? ''),
-      title: rowState.title || '',
-      dl: rowState.dl || '',
-      author: rowState.author_info || '',
-      narrator: rowState.narrator_info || '',
-      abs_cover_url: rowState.abs_cover_url || '',
-      abs_item_id: rowState.abs_item_id || ''
-    })
-    status.value = `✓ Added "${rowState.title}" to qBittorrent`
-    window.dispatchEvent(new CustomEvent('torrentAdded'))
-  } catch (err) {
-    status.value = `Add failed: ${err.message}`
   }
 }
 
@@ -497,6 +487,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
     detailGroup.value = null
     detailCoverUrl.value = ''
     detailDescription.value = ''
+    clearVersionsData()
   }
 })
 </script>
@@ -637,53 +628,9 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   text-overflow: ellipsis;
 }
 
-/* Table Card */
-.table-card {
-  background: rgba(26, 26, 26, 0.5);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 600px;
-}
-
-.versions-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.versions-table thead th {
-  position: sticky;
-  top: 0;
-  padding: var(--spacing-sm, 0.5rem);
-  border-bottom: 2px solid var(--border-default, #3a3a3a);
-  text-align: left;
-  font-weight: 600;
-  color: var(--text-secondary, #b8b8b8);
-  background: var(--bg-panel, #242424);
-  z-index: 10;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.versions-table td {
-  padding: var(--spacing-sm, 0.5rem);
-  border-bottom: 1px solid var(--border-subtle, #2a2a2a);
-  color: var(--text-primary, #e8e8e8);
-}
-
-.versions-table tbody tr:hover {
-  background: rgba(42, 42, 42, 0.3);
-}
-
-.right {
-  text-align: right;
-}
-
-.center {
-  text-align: center;
+/* Versions Data Table */
+.versions-data-table {
+  margin-top: var(--spacing-md, 1rem);
 }
 
 /* Responsive */
