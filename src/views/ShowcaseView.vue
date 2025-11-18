@@ -14,9 +14,11 @@
       </div>
     </div>
     <div class="muted" style="margin: 1rem 0;" v-text="status"></div>
-    <div class="showcase-grid">
+
+    <div v-if="!detailGroup" class="showcase-grid">
       <ShowcaseCard v-for="group in groups" :key="group.mam_id" :group="group" @select="showDetail" />
     </div>
+
     <div class="showcase-detail" v-if="detailGroup">
       <div class="showcase-detail-header">
         <h3>{{ detailGroup.display_title }}</h3>
