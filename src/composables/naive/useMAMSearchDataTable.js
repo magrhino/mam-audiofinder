@@ -1,7 +1,7 @@
 /**
- * useDataTable Composable
- * Reusable table logic for Search, History, and Showcase views
- * Provides column definitions, pagination, sorting, and filtering
+ * useMAMSearchDataTable Composable
+ * Customized table logic for MAM Audiobook Finder search functionality
+ * Provides column definitions, pagination, sorting, and filtering optimized for search results
  */
 
 import { ref, computed, h } from 'vue'
@@ -92,6 +92,7 @@ function createColumns(viewType, callbacks) {
     format: {
       title: 'Filetype',
       key: 'format',
+      minWidth: 90,
       filterOptions: [
         { label: 'MP3', value: 'MP3' },
         { label: 'M4B', value: 'M4B' },
@@ -111,6 +112,7 @@ function createColumns(viewType, callbacks) {
     size: {
       title: 'Size',
       key: 'size',
+      minWidth: 100,
       align: 'right',
       sorter: (a, b) => (a.size || 0) - (b.size || 0),
       render(row) {
@@ -122,6 +124,7 @@ function createColumns(viewType, callbacks) {
     seeders: {
       title: 'Seeders',
       key: 'seeders',
+      minWidth: 110,
       align: 'right',
       defaultSortOrder: 'descend',
       sorter: (a, b) => (a.seeders || 0) - (b.seeders || 0),
@@ -136,6 +139,7 @@ function createColumns(viewType, callbacks) {
     uploaded: {
       title: 'Uploaded',
       key: 'added',
+      minWidth: 140,
       sorter: (a, b) => {
         const dateA = new Date(a.added || 0)
         const dateB = new Date(b.added || 0)
@@ -303,7 +307,7 @@ function createColumns(viewType, callbacks) {
 }
 
 /**
- * Main composable for data table functionality
+ * Main composable for MAM search data table functionality
  * @param {object} config - Configuration object
  * @param {string} config.viewType - Type of view ('search' | 'history' | 'showcase')
  * @param {function} config.onAdd - Callback for Add button
@@ -312,7 +316,7 @@ function createColumns(viewType, callbacks) {
  * @param {number} config.defaultPageSize - Default pagination size (default: 25)
  * @returns {object} Table state and methods
  */
-export function useDataTable(config = {}) {
+export function useMAMSearchDataTable(config = {}) {
   const {
     viewType = 'search',
     onAdd = null,

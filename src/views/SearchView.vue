@@ -26,7 +26,7 @@
         :pagination="pagination"
         :bordered="false"
         :loading="loading"
-        :scroll-x="1200"
+        :scroll-x="1500"
         striped
       />
     </div>
@@ -38,7 +38,7 @@ import { reactive, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NDataTable } from 'naive-ui'
 import { useApi } from '@composables/useApi'
-import { useDataTable } from '@composables/naive/useDataTable'
+import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 
 const api = useApi()
 const route = useRoute()
@@ -54,7 +54,7 @@ const {
   setData,
   clearData,
   sort
-} = useDataTable({
+} = useMAMSearchDataTable({
   viewType: 'search',
   defaultPageSize: 25,
   onAdd: addTorrent
@@ -177,8 +177,23 @@ watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
   margin-top: var(--spacing-md, 1rem);
 }
 
-/* Mobile optimization */
-@media (max-width: 768px) {
+/* Desktop: Full width, no constraints */
+@media (min-width: 1024px) {
+  .table-responsive {
+    max-width: 100%;
+  }
+}
+
+/* Tablet: Comfortable scrolling */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .table-responsive {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* Mobile: Optimized padding and scroll */
+@media (max-width: 767px) {
   .table-responsive {
     margin-left: calc(-1 * var(--spacing-md, 1rem));
     margin-right: calc(-1 * var(--spacing-md, 1rem));

@@ -20,12 +20,12 @@ const { coverUrl, loading, error, fetchCover } = useCover({
 await fetchCover()
 ```
 
-### `useDataTable.js`
-Composable for managing NaiveUI `n-data-table` instances with predefined column configurations for different view types (search, history, showcase).
+### `useMAMSearchDataTable.js`
+Composable for managing NaiveUI `n-data-table` instances with predefined column configurations customized for MAM Audiobook Finder search functionality. Includes responsive column widths and mobile-optimized display.
 
 **Usage:**
 ```js
-import { useDataTable } from '@composables/naive/useDataTable'
+import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 
 const {
   tableRef,
@@ -37,7 +37,7 @@ const {
   clearData,
   sort,
   filter
-} = useDataTable({
+} = useMAMSearchDataTable({
   viewType: 'search',
   onAdd: handleAdd,
   defaultPageSize: 25
@@ -56,4 +56,4 @@ NaiveUI composables are kept separate from general composables to:
 
 These composables replace legacy implementations:
 - `useCover` replaces `CoverLoader` class and `useCovers` from legacy code
-- `useDataTable` replaces manual table rendering in legacy views
+- `useMAMSearchDataTable` replaces manual table rendering in legacy views
