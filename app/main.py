@@ -54,7 +54,7 @@ initialize_databases()
 # ---------------------------- FastAPI Application ----------------------------
 app = FastAPI(title="MAM Audiobook Finder", version="0.4.0")
 
-# Mount static files
+# Mount static files (including Vue build output at /static/dist)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Include all routes

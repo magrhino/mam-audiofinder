@@ -403,6 +403,7 @@ async def get_torrent_tree(hash: str):
                     "files": [],
                     "single_file": False,
                     "has_disc_structure": False,
+                    "has_multi_disc": False,  # Alias for frontend compatibility
                     "disc_count": 0,
                     "track_count": 0,
                     "recommended_flatten": False,
@@ -419,6 +420,7 @@ async def get_torrent_tree(hash: str):
             "files": files_data,
             "single_file": single_file,
             "has_disc_structure": detection["has_disc_structure"],
+            "has_multi_disc": detection["has_disc_structure"],  # Alias for frontend compatibility
             "disc_count": detection["disc_count"],
             "track_count": detection["track_count"],
             "recommended_flatten": detection["recommended_flatten"],

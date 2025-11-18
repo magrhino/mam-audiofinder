@@ -23,49 +23,28 @@ This roadmap enumerates the concurrent-ready tasks AI assistants can execute to 
 3. `[CON]` Implement `list_series_books(series_id)` that returns book records ready for `card_helper` consumption (title, narrators, cover, torrent refs when present).
 4. `[SEQ]` Define cache + persistence strategy (SQLite table or in-memory TTL store) so repeated UI clicks avoid exceeding rate limits.
 
-## Phase 3 — Series Tab & Card Rendering
+## Phase 3 — Series Tab & ABS/MAM Integration
 
-### Task 12: Route + Template `[SEQ]`
-1. Add `/series` route to the page router in `app/routes/basic.py` to serve new `app/templates/series.html` mirroring existing search/showcase scaffolding.
-2. Update nav bar in `app/templates/base.html` with "📚 Series" link pointing to `/series`.
-3. Point template at `/static/pages/series.js` for bootstrap script.
-4. Create `app/static/pages/series.js` to bootstrap `SeriesView`, mirroring how `search.js` wires `SearchView` (`app/static/pages/search.js:17-67`).
-5. Wire page controller to listen for `series-search` event (already emitted by `app/static/js/components/seriesSearchButton.js`) to pre-populate the new tab or open series modal with originating card metadata.
+### Task 12: Table-First Layout `[SEQ]`
+1. Keep `/series` as the entry point but remove the broken `cardHelper` grid entirely; Hardcover is only trusted for hierarchy metadata, so the UI should stay in tables.
+2. Series list remains a table (title, author, readers, book count). When a series is selected, swap in a **book table** (position, title, optional year, action column) instead of card tiles. Maintain router/back-state so `q`, `author`, `limit`, and the selected series/book can be restored.
 
-### Task 13: Search Table + Limit Selector `[CON]`
-1. Build `app/static/js/views/seriesView.js` that renders Hardcover matches in a `<table>` before cards are shown.
-2. Call `api.searchSeries()` (`app/static/js/core/api.js:234-254`) and display columns: Series, Author, Book Count, Readers, plus "View books" affordance.
-3. Surface author filter + "Search #" selector with values `5,10,20,30,40,50` bound to backend limit in `SeriesSearchRequest` (`app/routes/series.py:19-41`).
-4. Default selector to `hardcover_series_limit` from `/config` (`app/routes/basic.py:34-52`).
-5. Keep state in Router so `/series?q=stormlight&limit=20` deep-links work.
-6. When `series-search` event arrives from search/showcase card, reuse same `SeriesView` instance to run lookup and focus/highlight the originating row.
+### Task 13: Book → Grouped MAM Results `[CON]`
+1. Each book row gets a “View torrents” button. Clicking it issues a MAM search (`/search`) for `"{bookTitle} {seriesAuthor}"` using the “Search #” selector (allowed values `5,10,20,30,40,50`) for `perpage`.
+2. Immediately group that payload the same way Showcase does (reuse the existing helper or `/api/showcase`). Render the result **inside the Series tab** with the exact markup Showcase detail uses: ABS cover fetched via `/api/covers/fetch`, metadata chips, torrent table with Add buttons, and ABS availability badges.
+3. Provide breadcrumbs/back buttons so users can jump:
+   - Series list → Book list → Grouped MAM view.
+   Persist identifiers in router state so reloading restores whatever panel was open.
 
-### Task 14: Detail Cards via CardHelper `[CON]`
-1. On row click, fetch `/api/series/{id}/books` (`app/routes/series.py:77-140`).
-2. Render each book using `createBookCard()` (`app/static/js/components/cardHelper.js:27-121`) for consistent markup, normalized titles, and card GUIDs.
-3. Show book cards in flex grid under table with breadcrumbs back to table.
-4. Extend backend response so each book includes `mam_match` metadata by calling existing `/search` logic (`app/routes/search.py:34-124`) with book title/author.
-5. Bubble `in_abs_library` flag through to `cardHelper` so `addLibraryIndicator()` can render availability badge.
-6. Lazy covers work automatically via `cardHelper`'s `<img loading="lazy">`; supplement with `IntersectionObserver` if extra skeletons needed.
+### Task 14: Drawer & Feedback `[SEQ]`
+1. Ensure the search-page drawer that responds to `series-search` events now embeds the same table/grouped components (no cards). When a card triggers the drawer, auto-run the corresponding series search, focus the matching book row, and optionally auto-open the grouped view for the best match.
+2. Reuse the existing toast helper for every async stage (Hardcover search, book fetch, MAM grouped fetch). Surface distinct errors (rate limit vs. “no torrents”) and reset the triggering `series-search` button via `setSeriesSearchButtonSuccess/Error`.
+3. When a grouped detail is shown via the drawer, keep the ABS cover + Add torrent functionality identical to Showcase so behavior stays predictable.
 
-### Task 15: Rate-Limit Toasts + Modal Flow `[SEQ]`
-1. Create lightweight toast component (`app/static/js/components/toast.js` + styles in `app/static/css/main.css`).
-2. `SeriesView` calls toast whenever `api.searchSeries` or `api.getSeriesBooks` rejects with HTTP 429/503.
-3. Surface messages like "Hardcover rate limit hit, retry in 30s" and log via `console.warn` for backend correlation.
-4. Reuse toast helper anywhere else transient status is needed.
-5. For modal/slide requirement: mount same `SeriesView` DOM (table + detail panel) inside hidden drawer on search page.
-6. When `seriesSearchButton` fires, slide drawer in, run `loadSeries` with card's normalized title.
-7. Reset triggering button via `setSeriesSearchButtonSuccess/Error()` once results arrive.
-8. Ensure modal/drawer can be dismissed or retried without page refresh.
-
-### Search # ↔ Backend Limit Coupling `[CON]`
-1. Update per-page selector in `app/templates/search.html:9-20` so `<select id="perpage">` options are exactly `5,10,20,30,40,50`.
-2. Have `SearchPage` (`app/static/pages/search.js:38-74`) default to `20` when no state exists.
-3. Keep Router updates in sync so bookmarks reflect new values.
-4. On server, clamp and validate `perpage` inside `/search` (`app/routes/search.py:37-55`) against same list (fallback to `20` if invalid).
-5. Mirror same allowed set for Hardcover series limit: make `SeriesSearchRequest.limit` a constrained int (`Field(ge=5, le=50)`) or explicit whitelist.
-6. Drive both `/series` page select and search overlay select from shared constant so UX + API never drift.
-7. Keep MAM and Hardcover queries under rate limits and reduce cache churn (cache keys already include `perpage`).
+### Task 15: Limit Coupling `[CON]`
+1. Validate both `perpage` (MAM) and `limit` (Hardcover) against the shared whitelist `5,10,20,30,40,50` server-side; coerce invalid requests back to the nearest supported value to protect caches and rate limits.
+2. Drive every selector (search page, series tab, drawer) from that single constant, and log the applied value so debugging mismatches is easy.
+3. When book rows trigger grouped searches, reuse the same selected value to keep ABS cover caching and MAM limit behavior aligned with the rest of the app.
 
 ## Phase 4 — Multi-Book Download & Import Pipeline
 1. `[SEQ]` Extend import planning logic to accept multiple book payloads per torrent without altering the disk-flattening helper contracts.
