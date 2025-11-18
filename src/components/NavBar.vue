@@ -92,20 +92,12 @@
       <div class="nav-section nav-right">
         <n-popover trigger="hover" placement="bottom-end">
           <template #trigger>
-            <n-badge
-              :value="health.ok ? '✓' : '✗'"
-              :type="health.checking ? 'default' : health.ok ? 'success' : 'error'"
-              :color="health.checking ? 'rgba(136, 136, 136, 0.8)' : health.ok ? 'rgba(45, 122, 62, 0.9)' : 'rgba(168, 50, 50, 0.9)'"
-              :processing="health.checking"
-              show-zero
-            >
-              <n-button text class="health-button glass-health">
-                <template #icon>
-                  <span class="health-icon">💊</span>
-                </template>
-                Status
-              </n-button>
-            </n-badge>
+            <div class="health-indicator glass-health" :class="healthClass">
+              <span v-if="health.checking" class="health-spinner"></span>
+              <span v-else-if="health.ok" class="health-dot"></span>
+              <span v-else class="health-x">✗</span>
+              <span class="health-label">{{ healthStatusText }}</span>
+            </div>
           </template>
           <div class="health-popover glass-popover">
             <strong>Application Health</strong>
@@ -125,7 +117,6 @@ import {
   NSpace,
   NButton,
   NThing,
-  NBadge,
   NPopover
 } from 'naive-ui'
 
@@ -142,6 +133,16 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const currentRoute = computed(() => route.name)
+
+const healthClass = computed(() => {
+  if (props.health.checking) return 'checking'
+  return props.health.ok ? 'healthy' : 'unhealthy'
+})
+
+const healthStatusText = computed(() => {
+  if (props.health.checking) return 'Checking'
+  return props.health.ok ? 'Healthy' : 'Error'
+})
 
 const healthText = computed(() => {
   if (props.health.checking) return 'Checking system health...'
@@ -293,26 +294,90 @@ const navigateTo = (path) => {
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
 
-/* Health Button - Glass indicator */
-.glass-health {
-  background: rgba(42, 42, 42, 0.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+/* Health Indicator - Glass card with dot/X */
+.health-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(42, 42, 42, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
-  padding: 0.4rem 0.8rem !important;
+  padding: 0.4rem 0.8rem;
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
-  font-size: 0.85rem;
+  cursor: pointer;
 }
 
-.glass-health:hover {
-  background: rgba(42, 42, 42, 0.5) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+.health-indicator:hover {
+  background: rgba(42, 42, 42, 0.5);
+  border-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.health-icon {
-  font-size: 1.1rem;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+.health-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Health Dot - Green when healthy */
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2d7a3e;
+  box-shadow: 0 0 8px rgba(45, 122, 62, 0.6);
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
+
+/* Health X - Red when unhealthy */
+.health-x {
+  font-size: 0.9rem;
+  color: #a83232;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(168, 50, 50, 0.6);
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Health Spinner - Gray when checking */
+.health-spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #888888;
+  animation: pulse-gray 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-gray {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Glass Popover */
