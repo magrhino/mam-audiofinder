@@ -6,56 +6,33 @@
 
 import { ref, computed, h } from 'vue'
 import { NButton, NTag } from 'naive-ui'
-import { formatSize, escapeHtml } from '../../app/static/js/core/utils.js'
-import { useCoverLoader } from './useCoverLoader.js'
+import { formatSize, escapeHtml } from '../../../app/static/js/core/utils.js'
+import CoverImage from '../../components/CoverImage.vue'
 
 /**
  * Create column definitions based on view type
  * @param {string} viewType - 'search' | 'history' | 'showcase'
  * @param {object} callbacks - { onAdd, onVerify, onDelete }
- * @param {object} coverLoader - Cover loader service instance
  * @returns {Array} Column configuration for n-data-table
  */
-function createColumns(viewType, callbacks, coverLoader) {
+function createColumns(viewType, callbacks) {
   const { onAdd, onVerify, onDelete } = callbacks
 
   const columns = {
-    // Cover column with library indicator
+    // Cover column with library indicator using NaiveUI n-image with lazy loading
     cover: {
       title: 'Cover',
       key: 'cover',
       width: 80,
       render(row) {
-        const rowId = `${row.id}-${row.added || Date.now()}`
-        const container = document.createElement('div')
-        container.className = 'cover-skeleton'
-        container.style.cssText = 'position: relative; width: 60px; height: 80px;'
-        container.dataset.mamId = row.id || ''
-        container.dataset.title = row.title || ''
-        container.dataset.author = row.author_info || row.author || ''
-        container.dataset.rowId = rowId
-
-        // Add library indicator if item is in ABS
-        if (row.in_abs_library) {
-          const indicator = document.createElement('span')
-          indicator.className = 'in-library-indicator'
-          indicator.title = 'Already in your library'
-          indicator.textContent = '✓'
-          container.appendChild(indicator)
-        }
-
-        // Set row state and observe for lazy loading
-        if (coverLoader) {
-          coverLoader.setRowState(rowId, {
-            ...row,
-            abs_cover_url: row.abs_cover_url || '',
-            abs_item_id: row.abs_item_id || ''
-          })
-          // Observe after next tick to ensure DOM is ready
-          setTimeout(() => coverLoader.observe(container), 0)
-        }
-
-        return h('div', { innerHTML: container.outerHTML })
+        return h(CoverImage, {
+          mamId: String(row.id || ''),
+          title: row.title || '',
+          author: row.author_info || row.author || '',
+          width: 60,
+          height: 80,
+          inLibrary: row.in_abs_library || false
+        })
       }
     },
 
@@ -344,9 +321,6 @@ export function useDataTable(config = {}) {
     defaultPageSize = 25
   } = config
 
-  // Initialize cover loader for lazy loading
-  const coverLoader = useCoverLoader()
-
   // Table ref for programmatic control
   const tableRef = ref(null)
 
@@ -366,8 +340,7 @@ export function useDataTable(config = {}) {
   const columns = computed(() => {
     return createColumns(
       viewType,
-      { onAdd, onVerify, onDelete },
-      coverLoader
+      { onAdd, onVerify, onDelete }
     )
   })
 
@@ -399,19 +372,11 @@ export function useDataTable(config = {}) {
   // Set table data
   const setData = (newData) => {
     data.value = newData || []
-    // Clear and reinitialize cover loader
-    if (coverLoader) {
-      coverLoader.clearRowState()
-      coverLoader.init()
-    }
   }
 
   // Clear table data
   const clearData = () => {
     data.value = []
-    if (coverLoader) {
-      coverLoader.clearRowState()
-    }
   }
 
   return {
@@ -428,9 +393,6 @@ export function useDataTable(config = {}) {
     sort,
     clearSorter,
     filter,
-    clearFilters,
-
-    // Cover loader
-    coverLoader
+    clearFilters
   }
 }

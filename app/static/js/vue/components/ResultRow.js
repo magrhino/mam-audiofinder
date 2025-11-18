@@ -3,9 +3,13 @@ import { formatSize } from '../../core/utils.js';
 import { useLazyCover } from '../composables/useCovers.js';
 import { useLibraryCheck } from '../composables/useLibraryCheck.js';
 import { useAddAction } from '../composables/useActionButtons.js';
+import { ActionButton } from './ActionButton.js';
 
 export const ResultRow = {
   name: 'ResultRow',
+  components: {
+    ActionButton
+  },
   props: {
     item: { type: Object, required: true }
   },

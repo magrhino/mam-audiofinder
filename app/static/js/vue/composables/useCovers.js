@@ -15,8 +15,14 @@ let observerRefCount = 0;
  */
 function initSharedObserver() {
   if (!sharedObserver) {
+    console.log('[useLazyCover] Creating new shared IntersectionObserver');
     sharedObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
+        console.log('[useLazyCover] Observer callback:', {
+          isIntersecting: entry.isIntersecting,
+          target: entry.target,
+          hasFetchFn: !!entry.target._coverFetchFn
+        });
         if (entry.isIntersecting) {
           const container = entry.target;
           const fetchFn = container._coverFetchFn;
@@ -25,7 +31,10 @@ function initSharedObserver() {
           sharedObserver.unobserve(container);
 
           if (fetchFn) {
+            console.log('[useLazyCover] Calling fetchFn for element');
             fetchFn();
+          } else {
+            console.warn('[useLazyCover] Element has no _coverFetchFn attached!');
           }
         }
       });
@@ -35,6 +44,7 @@ function initSharedObserver() {
     });
   }
   observerRefCount++;
+  console.log('[useLazyCover] Observer refCount:', observerRefCount);
   return sharedObserver;
 }
 
@@ -135,8 +145,11 @@ export function useLazyCover({ mamId, title, author, elementRef }) {
     const t = typeof title === 'object' && title.value !== undefined ? title.value : title;
     const a = typeof author === 'object' && author.value !== undefined ? author.value : author;
 
+    console.log('[useLazyCover] fetchCover called:', { id, title: t, author: a });
+
     if (!id || !t) {
       error.value = 'Missing info';
+      console.warn('[useLazyCover] Missing required data for cover fetch');
       return;
     }
 
@@ -144,6 +157,7 @@ export function useLazyCover({ mamId, title, author, elementRef }) {
     error.value = '';
 
     try {
+      console.log('[useLazyCover] Calling api.fetchCover...');
       const data = await api.fetchCover({
         mam_id: id,
         title: t,
@@ -151,15 +165,19 @@ export function useLazyCover({ mamId, title, author, elementRef }) {
         max_retries: '2'
       });
 
+      console.log('[useLazyCover] api.fetchCover response:', data);
+
       if (data.cover_url) {
         coverUrl.value = data.cover_url;
         itemId.value = data.item_id || '';
         loaded.value = true;
+        console.log('[useLazyCover] Cover loaded successfully:', data.cover_url);
       } else {
         error.value = data.error || 'No cover';
+        console.log('[useLazyCover] No cover found:', data.error);
       }
     } catch (e) {
-      console.error('Cover fetch exception:', e);
+      console.error('[useLazyCover] Cover fetch exception:', e);
       error.value = 'Error';
     } finally {
       loading.value = false;
@@ -174,13 +192,20 @@ export function useLazyCover({ mamId, title, author, elementRef }) {
       ? elementRef.value
       : elementRef;
 
-    if (!el) return;
+    console.log('[useLazyCover] startObserving called, el:', el, 'mamId:',
+      typeof mamId === 'object' ? mamId.value : mamId);
+
+    if (!el) {
+      console.warn('[useLazyCover] No element to observe!');
+      return;
+    }
 
     observer = initSharedObserver();
 
     // Attach fetch function to element for observer callback
     el._coverFetchFn = fetchCover;
 
+    console.log('[useLazyCover] Starting to observe element');
     observer.observe(el);
   };
 

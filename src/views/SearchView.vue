@@ -36,7 +36,7 @@ import { reactive, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NDataTable } from 'naive-ui'
 import { useApi } from '@composables/useApi'
-import { useDataTable } from '@composables/useDataTable'
+import { useDataTable } from '@composables/naive/useDataTable'
 
 const api = useApi()
 const route = useRoute()
