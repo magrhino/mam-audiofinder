@@ -20,6 +20,11 @@ htmlcov/
 test-results/
 *.log
 
+# Frontend testing
+node_modules/
+coverage/
+.vitest/
+
 # Environment & local data
 .env
 /data/

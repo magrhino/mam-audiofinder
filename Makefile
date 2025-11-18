@@ -200,6 +200,8 @@ clean-test: ## Remove test artifacts and coverage reports
 	@rm -rf test-results/
 	@rm -f .coverage
 	@rm -f coverage.xml
+	@rm -rf coverage/
+	@rm -rf .vitest/
 	@echo "✓ Test artifacts cleaned"
 
 ##@ Docker Testing
@@ -253,6 +255,26 @@ docker-test-clean: ## Stop and remove test containers and volumes
 	@echo "Cleaning up test containers and volumes..."
 	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml down -v
 	@echo "✓ Test containers and volumes removed"
+
+##@ Frontend Testing (Vue.js/Vitest)
+
+test-frontend-unit: ## Run frontend unit tests (Vitest)
+	@echo "Running frontend unit tests..."
+	@npm test -- --run
+	@echo "✓ Frontend unit tests passed"
+
+test-frontend-watch: ## Run frontend tests in watch mode
+	@echo "Starting frontend test watcher..."
+	@npm test
+
+test-frontend-ui: ## Open interactive frontend test UI
+	@echo "Opening frontend test UI..."
+	@npm run test:ui
+
+test-frontend-coverage: ## Run frontend tests with coverage report
+	@echo "Running frontend tests with coverage..."
+	@npm run test:coverage
+	@echo "✓ Frontend coverage report generated at coverage/index.html"
 
 ##@ Development
 

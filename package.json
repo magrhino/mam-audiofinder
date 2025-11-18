@@ -1,0 +1,21 @@
+{
+  "name": "mam-audiofinder-frontend",
+  "version": "1.0.0",
+  "description": "Vue.js frontend tests for MAM Audiobook Finder",
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "@vue/test-utils": "^2.4.4",
+    "happy-dom": "^13.3.8",
+    "vitest": "^1.2.2",
+    "@vitest/ui": "^1.2.2",
+    "@vitest/coverage-v8": "^1.2.2",
+    "vue": "^3.4.15"
+  }
+}
