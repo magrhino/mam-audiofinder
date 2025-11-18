@@ -13,6 +13,11 @@
     <td>{{ formattedWhen }}</td>
     <td>
       <StatusBadge :label="item.qb_status" :variant="statusVariant" :title="statusTooltip" />
+      <span
+        v-if="hasPathWarning"
+        :title="item.path_warning"
+        style="color: #e74c3c; cursor: help; margin-left: 4px; font-size: 1.1em;"
+      >⚠️</span>
       <StatusBadge v-if="verifyBadge" :label="verifyBadge.label" :variant="verifyBadge.variant" :title="verifyBadge.title" />
     </td>
     <td>
@@ -233,6 +238,8 @@ const statusVariant = computed(() => {
 })
 
 const statusTooltip = computed(() => props.item.path_warning || '')
+
+const hasPathWarning = computed(() => !!props.item.path_warning)
 
 const verifyBadge = computed(() => {
   if (!props.item.imported_at || !props.item.abs_verify_status) return null
