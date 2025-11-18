@@ -13,13 +13,18 @@
     <td>{{ formattedWhen }}</td>
     <td>
       <StatusBadge :label="item.qb_status" :variant="statusVariant" :title="statusTooltip" />
+      <span
+        v-if="hasPathWarning"
+        :title="item.path_warning"
+        style="color: #e74c3c; cursor: help; margin-left: 4px; font-size: 1.1em;"
+      >⚠️</span>
       <StatusBadge v-if="verifyBadge" :label="verifyBadge.label" :variant="verifyBadge.variant" :title="verifyBadge.title" />
     </td>
     <td>
       <ActionButton label="Import" variant="primary" :loading="loading && showForm" @click="toggleForm" />
     </td>
     <td>
-      <ActionButton label="Verify" variant="secondary" :loading="verifyLoading" :disabled="!item.imported_at" @click="verifyItem" />
+      <ActionButton :label="verifyButtonLabel" variant="secondary" :loading="verifyLoading" :disabled="!item.imported_at || verifyLoading" @click="verifyItem" />
     </td>
     <td>
       <ActionButton label="Remove" variant="danger" :loading="removeLoading" @click="removeItem" />
@@ -86,6 +91,7 @@ const api = useApi()
 const showForm = ref(false)
 const loading = ref(false)
 const verifyLoading = ref(false)
+const verifyButtonLabel = ref('🔄 Verify')
 const removeLoading = ref(false)
 const formLoaded = ref(false)
 const torrents = ref([])
@@ -149,7 +155,7 @@ const performImport = async () => {
   loading.value = true
   statusMessage.value = 'Importing…'
   try {
-    await api.importTorrent({
+    const result = await api.importTorrent({
       author: form.author,
       title: form.title,
       hash: form.selectedHash,
@@ -158,6 +164,15 @@ const performImport = async () => {
     })
     statusMessage.value = '✓ Import requested'
     showForm.value = false
+
+    // Dispatch importCompleted event for live status updates
+    window.dispatchEvent(new CustomEvent('importCompleted', {
+      detail: {
+        historyId: props.item.id,
+        verification: result.verification
+      }
+    }))
+
     emit('updated')
   } catch (err) {
     statusMessage.value = `Import failed: ${err.message}`
@@ -167,14 +182,41 @@ const performImport = async () => {
 }
 
 const verifyItem = async () => {
+  const originalLabel = verifyButtonLabel.value
   verifyLoading.value = true
+  verifyButtonLabel.value = '⏳ Verifying...'
+
   try {
-    await api.verifyHistoryItem(props.item.id)
-    emit('updated')
+    const result = await api.verifyHistoryItem(props.item.id)
+
+    if (result.ok) {
+      verifyButtonLabel.value = '✓ Done'
+      // Trigger parent reload to get updated verification badge
+      emit('updated')
+
+      // Reset button after 2 seconds
+      setTimeout(() => {
+        verifyButtonLabel.value = originalLabel
+        verifyLoading.value = false
+      }, 2000)
+    } else {
+      verifyButtonLabel.value = '✗ Failed'
+      // Reset button after 2 seconds
+      setTimeout(() => {
+        verifyButtonLabel.value = originalLabel
+        verifyLoading.value = false
+      }, 2000)
+    }
   } catch (err) {
+    console.error('[HistoryRow] Verify failed:', err)
+    verifyButtonLabel.value = '✗ Error'
     statusMessage.value = `Verify failed: ${err.message}`
-  } finally {
-    verifyLoading.value = false
+
+    // Reset button after 2 seconds
+    setTimeout(() => {
+      verifyButtonLabel.value = originalLabel
+      verifyLoading.value = false
+    }, 2000)
   }
 }
 
@@ -224,6 +266,8 @@ const statusVariant = computed(() => {
 })
 
 const statusTooltip = computed(() => props.item.path_warning || '')
+
+const hasPathWarning = computed(() => !!props.item.path_warning)
 
 const verifyBadge = computed(() => {
   if (!props.item.imported_at || !props.item.abs_verify_status) return null

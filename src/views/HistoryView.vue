@@ -27,27 +27,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
 import HistoryRow from '@components/HistoryRow.vue'
-import { useApi } from '@composables/useApi'
+import { useHistoryLiveUpdates } from '@composables/useHistoryLiveUpdates'
 
-const api = useApi()
-const history = ref([])
-
-const loadHistory = async () => {
-  try {
-    const data = await api.getHistory()
-    history.value = data.items || []
-  } catch (err) {
-    console.error('Failed to load history', err)
-  }
-}
-
-onMounted(() => {
-  loadHistory()
-  // Reload history when torrents are added
-  window.addEventListener('torrentAdded', loadHistory)
-})
+// Use the live updates composable for auto-refresh and event handling
+// - Auto-refreshes every 5 seconds to show live torrent status
+// - Listens to 'torrentAdded' events for immediate updates
+// - Automatically cleans up interval and listeners on unmount
+// - Exposes start/stop methods for future router integration (pause on navigation)
+const { history, loadHistory } = useHistoryLiveUpdates({ interval: 5000 })
 </script>
 
 <style scoped>
