@@ -126,7 +126,12 @@ function createColumns(viewType, callbacks) {
       key: 'size',
       minWidth: 100,
       align: 'right',
-      sorter: true,  // Use NaiveUI's default numeric sorting
+      sorter: (row1, row2) => (row1.size || 0) - (row2.size || 0),
+      customNextSortOrder: (order) => {
+        // Only toggle between ascend and descend (no unsorted state)
+        if (order === 'ascend') return 'descend'
+        return 'ascend'
+      },
       render(row) {
         return h('span', {}, formatSize(row.size))
       }
