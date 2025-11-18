@@ -54,10 +54,13 @@
           <label class="import-form__inline">
             <input type="checkbox" v-model="form.flatten" /> Flatten multi-disc
           </label>
-          <ActionButton :label="buttonLabel" variant="success" :loading="loading" @click="performImport" />
-          <ActionButton :label="toggleTreeLabel" variant="secondary" :disabled="!form.selectedHash" @click="loadTree" />
+          <ActionButton :label="buttonLabel" variant="success" :loading="loading" :disabled="!canImport" @click="handleImport" />
+          <ActionButton :label="toggleTreeLabel" variant="secondary" :disabled="!form.selectedHash" @click="toggleTree" />
         </div>
         <div class="import-form__status" v-if="statusMessage">{{ statusMessage }}</div>
+        <div class="import-form__context" v-if="contextualMessage && !statusMessage" style="color: #f39c12; padding: 0.5rem 0;">
+          {{ contextualMessage }}
+        </div>
         <div class="import-form__tree" v-if="showTree">
           <ul>
             <li v-for="file in treeContents" :key="file.path">{{ file.path }} ({{ file.type }})</li>
@@ -69,8 +72,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useApi } from '@composables/useApi'
+import { useImport } from '@composables/useImport'
 import ActionButton from './ActionButton.vue'
 import StatusBadge from './StatusBadge.vue'
 
@@ -89,56 +93,30 @@ const emit = defineEmits(['updated'])
 
 const api = useApi()
 const showForm = ref(false)
-const loading = ref(false)
 const verifyLoading = ref(false)
 const verifyButtonLabel = ref('🔄 Verify')
 const removeLoading = ref(false)
-const formLoaded = ref(false)
-const torrents = ref([])
-const torrentTree = ref(null)
-const buttonLabel = ref('Copy to Library')
-const form = reactive({
-  author: props.item.author || '',
-  title: props.item.title || '',
-  selectedHash: props.item.qb_hash || '',
-  flatten: false
-})
-const statusMessage = ref('')
-const showTree = ref(false)
 
-const loadFormData = async () => {
-  if (formLoaded.value) return
-  formLoaded.value = true
-  loading.value = true
-  try {
-    const cfg = await api.getConfig()
-    if (cfg.import_mode === 'link') {
-      buttonLabel.value = 'Link to Library'
-    } else if (cfg.import_mode === 'move') {
-      buttonLabel.value = 'Move to Library'
-    }
-  } catch (err) {
-    console.warn('Failed to fetch config', err)
-  }
+// Use import composable for all import workflow
+const {
+  loading,
+  torrents,
+  statusMessage,
+  buttonLabel,
+  showTree,
+  form,
+  selectedTorrent,
+  hasMultiDisc,
+  canImport,
+  treeContents,
+  toggleTreeLabel,
+  contextualMessage,
+  loadFormData,
+  performImport,
+  toggleTree
+} = useImport(props.item)
 
-  try {
-    const data = await api.getCompletedTorrents()
-    torrents.value = data.items || []
-    if (!form.selectedHash) {
-      const match = torrents.value.find(t => t.hash === props.item.qb_hash || String(t.mam_id || '') === String(props.item.mam_id || ''))
-      if (match) {
-        form.selectedHash = match.hash
-        statusMessage.value = '✓ Auto-selected matching torrent'
-      }
-    }
-  } catch (err) {
-    console.error('Failed to load torrents', err)
-    statusMessage.value = 'Failed to load torrents'
-  } finally {
-    loading.value = false
-  }
-}
-
+// Watch showForm to lazy-load form data
 watch(showForm, (val) => {
   if (val) loadFormData()
 })
@@ -147,37 +125,11 @@ const toggleForm = () => {
   showForm.value = !showForm.value
 }
 
-const performImport = async () => {
-  if (!form.selectedHash) {
-    statusMessage.value = 'Select a torrent to import'
-    return
-  }
-  loading.value = true
-  statusMessage.value = 'Importing…'
-  try {
-    const result = await api.importTorrent({
-      author: form.author,
-      title: form.title,
-      hash: form.selectedHash,
-      history_id: props.item.id,
-      flatten: form.flatten
-    })
-    statusMessage.value = '✓ Import requested'
+const handleImport = async () => {
+  const result = await performImport()
+  if (result.success) {
     showForm.value = false
-
-    // Dispatch importCompleted event for live status updates
-    window.dispatchEvent(new CustomEvent('importCompleted', {
-      detail: {
-        historyId: props.item.id,
-        verification: result.verification
-      }
-    }))
-
     emit('updated')
-  } catch (err) {
-    statusMessage.value = `Import failed: ${err.message}`
-  } finally {
-    loading.value = false
   }
 }
 
@@ -210,7 +162,6 @@ const verifyItem = async () => {
   } catch (err) {
     console.error('[HistoryRow] Verify failed:', err)
     verifyButtonLabel.value = '✗ Error'
-    statusMessage.value = `Verify failed: ${err.message}`
 
     // Reset button after 2 seconds
     setTimeout(() => {
@@ -227,25 +178,9 @@ const removeItem = async () => {
     await api.deleteHistoryItem(props.item.id)
     emit('updated')
   } catch (err) {
-    statusMessage.value = `Remove failed: ${err.message}`
+    console.error('[HistoryRow] Remove failed:', err)
   } finally {
     removeLoading.value = false
-  }
-}
-
-const loadTree = async () => {
-  if (!form.selectedHash) return
-  showTree.value = !showTree.value
-  if (!showTree.value) return
-  loading.value = true
-  try {
-    const data = await api.getTorrentTree(form.selectedHash)
-    torrentTree.value = data
-  } catch (err) {
-    statusMessage.value = `Tree failed: ${err.message}`
-    showTree.value = false
-  } finally {
-    loading.value = false
   }
 }
 
@@ -285,13 +220,6 @@ const verifyBadge = computed(() => {
 })
 
 const detailUrl = computed(() => props.item.mam_id ? `https://www.myanonamouse.net/t/${encodeURIComponent(props.item.mam_id)}` : '')
-
-const toggleTreeLabel = computed(() => showTree.value ? 'Hide Files' : '📁 View Files')
-
-const treeContents = computed(() => {
-  if (!torrentTree.value?.files) return []
-  return torrentTree.value.files
-})
 </script>
 
 <style scoped>
