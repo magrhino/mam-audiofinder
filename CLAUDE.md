@@ -20,8 +20,10 @@ mam-audiofinder/
 │   ├── config.py               # Environment configuration
 │   ├── db/
 │   │   ├── db.py              # Database engines and migrations
-│   │   └── migrations/        # SQL migration files (001-008)
+│   │   └── migrations/        # SQL migration files (001-011)
 │   ├── abs_client.py          # Audiobookshelf API client (~850 lines)
+│   ├── description_service.py # Unified description service (~330 lines)
+│   ├── hardcover_client.py    # Hardcover GraphQL API client (~920 lines)
 │   ├── covers.py              # CoverService class (~350 lines)
 │   ├── qb_client.py           # qBittorrent API helpers
 │   ├── torrent_helpers.py     # Torrent state and matching
@@ -70,6 +72,8 @@ mam-audiofinder/
 ├── BACKEND.md                 # Technical implementation details
 ├── FRONTEND.md                # UI architecture documentation
 ├── README.md                  # User-facing documentation
+├── TESTING.md                 # Testing guide
+├── CLAUDE.md                  # AI assistant guide (this file)
 ├── env.example
 ├── Dockerfile
 └── docker-compose.yml
@@ -113,6 +117,18 @@ For detailed workflows, see [BACKEND.md](BACKEND.md).
 - `fetch_item_details()` - Description/metadata fetching
 - `_update_description_after_verification()` - Post-verification description fetch
 
+**`description_service.py` (~330 lines):** Unified description fetching with cascading fallback:
+- `get_description()` - ABS → Hardcover fallback with caching
+- Smart matching: ASIN/ISBN (200pts), Title (100pts), Author (50pts)
+- In-memory cache with 24hr TTL
+- Source tracking ('abs', 'hardcover', 'none')
+
+**`hardcover_client.py` (~920 lines):** Hardcover GraphQL API client:
+- `search_series()` - Series discovery with caching
+- `list_series_books()` - Book listings per series
+- `search_book_by_title()` - Book search for description fallback
+- Rate limiting (60 req/min) and retry logic
+
 **`covers.py`:** CoverService with local caching, auto-cleanup, auto-healing
 
 **`torrent_helpers.py`:** State mapping, path validation, MAM ID extraction, fuzzy matching
@@ -128,6 +144,7 @@ For detailed workflows, see [BACKEND.md](BACKEND.md).
 - `import_route.py` - POST /import (with verification + description fetch)
 - `showcase.py` - GET /api/showcase (grouped search results)
 - `series.py` - POST /api/series/search, GET /api/series/{id}/books (Hardcover integration)
+- `description_route.py` - POST /api/description/fetch, GET /api/description/stats (unified description service)
 - `covers_route.py` - GET /covers/{filename}
 - `logs_route.py` - GET /api/logs
 
