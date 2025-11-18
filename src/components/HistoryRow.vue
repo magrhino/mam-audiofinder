@@ -24,7 +24,7 @@
       <ActionButton label="Import" variant="primary" :loading="loading && showForm" @click="toggleForm" />
     </td>
     <td>
-      <ActionButton label="Verify" variant="secondary" :loading="verifyLoading" :disabled="!item.imported_at" @click="verifyItem" />
+      <ActionButton :label="verifyButtonLabel" variant="secondary" :loading="verifyLoading" :disabled="!item.imported_at || verifyLoading" @click="verifyItem" />
     </td>
     <td>
       <ActionButton label="Remove" variant="danger" :loading="removeLoading" @click="removeItem" />
@@ -91,6 +91,7 @@ const api = useApi()
 const showForm = ref(false)
 const loading = ref(false)
 const verifyLoading = ref(false)
+const verifyButtonLabel = ref('🔄 Verify')
 const removeLoading = ref(false)
 const formLoaded = ref(false)
 const torrents = ref([])
@@ -181,14 +182,41 @@ const performImport = async () => {
 }
 
 const verifyItem = async () => {
+  const originalLabel = verifyButtonLabel.value
   verifyLoading.value = true
+  verifyButtonLabel.value = '⏳ Verifying...'
+
   try {
-    await api.verifyHistoryItem(props.item.id)
-    emit('updated')
+    const result = await api.verifyHistoryItem(props.item.id)
+
+    if (result.ok) {
+      verifyButtonLabel.value = '✓ Done'
+      // Trigger parent reload to get updated verification badge
+      emit('updated')
+
+      // Reset button after 2 seconds
+      setTimeout(() => {
+        verifyButtonLabel.value = originalLabel
+        verifyLoading.value = false
+      }, 2000)
+    } else {
+      verifyButtonLabel.value = '✗ Failed'
+      // Reset button after 2 seconds
+      setTimeout(() => {
+        verifyButtonLabel.value = originalLabel
+        verifyLoading.value = false
+      }, 2000)
+    }
   } catch (err) {
+    console.error('[HistoryRow] Verify failed:', err)
+    verifyButtonLabel.value = '✗ Error'
     statusMessage.value = `Verify failed: ${err.message}`
-  } finally {
-    verifyLoading.value = false
+
+    // Reset button after 2 seconds
+    setTimeout(() => {
+      verifyButtonLabel.value = originalLabel
+      verifyLoading.value = false
+    }, 2000)
   }
 }
 
