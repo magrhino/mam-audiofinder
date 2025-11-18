@@ -20,23 +20,67 @@
     </div>
 
     <div class="showcase-detail" v-if="detailGroup">
+      <button class="showcase-detail-close" @click="closeDetail">✕ Close</button>
+
       <div class="showcase-detail-header">
-        <h3>{{ detailGroup.display_title }}</h3>
-        <div class="muted">{{ detailGroup.author }}</div>
-        <button class="secondary" @click="closeDetail">← Back to results</button>
-      </div>
-      <div class="showcase-detail-content">
-        <div v-for="version in detailGroup.versions" :key="version.id" class="showcase-detail-row">
-          <div>
-            <strong>{{ version.release_name }}</strong>
-            <div class="muted">{{ version.format }} • {{ version.bitrate }} • {{ version.length }}</div>
+        <!-- Cover -->
+        <div v-if="detailGroup.mam_id" class="showcase-detail-cover">
+          <img v-if="detailCoverUrl" :src="detailCoverUrl" :alt="detailGroup.display_title" loading="lazy" />
+          <div v-else class="cover-skeleton">Loading cover...</div>
+        </div>
+
+        <!-- Info -->
+        <div class="showcase-detail-info">
+          <h2 class="showcase-detail-title">{{ detailGroup.display_title }}</h2>
+          <div v-if="detailGroup.author" class="showcase-detail-author">by {{ detailGroup.author }}</div>
+          <div v-if="detailGroup.narrator" class="showcase-detail-narrator">Narrated by {{ detailGroup.narrator }}</div>
+          <div class="showcase-formats">
+            <span v-for="format in detailGroup.formats || []" :key="format" class="showcase-format-badge">{{ format }}</span>
           </div>
-          <div class="showcase-detail-actions">
-            <a v-if="version.mam_url" :href="version.mam_url" target="_blank" rel="noopener">Open on MAM</a>
-            <ActionButton label="Copy" variant="primary" @click.stop="copyVersion(version)" />
+
+          <!-- Description (if available) -->
+          <div v-if="detailDescription" class="showcase-description">
+            <div class="showcase-description-text" :class="{ collapsed: descriptionCollapsed }">
+              {{ detailDescription }}
+            </div>
+            <button v-if="detailDescription.length > 200" class="description-toggle" @click.stop="descriptionCollapsed = !descriptionCollapsed">
+              {{ descriptionCollapsed ? 'Show more' : 'Show less' }}
+            </button>
+            <div class="description-source muted">via Audiobookshelf</div>
           </div>
         </div>
       </div>
+
+      <!-- Versions table -->
+      <h3>Available Versions ({{ detailGroup.total_versions }})</h3>
+      <table class="showcase-versions-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Format</th>
+            <th class="right">Size</th>
+            <th class="right">Seeders/Leechers</th>
+            <th>Added</th>
+            <th class="center">Link</th>
+            <th>Add</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="version in detailGroup.versions" :key="version.id">
+            <td>{{ version.title }}</td>
+            <td>{{ version.format }}</td>
+            <td class="right">{{ formatSize(version.size) }}</td>
+            <td class="right">{{ version.seeders || 0 }} / {{ version.leechers || 0 }}</td>
+            <td>{{ version.added }}</td>
+            <td class="center">
+              <a v-if="version.id" :href="`https://www.myanonamouse.net/t/${version.id}`" target="_blank" rel="noopener" title="Open on MAM">🔗</a>
+            </td>
+            <td>
+              <ActionButton label="Add" variant="primary" @click.stop="addVersion(version)" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>
@@ -55,6 +99,9 @@ const form = reactive({ q: '', limit: '100' })
 const status = ref('Enter a search query to find audiobooks.')
 const groups = ref([])
 const detailGroup = ref(null)
+const detailCoverUrl = ref('')
+const detailDescription = ref('')
+const descriptionCollapsed = ref(true)
 
 const normalizeQuery = (values) => {
   const query = {}
@@ -101,13 +148,71 @@ const runSearch = async () => {
   }
 }
 
-const showDetail = (group) => {
+const showDetail = async (group) => {
   console.log('showDetail called with:', group)
   detailGroup.value = group
+  detailCoverUrl.value = ''
+  detailDescription.value = ''
+  descriptionCollapsed.value = true
+
+  // Load cover for detail view
+  if (group.mam_id && group.display_title) {
+    try {
+      const data = await api.fetchCover({
+        mam_id: group.mam_id,
+        title: group.display_title,
+        author: group.author || '',
+        max_retries: '3'
+      })
+      detailCoverUrl.value = data.cover_url || ''
+
+      // Also fetch description if available
+      if (data.abs_description) {
+        detailDescription.value = data.abs_description
+      }
+    } catch (err) {
+      console.warn('Failed to load detail cover:', err)
+    }
+  }
 }
 
 const closeDetail = () => {
   detailGroup.value = null
+  detailCoverUrl.value = ''
+  detailDescription.value = ''
+}
+
+const formatSize = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
+}
+
+const addVersion = async (version) => {
+  if (!version.dl || !version.id) {
+    status.value = 'Cannot add: missing download link'
+    return
+  }
+
+  try {
+    await api.addTorrent({
+      id: version.id,
+      dl: version.dl,
+      title: version.title,
+      author: version.author_info,
+      narrator: version.narrator_info
+    })
+    status.value = `✓ Added "${version.title}" to qBittorrent`
+
+    // Dispatch event for history refresh
+    window.dispatchEvent(new CustomEvent('torrentAdded', {
+      detail: { item: version }
+    }))
+  } catch (err) {
+    status.value = `Failed to add torrent: ${err.message}`
+  }
 }
 
 const copyVersion = async (version) => {
