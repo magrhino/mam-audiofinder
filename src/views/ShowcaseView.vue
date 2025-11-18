@@ -100,6 +100,7 @@ const runSearch = async () => {
 }
 
 const showDetail = (group) => {
+  console.log('showDetail called with:', group)
   detailGroup.value = group
 }
 

@@ -62,7 +62,10 @@ const versionsLabel = computed(() => {
   return `${total} version${total === 1 ? '' : 's'}`
 })
 
-const handleClick = () => emit('select', props.group)
+const handleClick = () => {
+  console.log('ShowcaseCard clicked:', props.group)
+  emit('select', props.group)
+}
 </script>
 
 <style scoped>
