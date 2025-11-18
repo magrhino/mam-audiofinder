@@ -150,9 +150,20 @@ const runSearch = async () => {
     const data = await api.getShowcase({ query: form.q.trim(), limit: parseInt(form.limit, 10) })
     groups.value = data.groups || []
     status.value = groups.value.length ? `Showing ${data.total_groups} titles (${data.total_results} versions)` : 'No audiobooks found.'
+
+    // Update URL with search params (preserve detail if exists)
     router.replace({
-      query: normalizeQuery({ q: form.q.trim(), limit: form.limit })
+      query: normalizeQuery({
+        q: form.q.trim(),
+        limit: form.limit,
+        detail: route.query.detail // Preserve detail parameter
+      })
     })
+
+    // Restore detail view if detail parameter exists in URL
+    if (route.query.detail) {
+      restoreDetailFromUrl()
+    }
   } catch (err) {
     status.value = `Failed to load showcase: ${err.message}`
   }
@@ -165,6 +176,14 @@ const showDetail = async (group) => {
   detailDescription.value = ''
   descriptionCollapsed.value = true
   coverLoader.clearRowState()
+
+  // Update URL with detail parameter
+  router.push({
+    query: {
+      ...route.query,
+      detail: group.normalized_title || group.display_title?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
+    }
+  })
 
   // Load cover for detail view
   if (group.mam_id && group.display_title) {
@@ -191,6 +210,48 @@ const closeDetail = () => {
   detailGroup.value = null
   detailCoverUrl.value = ''
   detailDescription.value = ''
+
+  // Remove detail parameter from URL
+  const query = { ...route.query }
+  delete query.detail
+  router.replace({ query })
+}
+
+const restoreDetailFromUrl = () => {
+  const detailId = route.query.detail
+  if (!detailId || !groups.value.length) return
+
+  // Find matching group by normalized_title
+  const group = groups.value.find(g =>
+    g.normalized_title === detailId ||
+    g.display_title?.toLowerCase().replace(/\s+/g, '-') === detailId
+  )
+
+  if (group) {
+    // Show detail without updating URL (already in URL)
+    detailGroup.value = group
+    detailCoverUrl.value = ''
+    detailDescription.value = ''
+    descriptionCollapsed.value = true
+    coverLoader.clearRowState()
+
+    // Load cover
+    if (group.mam_id && group.display_title) {
+      api.fetchCover({
+        mam_id: group.mam_id,
+        title: group.display_title,
+        author: group.author || '',
+        max_retries: '3'
+      }).then(data => {
+        detailCoverUrl.value = data.cover_url || ''
+        if (data.description) {
+          detailDescription.value = data.description
+        }
+      }).catch(err => {
+        console.warn('Failed to load detail cover:', err)
+      })
+    }
+  }
 }
 
 const addTorrent = async (rowState) => {
@@ -228,6 +289,7 @@ onMounted(() => {
   }
 })
 
+// Watch for search parameter changes
 watch(() => [route.query.q, route.query.limit], () => {
   const previous = form.q
   syncForm()
@@ -238,6 +300,19 @@ watch(() => [route.query.q, route.query.limit], () => {
     groups.value = []
     detailGroup.value = null
     status.value = 'Enter a search query to find audiobooks.'
+  }
+})
+
+// Watch for detail parameter changes (browser back/forward)
+watch(() => route.query.detail, (newDetail, oldDetail) => {
+  if (newDetail && newDetail !== oldDetail) {
+    // Detail parameter added or changed - show detail view
+    restoreDetailFromUrl()
+  } else if (!newDetail && oldDetail) {
+    // Detail parameter removed - close detail view
+    detailGroup.value = null
+    detailCoverUrl.value = ''
+    detailDescription.value = ''
   }
 })
 </script>
