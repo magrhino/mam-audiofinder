@@ -127,24 +127,37 @@
               </n-space>
             </div>
 
-            <!-- Description -->
-            <div v-if="detailDescription" class="description-section">
+            <!-- Description - Lazy Loading Card -->
+            <div class="description-section">
               <n-card :bordered="false" embedded class="description-card">
-                <div :class="{ 'description-collapsed': descriptionCollapsed }">
-                  <n-text :depth="2">{{ detailDescription }}</n-text>
-                </div>
-                <n-button
-                  v-if="detailDescription.length > 200"
-                  text
-                  type="primary"
-                  size="small"
-                  @click="descriptionCollapsed = !descriptionCollapsed"
-                  style="margin-top: 8px"
-                >
-                  {{ descriptionCollapsed ? 'Show more' : 'Show less' }}
-                </n-button>
-                <n-text :depth="3" style="font-size: 11px; font-style: italic; display: block; margin-top: 8px">
-                  via Audiobookshelf
+                <template #header>
+                  <n-skeleton v-if="descriptionLoading" text width="40%" />
+                  <n-text v-else tag="strong" :depth="2">
+                    Description
+                  </n-text>
+                </template>
+
+                <n-skeleton v-if="descriptionLoading" text :repeat="4" />
+                <template v-else-if="detailDescription">
+                  <div :class="{ 'description-collapsed': descriptionCollapsed }">
+                    <n-text :depth="2">{{ detailDescription }}</n-text>
+                  </div>
+                  <n-button
+                    v-if="detailDescription.length > 200"
+                    text
+                    type="primary"
+                    size="small"
+                    @click="descriptionCollapsed = !descriptionCollapsed"
+                    style="margin-top: 8px"
+                  >
+                    {{ descriptionCollapsed ? 'Show more' : 'Show less' }}
+                  </n-button>
+                  <n-text :depth="3" style="font-size: 11px; font-style: italic; display: block; margin-top: 8px">
+                    via Audiobookshelf
+                  </n-text>
+                </template>
+                <n-text v-else :depth="3" style="font-style: italic">
+                  No description available
                 </n-text>
               </n-card>
             </div>
@@ -189,7 +202,8 @@ import {
   NTag,
   NDivider,
   NSpin,
-  NDataTable
+  NDataTable,
+  NSkeleton
 } from 'naive-ui'
 import ShowcaseCard from '@components/ShowcaseCard.vue'
 import { useApi } from '@composables/useApi'
@@ -233,6 +247,7 @@ const detailGroup = ref(null)
 const detailElement = ref(null)
 const detailCoverUrl = ref('')
 const detailDescription = ref('')
+const descriptionLoading = ref(false)
 const descriptionCollapsed = ref(true)
 
 // Add torrent handler - defined before data table initialization
@@ -359,8 +374,11 @@ const showDetail = async (group) => {
     detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Load cover for detail view
+  // Load cover and description separately for lazy loading effect
   if (group.mam_id && group.display_title) {
+    // Start description loading
+    descriptionLoading.value = true
+
     try {
       const data = await api.fetchCover({
         mam_id: group.mam_id,
@@ -368,14 +386,19 @@ const showDetail = async (group) => {
         author: group.author || '',
         max_retries: '3'
       })
+
+      // Set cover URL
       detailCoverUrl.value = data.cover_url || ''
 
-      // Also fetch description if available
+      // Set description if available
       if (data.description) {
         detailDescription.value = data.description
       }
     } catch (err) {
-      console.warn('Failed to load detail cover:', err)
+      console.warn('Failed to load detail cover and description:', err)
+    } finally {
+      // Stop loading after fetch completes
+      descriptionLoading.value = false
     }
   }
 }
@@ -384,6 +407,7 @@ const closeDetail = () => {
   detailGroup.value = null
   detailCoverUrl.value = ''
   detailDescription.value = ''
+  descriptionLoading.value = false
   clearVersionsData()
 
   // Remove detail parameter from URL
@@ -437,8 +461,10 @@ const restoreDetailFromUrl = async () => {
       detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
 
-    // Load cover
+    // Load cover and description with loading state
     if (group.mam_id && group.display_title) {
+      descriptionLoading.value = true
+
       api.fetchCover({
         mam_id: group.mam_id,
         title: group.display_title,
@@ -450,7 +476,9 @@ const restoreDetailFromUrl = async () => {
           detailDescription.value = data.description
         }
       }).catch(err => {
-        console.warn('Failed to load detail cover:', err)
+        console.warn('Failed to load detail cover and description:', err)
+      }).finally(() => {
+        descriptionLoading.value = false
       })
     }
   }
@@ -487,6 +515,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
     detailGroup.value = null
     detailCoverUrl.value = ''
     detailDescription.value = ''
+    descriptionLoading.value = false
     clearVersionsData()
   }
 })
