@@ -5,7 +5,7 @@
  */
 
 import { ref } from 'vue'
-import { useApi } from './useApi.js'
+import { useApi } from '../useApi.js'
 
 /**
  * Create a cover fetcher for a specific item
