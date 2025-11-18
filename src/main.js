@@ -7,8 +7,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 
-// Naive UI - import styles globally
-import 'naive-ui/es/styles/base.css'
+// Naive UI uses CSS-in-JS, no need to import styles separately
 
 const app = createApp(App)
 
