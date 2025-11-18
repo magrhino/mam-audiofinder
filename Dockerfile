@@ -1,5 +1,25 @@
 # ============================================================================
-# Stage 1: Production Image (Lean, Production-Ready)
+# Stage 1: Vue Build Stage (Node.js for building frontend assets)
+# ============================================================================
+FROM node:20-alpine AS vue-builder
+
+WORKDIR /build
+
+# Copy package files and install dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copy Vue source and build configuration
+COPY index.html vite.config.js ./
+COPY src/ ./src/
+COPY app/static/js/ ./app/static/js/
+COPY app/static/css/ ./app/static/css/
+
+# Build Vue application for production
+RUN npm run build
+
+# ============================================================================
+# Stage 2: Production Image (Lean, Production-Ready with Vue assets)
 # ============================================================================
 FROM python:3.12-slim AS production
 
@@ -23,6 +43,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ /app/
 COPY validate_env.py /app/
+
+# Copy Vue build output from the vue-builder stage
+COPY --from=vue-builder /build/app/static/dist /app/static/dist
 
 # Ensure the app directory and files are owned by appuser
 RUN chown -R ${PUID}:${PGID} /app

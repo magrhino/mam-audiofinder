@@ -38,7 +38,7 @@ export class SearchView {
     this.coverLoader.clearRowState();
     const text = (this.elements.q?.value || '').trim();
     const sortType = (this.elements.sort?.value) || 'default';
-    const perpage = parseInt(this.elements.perpage?.value || '25', 10);
+    const perpage = parseInt(this.elements.perpage?.value || '20', 10);
 
     this.elements.status.textContent = 'Searching…';
     this.elements.table.style.display = 'none';

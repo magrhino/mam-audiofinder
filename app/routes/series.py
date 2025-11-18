@@ -20,7 +20,7 @@ class SeriesSearchRequest(BaseModel):
     title: str
     author: str = ""
     normalized_title: Optional[str] = None
-    limit: int = 10
+    limit: int = 20  # Default to 20
 
 
 @router.post("/api/series/search")
@@ -65,6 +65,10 @@ async def search_series(request: SeriesSearchRequest):
     if not request.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
 
+    # Validate limit parameter (allowed values: 5, 10, 20, 30, 40, 50)
+    ALLOWED_LIMITS = [5, 10, 20, 30, 40, 50]
+    limit = request.limit if request.limit in ALLOWED_LIMITS else 20
+
     # Compute normalized title if not provided
     normalized_title = request.normalized_title or normalize_title(request.title)
 
@@ -75,7 +79,7 @@ async def search_series(request: SeriesSearchRequest):
         series_results = await hardcover_client.search_series(
             title=request.title,
             author=request.author,
-            limit=request.limit
+            limit=limit
         )
 
         # Check if API call failed

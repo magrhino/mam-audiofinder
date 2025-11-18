@@ -5,9 +5,9 @@
 {% block page_script %}/static/pages/history.js?v=5{% endblock %}
 
 {% block content %}
-  <div class="card">
+  <div id="historyApp" class="card">
     <h3>Download History & Imports</h3>
-    <table id="history">
+    <table>
       <thead>
         <tr>
           <th style="width: 80px">Cover</th>
@@ -22,7 +22,12 @@
           <th>Remove</th>
         </tr>
       </thead>
-      <tbody></tbody>
+      <tbody>
+        <HistoryRow v-for="entry in history" :key="entry.id" :item="entry" :column-count="10" @updated="loadHistory" />
+        <tr v-if="!history.length">
+          <td colspan="10" class="center muted">No items in history yet.</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 {% endblock %}

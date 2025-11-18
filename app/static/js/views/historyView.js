@@ -5,6 +5,7 @@
 import { api } from '../core/api.js';
 import { escapeHtml } from '../core/utils.js';
 import { ImportForm } from '../components/importForm.js';
+import { CoverLoader } from '../services/coverLoader.js';
 
 /**
  * HistoryView handles the history table and import functionality
@@ -15,6 +16,7 @@ export class HistoryView {
     this.importForms = new Map();
     this.refreshInterval = null;
     this.isActive = false;
+    this.coverLoader = new CoverLoader();
 
     // Listen for torrent additions and import completions
     window.addEventListener('torrentAdded', () => {
@@ -64,6 +66,9 @@ export class HistoryView {
         this.elements.card.style.display = '';
         return;
       }
+
+      // Initialize cover loader before rendering rows
+      this.coverLoader.init();
 
       items.forEach((item) => {
         this.createHistoryRow(item);
@@ -120,10 +125,13 @@ export class HistoryView {
       await this.removeHistoryItem(h.id, tr);
     });
 
-    // Cover image (if available)
-    const coverHTML = h.abs_cover_url
-      ? `<img src="${escapeHtml(h.abs_cover_url)}" alt="Cover" style="max-width: 60px; max-height: 90px; width: auto; height: auto; display: block;" loading="lazy" onerror="this.style.display='none'">`
-      : '<span style="color: #666; font-size: 0.8em;">No cover</span>';
+    // Create cover container with lazy loading (like search page)
+    const coverContainer = this.coverLoader.createCoverContainer({
+      mamId: h.mam_id || '',
+      title: h.title || '',
+      author: h.author || '',
+      rowId: `history-${h.id}`
+    });
 
     // Color-coded status display
     const statusColor = h.qb_status_color || 'grey';
@@ -165,7 +173,7 @@ export class HistoryView {
     }
 
     tr.innerHTML = `
-      <td style="padding: 0.25rem;">${coverHTML}</td>
+      <td style="padding: 0.25rem;"></td>
       <td>${escapeHtml(h.title || '')}</td>
       <td>${escapeHtml(h.author || '')}</td>
       <td>${escapeHtml(h.narrator || '')}</td>
@@ -177,10 +185,17 @@ export class HistoryView {
       <td></td>
     `;
 
+    // Replace the first cell with our cover cell
+    const coverCell = tr.firstElementChild;
+    coverCell.appendChild(coverContainer);
+
     tr.children[tr.children.length - 3].appendChild(importBtn);
     tr.children[tr.children.length - 2].appendChild(verifyBtn);
     tr.lastElementChild.appendChild(rmBtn);
     this.elements.tbody.appendChild(tr);
+
+    // Observe the cover container for lazy loading
+    this.coverLoader.observe(coverContainer);
 
     // Create expander row (initially hidden)
     const expanderRow = document.createElement('tr');
@@ -373,5 +388,13 @@ export class HistoryView {
       this.refreshInterval = null;
       console.log('[HistoryView] Auto-refresh stopped');
     }
+  }
+
+  /**
+   * Clean up resources
+   */
+  destroy() {
+    this.stopAutoRefresh();
+    this.coverLoader.destroy();
   }
 }

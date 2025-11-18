@@ -2,12 +2,12 @@
 
 ## Project Overview
 
-**MAM Audiobook Finder** is a lightweight web application for searching MyAnonamouse audiobooks, adding them to qBittorrent, and importing completed downloads into Audiobookshelf. Personal use tool with zero authentication - Docker-first deployment, multi-page web app with modular ES6 JavaScript.
+**MAM Audiobook Finder** is a lightweight web application for searching MyAnonamouse audiobooks, adding them to qBittorrent, and importing completed downloads into Audiobookshelf. Personal use tool with zero authentication - Docker-first deployment, Vue 3 SPA with FastAPI backend.
 
 ## Tech Stack
 
 **Backend:** Python 3.12, FastAPI, Uvicorn, SQLite, httpx, Jinja2
-**Frontend:** Vanilla JavaScript ES6 modules, HTML5, minimal CSS
+**Frontend:** Vue 3 (Composition API), Vue Router, Vite, ES6 modules
 **Infrastructure:** Docker, Docker Compose
 **Testing:** pytest (223 test functions)
 
@@ -15,7 +15,7 @@
 
 ```
 mam-audiofinder/
-├── app/
+├── app/                       # Backend (FastAPI)
 │   ├── main.py                 # FastAPI bootstrap
 │   ├── config.py               # Environment configuration
 │   ├── db/
@@ -29,36 +29,46 @@ mam-audiofinder/
 │   ├── torrent_helpers.py     # Torrent state and matching
 │   ├── utils.py               # Utility functions
 │   ├── routes/
-│   │   ├── basic.py           # Health, config, page endpoints
+│   │   ├── basic.py           # Health, config, API endpoints
 │   │   ├── search.py          # MAM search
 │   │   ├── history.py         # History CRUD
 │   │   ├── qbittorrent.py     # qBittorrent operations
 │   │   ├── import_route.py    # Import logic
 │   │   ├── showcase.py        # Grouped search results
-│   │   ├── series.py          # Hardcover series discovery
-│   │   ├── description_route.py # Unified description API
+│   │   ├── series.py          # Hardcover series integration
 │   │   ├── covers_route.py    # Cover serving
 │   │   └── logs_route.py      # Logs endpoint
-│   ├── static/
-│   │   ├── js/
-│   │   │   ├── core/          # api.js, router.js, utils.js
-│   │   │   ├── services/      # coverLoader.js
-│   │   │   ├── views/         # searchView, historyView, showcaseView, logsView
-│   │   │   ├── components/    # importForm.js, libraryIndicator.js
-│   │   │   └── pages/         # Entry scripts per page
-│   │   └── css/               # Stylesheets
-│   ├── templates/
-│   │   └── *.html             # Jinja2 templates (base, search, history, showcase, logs)
-│   └── demo_description_fetch.py # Live demo script for description service
-├── tests/                     # 250+ test functions across 7 files
-│   ├── conftest.py           # Fixtures and configuration
-│   ├── test_search.py
-│   ├── test_covers.py
-│   ├── test_verification.py
-│   ├── test_description_fetch.py
-│   ├── test_description_service.py # 30+ tests for unified service
-│   ├── test_helpers.py
-│   └── test_migration_syntax.py
+│   └── static/
+│       ├── dist/              # Vite build output (generated)
+│       └── css/               # Legacy stylesheets
+├── src/                       # Frontend (Vue 3)
+│   ├── main.js                # Vue app entry point
+│   ├── App.vue                # Root component
+│   ├── router/
+│   │   └── index.js           # Vue Router config (5 routes)
+│   ├── views/
+│   │   ├── SearchView.vue     # Search page
+│   │   ├── HistoryView.vue    # History page
+│   │   ├── ShowcaseView.vue   # Showcase page
+│   │   ├── LogsView.vue       # Logs page
+│   │   └── SeriesView.vue     # Series discovery page
+│   ├── components/
+│   │   ├── NavBar.vue         # Navigation bar
+│   │   ├── HealthIndicator.vue
+│   │   ├── ResultRow.vue      # Search result row
+│   │   ├── HistoryRow.vue     # History table row
+│   │   ├── ShowcaseCard.vue   # Showcase grid card
+│   │   ├── SeriesTable.vue    # Series results table
+│   │   ├── ActionButton.vue   # Reusable button
+│   │   └── StatusBadge.vue    # Status indicator
+│   └── composables/
+│       ├── useApi.js          # API wrapper composable
+│       ├── useCoverLoader.js  # Lazy image loading
+│       └── useHistoryLiveUpdates.js  # Real-time history updates
+├── tests/                     # 223 test functions across 6 files
+├── index.html                 # Vite entry point
+├── vite.config.js             # Vite build configuration
+├── package.json               # Node dependencies
 ├── BACKEND.md                 # Technical implementation details
 ├── FRONTEND.md                # UI architecture documentation
 ├── README.md                  # User-facing documentation
@@ -72,8 +82,8 @@ mam-audiofinder/
 ## Architecture & Data Flow
 
 ### Request Flow
-1. **Frontend:** Jinja2 templates + page-specific scripts (pages/*.js)
-2. **Backend:** FastAPI endpoints (routes/)
+1. **Frontend:** Vue 3 SPA (views/*.vue, components/*.vue) → Vue Router
+2. **Backend:** FastAPI API endpoints (routes/)
 3. **External Services:** MAM API, qBittorrent WebUI, Audiobookshelf API
 4. **Storage:** SQLite (history.db, covers.db), filesystem (imports, covers)
 
@@ -125,10 +135,10 @@ For detailed workflows, see [BACKEND.md](BACKEND.md).
 
 **`utils.py`:** sanitize(), next_available(), extract_disc_track(), try_hardlink()
 
-### Routes
+### Backend Routes (FastAPI)
 
-- `basic.py` - Page rendering (/, /history, /showcase, /logs), /health, /config
-- `search.py` - POST /search, cover fetching
+- `basic.py` - GET / (serves index.html), /health, /config
+- `search.py` - POST /search (MAM API integration)
 - `history.py` - GET /api/history, DELETE /api/history/{id}, POST /api/history/{id}/verify
 - `qbittorrent.py` - GET /qb/torrents, GET /qb/torrent/{hash}/tree, POST /add
 - `import_route.py` - POST /import (with verification + description fetch)
@@ -138,19 +148,28 @@ For detailed workflows, see [BACKEND.md](BACKEND.md).
 - `covers_route.py` - GET /covers/{filename}
 - `logs_route.py` - GET /api/logs
 
-### Frontend Architecture
+### Frontend Architecture (Vue 3)
 
-**Multi-page app:** Each route is separate HTML page with own entry script
+**Single-page app (SPA):** Vue Router with lazy-loaded views
 
-**Core (~315 lines):** api.js (13 methods), router.js (URL state), utils.js
+**Build:** Vite (dev server with HMR, production builds to app/static/dist/)
 
-**Services:** coverLoader.js (lazy loading with IntersectionObserver)
+**Composition API:** All components use `<script setup>` syntax
 
-**Views (~1,220 lines):** searchView, historyView, showcaseView, logsView
+**Router:** 5 routes (/, /history, /showcase, /logs, /series) with lazy loading
 
-**Components:** importForm.js (multi-disc detection), libraryIndicator.js (badges)
+**Views:** SearchView, HistoryView, ShowcaseView, LogsView, SeriesView
 
-**Patterns:** Event-driven, dependency injection, no build step
+**Components:** NavBar, HealthIndicator, ResultRow, HistoryRow, ShowcaseCard, SeriesTable, ActionButton, StatusBadge
+
+**Composables:**
+- `useApi()` - API wrapper (reuses legacy app/static/js/core/api.js)
+- `useCoverLoader()` - Lazy image loading with IntersectionObserver
+- `useHistoryLiveUpdates()` - Real-time history updates (auto-refresh)
+
+**Patterns:** Composition API, reactive refs, async/await, component-based design
+
+**Legacy Coexistence:** Vue components import `app/static/js/core/api.js` for backend communication. Vite configured with aliases (@core, @services) to access legacy JS modules.
 
 For detailed frontend architecture, see [FRONTEND.md](FRONTEND.md).
 
@@ -286,7 +305,8 @@ docker compose logs -f       # View logs
 ### Making Changes
 
 **Backend:** Edit files → `docker compose up -d --build` → Check logs
-**Frontend:** Edit JS/HTML/CSS → Rebuild → Hard refresh browser (Ctrl+Shift+R)
+**Frontend (Dev):** `npm run dev` → Edit .vue files → HMR auto-reload
+**Frontend (Prod):** `npm run build` → `docker compose up -d --build`
 **Environment:** Edit .env → `docker compose up -d --force-recreate`
 
 ### Testing
@@ -360,12 +380,21 @@ except Exception:
 
 ## Common Tasks
 
-### Add Endpoint
+### Add Backend Endpoint
 
 1. Create route in `app/routes/my_feature.py`
 2. Register in `app/routes/__init__.py`
-3. Add frontend call in appropriate view
-4. Test and commit
+3. Add method to `app/static/js/core/api.js` (legacy, still used by Vue)
+4. Call from Vue composable or component
+5. Test and commit
+
+### Add Vue View/Component
+
+1. Create `.vue` file in `src/views/` or `src/components/`
+2. Use `<script setup>` with Composition API
+3. Add route to `src/router/index.js` (if view)
+4. Import and use in parent component (if component)
+5. Test with `npm run dev`
 
 ### Add Environment Variable
 
@@ -425,8 +454,9 @@ sqlite> SELECT * FROM history LIMIT 5;
 ## Code Style
 
 **Python:** PEP 8, async endpoints, HTTPException for errors, minimal docstrings
-**JavaScript:** ES6+, async/await, camelCase, no frameworks
-**HTML/CSS:** Minimal classes, basic flexbox, dark theme with maroon accents
+**Vue:** Composition API with `<script setup>`, camelCase, reactive refs, composables for reusable logic
+**JavaScript:** ES6+, async/await, camelCase
+**CSS:** Minimal classes, basic flexbox, dark theme with maroon accents (global in app/static/css/)
 
 ## AI Assistant Guidelines
 

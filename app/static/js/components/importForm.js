@@ -131,8 +131,8 @@ export class ImportForm {
         if (matchedTorrent) {
           this.elements.statusEl.innerHTML = '<span style="color: #27ae60;">✓ Torrent auto-selected based on match</span>';
 
-          // Trigger auto-detection for the matched torrent
-          this.detectMultiDisc(matchedTorrent.hash);
+          // Trigger disc detection for the matched torrent when import form opens
+          await this.detectMultiDisc(matchedTorrent.hash);
         } else if (historyHash || historyMamId) {
           this.elements.statusEl.innerHTML = '<span style="color: #f39c12;">⚠️ No matching torrent found - please select manually</span>';
         }
@@ -209,7 +209,7 @@ export class ImportForm {
       this.elements.statusEl.textContent = '';
     }
 
-    // Fetch tree data and run chapter detector
+    // Run disc detection for newly selected torrent
     if (hash && hash !== 'Loading torrents…') {
       await this.detectMultiDisc(hash);
 
@@ -250,17 +250,35 @@ export class ImportForm {
   /**
    * Toggle tree view visibility
    */
-  toggleTreeView() {
+  async toggleTreeView() {
     if (this.elements.treeView.style.display === 'none') {
-      if (this.treeData) {
-        this.elements.treeView.innerHTML = this.renderTreeView(this.treeData, this.elements.flattenCheckbox.checked);
-        this.elements.treeView.style.display = 'block';
-        this.elements.viewFilesBtn.textContent = '📁 Hide Files';
-      } else {
+      const hash = this.elements.torrentSelect.value;
+
+      if (!hash || hash === 'Loading torrents…') {
         this.elements.treeView.innerHTML = '<div style="color:#f39c12;">Please select a torrent first</div>';
         this.elements.treeView.style.display = 'block';
         this.elements.viewFilesBtn.textContent = '📁 Hide Files';
+        return;
       }
+
+      // Fetch tree data if not already loaded
+      if (!this.treeData) {
+        this.elements.treeView.innerHTML = '<div style="color:#666;">Loading files...</div>';
+        this.elements.treeView.style.display = 'block';
+        this.elements.viewFilesBtn.textContent = '📁 Hide Files';
+
+        try {
+          this.treeData = await api.getTorrentTree(hash);
+        } catch (e) {
+          console.error('Error loading tree:', e);
+          this.elements.treeView.innerHTML = '<div style="color:#e74c3c;">Error loading files</div>';
+          return;
+        }
+      }
+
+      this.elements.treeView.innerHTML = this.renderTreeView(this.treeData, this.elements.flattenCheckbox.checked);
+      this.elements.treeView.style.display = 'block';
+      this.elements.viewFilesBtn.textContent = '📁 Hide Files';
     } else {
       this.elements.treeView.style.display = 'none';
       this.elements.viewFilesBtn.textContent = '📁 View Files';
