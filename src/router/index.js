@@ -9,6 +9,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const SearchView = () => import('@views/SearchView.vue')
 const HistoryView = () => import('@views/HistoryView.vue')
 const ShowcaseView = () => import('@views/ShowcaseView.vue')
+const DebugView = () => import('@views/DebugView.vue')
 const LogsView = () => import('@views/LogsView.vue')
 const SeriesView = () => import('@views/SeriesView.vue')
 
@@ -30,6 +31,12 @@ const routes = [
     name: 'showcase',
     component: ShowcaseView,
     meta: { title: 'Showcase - Audiobook Finder' }
+  },
+  {
+    path: '/debug',
+    name: 'debug',
+    component: DebugView,
+    meta: { title: 'Debug - Audiobook Finder' }
   },
   {
     path: '/logs',

@@ -95,6 +95,7 @@ const navLinks = [
   { path: '/', icon: '🔍', label: 'Search' },
   { path: '/history', icon: '📋', label: 'History' },
   { path: '/showcase', icon: '🎭', label: 'Showcase' },
+  { path: '/debug', icon: '🐛', label: 'Debug' },
   { path: '/series', icon: '📚', label: 'Series' },
   { path: '/logs', icon: '📄', label: 'Logs' }
 ]
