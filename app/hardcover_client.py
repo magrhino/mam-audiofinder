@@ -664,6 +664,184 @@ class HardcoverClient:
 
         return books
 
+    async def search_book_by_title(
+        self,
+        title: str,
+        author: str = "",
+        limit: int = 5
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Search for books by title using Hardcover search API.
+
+        Args:
+            title: Book title to search for
+            author: Author name for filtering (optional)
+            limit: Maximum number of results (default: 5)
+
+        Returns:
+            List of book dictionaries with keys:
+            - book_id: Hardcover book ID
+            - title: Book title
+            - authors: List of author names
+            - release_year: Publication year
+            - description: Book description
+            - cover_url: Cover image URL
+            Returns None if API call fails, empty list [] if no results found.
+        """
+        if not self.is_configured:
+            return None
+
+        # Generate cache key
+        cache_key = self._get_cache_key("book_search", f"{title}|{author}|limit{limit}")
+
+        # Check cache
+        cached = await self._get_cached(cache_key)
+        if cached is not None:
+            return cached.get("books", [])
+
+        # Build GraphQL query using Hardcover's search function
+        query = """
+        query SearchBooks($query: String!, $queryType: String!, $perPage: Int!) {
+          search(query: $query, query_type: $queryType, per_page: $perPage) {
+            results
+          }
+        }
+        """
+
+        variables = {
+            "query": title,
+            "queryType": "Book",
+            "perPage": limit
+        }
+
+        logger.info(f"🔍 Searching Hardcover for book: '{title}' (author: '{author}', limit: {limit})")
+
+        # Execute query
+        data = await self._execute_graphql(query, variables)
+
+        if data is None:
+            return None
+
+        if "search" not in data:
+            logger.warning(f"⚠️  No search results in response for '{title}'")
+            return []
+
+        search_data = data["search"]
+        results = search_data.get("results")
+
+        if results is None:
+            logger.warning(f"⚠️  No results field in search response for '{title}'")
+            return []
+
+        # Handle string response (parse JSON)
+        if isinstance(results, str):
+            try:
+                results = json.loads(results)
+                logger.debug("📝 Parsed results from JSON string")
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ Failed to parse results JSON: {e}")
+                return []
+
+        # Expected format: results is a dict with 'found' and 'hits' keys
+        if isinstance(results, dict):
+            found_count = results.get("found", 0)
+            hits = results.get("hits", [])
+
+            logger.debug(f"🔍 Results structure: found={found_count}, hits={len(hits)}")
+
+            if not hits:
+                logger.info(f"ℹ️  No books found matching '{title}' (found={found_count})")
+                return []
+
+            # Process hits array
+            books_list = []
+            for idx, hit in enumerate(hits):
+                doc = hit.get("document", {})
+
+                if idx == 0:
+                    logger.debug(f"🔍 First book document keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
+
+                # Extract book fields
+                authors_field = doc.get("authors", [])
+                # authors may be a list of strings or a list of dicts
+                if isinstance(authors_field, list) and len(authors_field) > 0:
+                    if isinstance(authors_field[0], dict):
+                        authors = [a.get("name", "") for a in authors_field]
+                    else:
+                        authors = authors_field
+                else:
+                    authors = []
+
+                # Apply author filter if provided
+                if author and authors:
+                    # Check if any author matches the filter
+                    if not any(author.lower() in a.lower() for a in authors):
+                        continue
+
+                books_list.append({
+                    "book_id": doc.get("id"),
+                    "title": doc.get("title", ""),
+                    "authors": authors,
+                    "release_year": doc.get("release_year"),
+                    "description": doc.get("description", ""),
+                    "cover_url": doc.get("image", "")
+                })
+
+        # Fallback: if results is already a list
+        elif isinstance(results, list):
+            logger.debug(f"🔍 Results is a list (unexpected format), processing {len(results)} items")
+
+            if len(results) == 0:
+                logger.info(f"ℹ️  No books found matching '{title}'")
+                return []
+
+            books_list = []
+            for idx, item in enumerate(results):
+                doc = item.get("document", item) if isinstance(item, dict) else item
+
+                if idx == 0:
+                    logger.debug(f"🔍 First result keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
+
+                # Extract authors
+                authors_field = doc.get("authors", [])
+                if isinstance(authors_field, list) and len(authors_field) > 0:
+                    if isinstance(authors_field[0], dict):
+                        authors = [a.get("name", "") for a in authors_field]
+                    else:
+                        authors = authors_field
+                else:
+                    authors = []
+
+                # Apply author filter if provided
+                if author and authors:
+                    if not any(author.lower() in a.lower() for a in authors):
+                        continue
+
+                books_list.append({
+                    "book_id": doc.get("id"),
+                    "title": doc.get("title", ""),
+                    "authors": authors,
+                    "release_year": doc.get("release_year"),
+                    "description": doc.get("description", ""),
+                    "cover_url": doc.get("image", "")
+                })
+
+        else:
+            logger.error(f"❌ Unexpected results type: {type(results)}")
+            return []
+
+        logger.info(f"✅ Found {len(books_list)} book matches")
+
+        # Cache results
+        await self._set_cache(
+            cache_key,
+            "book_search",
+            {"books": books_list},
+            {"title": title, "author": author, "normalized": title.lower()}
+        )
+
+        return books_list
+
     async def get_series_by_author(
         self,
         author_name: str,
