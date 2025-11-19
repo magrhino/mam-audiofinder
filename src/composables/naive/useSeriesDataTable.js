@@ -113,16 +113,6 @@ function createBooksColumns() {
       render(row) {
         return h('span', {}, row.release_year || '—')
       }
-    },
-    {
-      title: 'Pages',
-      key: 'page_count',
-      width: 100,
-      align: 'center',
-      sorter: (a, b) => (a.page_count || 0) - (b.page_count || 0),
-      render(row) {
-        return h('span', {}, row.page_count || '?')
-      }
     }
   ]
 }
