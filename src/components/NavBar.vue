@@ -5,10 +5,15 @@
       <div class="nav-section nav-left">
         <n-thing class="brand-section glass-brand">
           <template #avatar>
-            <span class="brand-icon">📚</span>
+            <img
+              :src="brandLogoSrc"
+              alt="Shelfarr logo"
+              class="brand-logo"
+              @error="handleLogoError"
+            />
           </template>
           <template #header>
-            <span v-if="!isMobile" class="brand-title">MAM Finder</span>
+            <span v-if="!isMobile" class="brand-title">Shelfarr</span>
           </template>
         </n-thing>
       </div>
@@ -60,7 +65,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useBreakpoints } from '@vueuse/core'
 import {
   NLayoutHeader,
@@ -98,6 +103,16 @@ const navLinks = [
   { path: '/series', icon: '📚', label: 'Series' },
   { path: '/logs', icon: '📄', label: 'Logs' }
 ]
+
+const brandLogoPrimary = '/static/favicon.svg'
+const brandLogoFallback = '/static/icon.png'
+const brandLogoSrc = ref(brandLogoPrimary)
+
+const handleLogoError = () => {
+  if (brandLogoSrc.value !== brandLogoFallback) {
+    brandLogoSrc.value = brandLogoFallback
+  }
+}
 
 const healthClass = computed(() => {
   if (props.health.checking) return 'checking'
@@ -187,8 +202,11 @@ const healthText = computed(() => {
   box-shadow: 0 2px 8px rgba(80, 0, 0, 0.2);
 }
 
-.brand-icon {
-  font-size: 1.5rem;
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  display: block;
+  object-fit: contain;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
@@ -443,8 +461,9 @@ const healthText = computed(() => {
     padding: 0.25rem;
   }
 
-  .brand-icon {
-    font-size: 1.2rem;
+  .brand-logo {
+    width: 28px;
+    height: 28px;
   }
 }
 </style>

@@ -4,11 +4,6 @@
     <div id="app">
       <NavBar :health="healthStatus" />
 
-      <header>
-        <h1>📚 Audiobook Finder</h1>
-        <span class="muted">Download Audiobooks and Import to Audiobookshelf</span>
-      </header>
-
       <RouterView />
     </div>
   </n-config-provider>
