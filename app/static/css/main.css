@@ -128,13 +128,11 @@ header {
   align-items: center;
 }
 
-/* Form Elements - Scoped to legacy views only (SearchView uses plain HTML, others use Naive UI) */
+/* Form Elements - Scoped to legacy views only (SearchView and LogsView use plain HTML) */
 .search-view input[type="text"],
 .search-view input[type="search"],
 .logs-view input[type="text"],
-.logs-view input[type="search"],
-.series-view input[type="text"],
-.series-view input[type="search"] {
+.logs-view input[type="search"] {
   flex: 1;
   min-width: 260px;
   padding: 0.6rem;
@@ -148,9 +146,7 @@ header {
 .search-view input[type="text"]:focus,
 .search-view input[type="search"]:focus,
 .logs-view input[type="text"]:focus,
-.logs-view input[type="search"]:focus,
-.series-view input[type="text"]:focus,
-.series-view input[type="search"]:focus {
+.logs-view input[type="search"]:focus {
   outline: none;
   border-color: var(--input-focus);
   box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.2);
@@ -159,15 +155,12 @@ header {
 .search-view input[type="text"]::placeholder,
 .search-view input[type="search"]::placeholder,
 .logs-view input[type="text"]::placeholder,
-.logs-view input[type="search"]::placeholder,
-.series-view input[type="text"]::placeholder,
-.series-view input[type="search"]::placeholder {
+.logs-view input[type="search"]::placeholder {
   color: var(--text-subtle);
 }
 
 .search-view select,
-.logs-view select,
-.series-view select {
+.logs-view select {
   padding: 0.6rem;
   background: var(--input-bg);
   border: 1px solid var(--input-border);
@@ -178,8 +171,7 @@ header {
 }
 
 .search-view select:focus,
-.logs-view select:focus,
-.series-view select:focus {
+.logs-view select:focus {
   outline: none;
   border-color: var(--input-focus);
   box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.2);
@@ -202,7 +194,6 @@ header {
 /* Buttons - Scoped to legacy views only (avoid conflicts with Naive UI) */
 .search-view button:not([class*="n-"]),
 .logs-view button:not([class*="n-"]),
-.series-view button:not([class*="n-"]),
 .import-form button {
   padding: 0.6rem 0.9rem;
   border: 1px solid var(--btn-secondary-border);
@@ -217,7 +208,6 @@ header {
 
 .search-view button:hover:not(:disabled):not([class*="n-"]),
 .logs-view button:hover:not(:disabled):not([class*="n-"]),
-.series-view button:hover:not(:disabled):not([class*="n-"]),
 .import-form button:hover:not(:disabled) {
   background: var(--bg-panel-hover);
   border-color: var(--accent-maroon);
@@ -226,14 +216,12 @@ header {
 
 .search-view button:active:not(:disabled):not([class*="n-"]),
 .logs-view button:active:not(:disabled):not([class*="n-"]),
-.series-view button:active:not(:disabled):not([class*="n-"]),
 .import-form button:active:not(:disabled) {
   transform: translateY(0);
 }
 
 .search-view button:disabled:not([class*="n-"]),
 .logs-view button:disabled:not([class*="n-"]),
-.series-view button:disabled:not([class*="n-"]),
 .import-form button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -244,8 +232,6 @@ header {
 .search-view button.primary:not([class*="n-"]),
 .logs-view button[type="submit"]:not([class*="n-"]),
 .logs-view button.primary:not([class*="n-"]),
-.series-view button[type="submit"]:not([class*="n-"]),
-.series-view button.primary:not([class*="n-"]),
 .import-form button[type="submit"],
 .import-form button.primary {
   background: var(--btn-primary-bg);
@@ -257,8 +243,6 @@ header {
 .search-view button.primary:hover:not(:disabled):not([class*="n-"]),
 .logs-view button[type="submit"]:hover:not(:disabled):not([class*="n-"]),
 .logs-view button.primary:hover:not(:disabled):not([class*="n-"]),
-.series-view button[type="submit"]:hover:not(:disabled):not([class*="n-"]),
-.series-view button.primary:hover:not(:disabled):not([class*="n-"]),
 .import-form button[type="submit"]:hover:not(:disabled),
 .import-form button.primary:hover:not(:disabled) {
   background: var(--btn-primary-hover);
@@ -1271,162 +1255,11 @@ a:hover {
 }
 
 /* ========================================
-   Series Page Styles
+   Series Page Styles - REMOVED
    ======================================== */
-
-.series-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
-}
-
-.series-header h3 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.series-controls {
-  display: flex;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-#seriesTable {
-  margin-top: var(--spacing-md);
-}
-
-#seriesTable th {
-  background: var(--bg-panel-hover);
-}
-
-#seriesTable tbody tr {
-  transition: background-color 0.2s;
-}
-
-#seriesTable tbody tr:hover {
-  background: var(--bg-panel-hover);
-}
-
-#seriesTable tbody tr.highlighted-row {
-  background: rgba(106, 0, 0, 0.2);
-  border-left: 3px solid var(--accent-maroon);
-}
-
-#seriesDetailContainer {
-  margin-top: var(--spacing-lg);
-}
-
-#seriesBreadcrumb {
-  margin-bottom: var(--spacing-md);
-}
-
-#seriesDetailTitle {
-  margin: var(--spacing-md) 0;
-  color: var(--text-primary);
-  font-size: 1.4rem;
-}
-
-#seriesDetailGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--spacing-lg);
-  margin-top: var(--spacing-md);
-}
-
-/* Series Drawer/Modal Styles */
-.series-drawer {
-  position: fixed;
-  top: 0;
-  right: -600px;
-  width: 600px;
-  height: 100vh;
-  background: var(--bg-panel);
-  border-left: 1px solid var(--border-default);
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
-  z-index: 9999;
-  transition: right 0.3s ease-out;
-  overflow-y: auto;
-}
-
-.series-drawer.open {
-  right: 0;
-}
-
-.series-drawer-content {
-  padding: var(--spacing-lg);
-}
-
-.series-drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-md);
-  border-bottom: 1px solid var(--border-default);
-}
-
-.series-drawer-header h3 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-/* Series search button in cards */
-.series-search-btn {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.85rem;
-  border-radius: 3px;
-  border: 1px solid var(--btn-secondary-border);
-  background: var(--btn-secondary-bg);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.series-search-btn:hover {
-  border-color: var(--accent-maroon);
-  background: rgba(80, 0, 0, 0.2);
-}
-
-.series-search-btn.searching {
-  opacity: 0.7;
-  cursor: wait;
-}
-
-.series-search-btn.error {
-  border-color: var(--error);
-  color: var(--error);
-}
-
-.series-search-btn.success {
-  border-color: var(--success);
-  color: var(--success);
-}
-
-/* Mobile responsiveness for series page */
-@media (max-width: 768px) {
-  .series-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .series-controls input,
-  .series-controls select,
-  .series-controls button {
-    width: 100%;
-  }
-
-  #seriesDetailGrid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: var(--spacing-md);
-  }
-
-  .series-drawer {
-    width: 100%;
-    right: -100%;
-  }
-}
+/* SeriesView now uses NaiveUI components with scoped styles.
+   All legacy series styles have been removed to prevent conflicts.
+   See src/views/SeriesView.vue for new glassmorphism implementation. */
 
 .action-btn {
   padding: 0.35rem 0.75rem;
