@@ -5,56 +5,45 @@
       <n-space vertical :size="24">
         <!-- Hero Header -->
         <div class="hero-header">
-          <n-text tag="h1" class="hero-title" :depth="1">
+          <GlassTitle tag="h1">
             Audiobook Showcase
-          </n-text>
-          <n-text :depth="2" class="hero-subtitle">
+          </GlassTitle>
+          <GlassSubtitle>
             Discover audiobooks grouped by title with advanced search powered by Naive UI components
-          </n-text>
+          </GlassSubtitle>
         </div>
 
         <!-- Search Form -->
-        <n-form ref="formRef" :model="form" :show-feedback="false">
-          <n-space :size="12" align="end" :wrap="true">
-            <n-form-item label="Search Query" path="q" class="search-input-item">
-              <n-input
-                v-model:value="form.q"
-                placeholder="Search audiobooks..."
-                :style="{ width: inputWidth }"
-                clearable
-                @keyup.enter="runSearch"
-                @clear="clearSearch"
-              >
-                <template #prefix>
-                  <span style="opacity: 0.5">🔍</span>
-                </template>
-              </n-input>
-            </n-form-item>
+        <n-space :size="12" align="end" :wrap="true">
+          <div class="search-input-wrapper">
+            <GlassSearchBar
+              v-model="form.q"
+              placeholder="Search audiobooks..."
+              @search="runSearch"
+              @clear="clearSearch"
+            />
+          </div>
 
-            <n-form-item label="Results Limit" path="limit">
-              <n-select
-                v-model:value="form.limit"
-                :options="limitOptions"
-                :style="{ width: '140px' }"
-              />
-            </n-form-item>
+          <GlassSelect
+            v-model="form.limit"
+            :options="limitOptions"
+            width="140px"
+          />
 
-            <n-form-item label=" " path="action">
-              <n-button
-                type="primary"
-                size="medium"
-                @click="runSearch"
-                :loading="loading"
-                :disabled="!form.q.trim()"
-              >
-                <template #icon>
-                  <span>🔍</span>
-                </template>
-                Search
-              </n-button>
-            </n-form-item>
-          </n-space>
-        </n-form>
+          <n-button
+            type="primary"
+            size="medium"
+            @click="runSearch"
+            :loading="loading"
+            :disabled="!form.q.trim()"
+            class="glass-button-primary"
+          >
+            <template #icon>
+              <span>🔍</span>
+            </template>
+            Search
+          </n-button>
+        </n-space>
       </n-space>
     </n-card>
 
@@ -72,7 +61,7 @@
     <n-card v-if="detailGroup" class="detail-card" :bordered="false" ref="detailElement">
       <template #header>
         <n-space justify="space-between" align="center">
-          <n-text tag="h2" class="detail-title">{{ detailGroup.display_title }}</n-text>
+          <GlassTitle tag="h2">{{ detailGroup.display_title }}</GlassTitle>
           <n-space :size="8">
             <n-button secondary @click="searchThisTitle" title="Search MAM for this title (25 results)">
               🔍 Search MAM
@@ -194,10 +183,6 @@ import {
   NCard,
   NSpace,
   NText,
-  NForm,
-  NFormItem,
-  NInput,
-  NSelect,
   NButton,
   NTag,
   NDivider,
@@ -206,6 +191,10 @@ import {
   NSkeleton
 } from 'naive-ui'
 import ShowcaseCard from '@components/ShowcaseCard.vue'
+import GlassSearchBar from '@components/GlassSearchBar.vue'
+import GlassSelect from '@components/GlassSelect.vue'
+import GlassTitle from '@components/GlassTitle.vue'
+import GlassSubtitle from '@components/GlassSubtitle.vue'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 
@@ -530,7 +519,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 
 /* Hero Panel - Audible/Jellyseerr Inspired */
 .hero-panel {
-  background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(26, 26, 26, 0.8) 100%);
+  background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.8) 100%);
   border-radius: 16px;
   margin-bottom: var(--spacing-lg, 1.5rem);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -539,27 +528,25 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 .hero-header {
   text-align: center;
   padding: var(--spacing-md, 1rem) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm, 0.5rem);
 }
 
-.hero-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: var(--spacing-sm, 0.5rem);
-  background: linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+/* Title styles now handled by GlassTitle/GlassSubtitle components */
 
-.hero-subtitle {
-  font-size: 1rem;
-  opacity: 0.85;
-}
-
-/* Make search input take priority in layout */
-.search-input-item {
+/* Make search input responsive */
+.search-input-wrapper {
   flex: 1;
   min-width: 200px;
+}
+
+@media (max-width: 768px) {
+  .search-input-wrapper {
+    min-width: 150px;
+    width: 100%;
+  }
 }
 
 /* Status Card */
@@ -580,16 +567,13 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 /* Detail Card */
 .detail-card {
   margin-top: var(--spacing-xl, 2rem);
-  background: rgba(26, 26, 26, 0.9);
+  background: rgba(0, 0, 0, 0.9);
   border: 2px solid rgba(80, 0, 0, 0.5);
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
-.detail-title {
-  font-size: 1.6rem;
-  font-weight: 700;
-}
+/* Detail title styles now handled by GlassTitle component */
 
 .detail-content {
   padding: var(--spacing-md, 1rem);
@@ -664,14 +648,6 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .hero-title {
-    font-size: 1.5rem;
-  }
-
-  .hero-subtitle {
-    font-size: 0.9rem;
-  }
-
   .showcase-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: var(--spacing-md, 1rem);

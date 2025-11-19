@@ -5,66 +5,52 @@
       <n-space vertical :size="24">
         <!-- Hero Header -->
         <div class="hero-header">
-          <n-text tag="h1" class="hero-title">
+          <GlassTitle tag="h1">
             Series Discovery
-          </n-text>
-          <n-text :depth="2" class="hero-subtitle">
+          </GlassTitle>
+          <GlassSubtitle>
             Discover audiobook series powered by Hardcover API
-          </n-text>
+          </GlassSubtitle>
         </div>
 
         <!-- Search Form -->
-        <n-form ref="formRef" :model="form" :show-feedback="false">
-          <n-space :size="12" align="end" :wrap="true">
-            <n-form-item label="Book Title" path="title" class="search-input-item">
-              <n-input
-                v-model:value="form.title"
-                placeholder="Search by title..."
-                :style="{ width: inputWidth }"
-                clearable
-                @keyup.enter="runSearch"
-                @clear="clearSearch"
-              >
-                <template #prefix>
-                  <span style="opacity: 0.5">📚</span>
-                </template>
-              </n-input>
-            </n-form-item>
+        <n-space :size="12" align="end" :wrap="true">
+          <div class="search-input-wrapper">
+            <GlassSearchBar
+              v-model="form.title"
+              placeholder="Search by title..."
+              @search="runSearch"
+            />
+          </div>
 
-            <n-form-item label="Author (Optional)" path="author">
-              <n-input
-                v-model:value="form.author"
-                placeholder="Author name..."
-                :style="{ width: '200px' }"
-                clearable
-                @keyup.enter="runSearch"
-              />
-            </n-form-item>
+          <div class="author-input-wrapper">
+            <GlassSearchBar
+              v-model="form.author"
+              placeholder="Author (optional)..."
+              @search="runSearch"
+            />
+          </div>
 
-            <n-form-item label="Results Limit" path="limit">
-              <n-select
-                v-model:value="form.limit"
-                :options="limitOptions"
-                :style="{ width: '140px' }"
-              />
-            </n-form-item>
+          <GlassSelect
+            v-model="form.limit"
+            :options="limitOptions"
+            width="140px"
+          />
 
-            <n-form-item label=" " path="action">
-              <n-button
-                type="primary"
-                size="medium"
-                @click="runSearch"
-                :loading="loading"
-                :disabled="!form.title.trim()"
-              >
-                <template #icon>
-                  <span>🔍</span>
-                </template>
-                Search Series
-              </n-button>
-            </n-form-item>
-          </n-space>
-        </n-form>
+          <n-button
+            type="primary"
+            size="medium"
+            @click="runSearch"
+            :loading="loading"
+            :disabled="!form.title.trim()"
+            class="glass-button-primary"
+          >
+            <template #icon>
+              <span>🔍</span>
+            </template>
+            Search Series
+          </n-button>
+        </n-space>
       </n-space>
     </n-card>
 
@@ -90,7 +76,7 @@
     <n-card v-if="detailItem" class="detail-card" :bordered="false" ref="detailElement">
       <template #header>
         <n-space justify="space-between" align="center">
-          <n-text tag="h2" class="detail-title">{{ detailItem.series_name }}</n-text>
+          <GlassTitle tag="h2">{{ detailItem.series_name }}</GlassTitle>
           <n-button @click="closeDetail" quaternary circle>
             <template #icon>
               <span style="font-size: 18px">✕</span>
@@ -143,10 +129,6 @@ import {
   NCard,
   NSpace,
   NText,
-  NForm,
-  NFormItem,
-  NInput,
-  NSelect,
   NButton,
   NTag,
   NDivider,
@@ -154,6 +136,10 @@ import {
 } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useSeriesDataTable, useBooksDataTable } from '@composables/naive/useSeriesDataTable'
+import GlassSearchBar from '@components/GlassSearchBar.vue'
+import GlassSelect from '@components/GlassSelect.vue'
+import GlassTitle from '@components/GlassTitle.vue'
+import GlassSubtitle from '@components/GlassSubtitle.vue'
 
 const api = useApi()
 const route = useRoute()
@@ -365,7 +351,7 @@ watch(() => [route.query.title, route.query.author, route.query.limit], () => {
 
 /* Hero Panel - Glassmorphism */
 .hero-panel {
-  background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(26, 26, 26, 0.8) 100%);
+  background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.8) 100%);
   border-radius: 16px;
   margin-bottom: var(--spacing-lg, 1.5rem);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -375,27 +361,30 @@ watch(() => [route.query.title, route.query.author, route.query.limit], () => {
 .hero-header {
   text-align: center;
   padding: var(--spacing-md, 1rem) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm, 0.5rem);
 }
 
-.hero-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: var(--spacing-sm, 0.5rem);
-  background: linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+/* Title styles now handled by GlassTitle/GlassSubtitle components */
 
-.hero-subtitle {
-  font-size: 1rem;
-  opacity: 0.85;
-}
-
-/* Make search input take priority in layout */
-.search-input-item {
+/* Make search inputs responsive */
+.search-input-wrapper {
   flex: 1;
   min-width: 250px;
+}
+
+.author-input-wrapper {
+  min-width: 200px;
+}
+
+@media (max-width: 768px) {
+  .search-input-wrapper,
+  .author-input-wrapper {
+    min-width: 150px;
+    width: 100%;
+  }
 }
 
 /* Status Card */
@@ -413,17 +402,14 @@ watch(() => [route.query.title, route.query.author, route.query.limit], () => {
 /* Detail Card - Glassmorphism */
 .detail-card {
   margin-top: var(--spacing-xl, 2rem);
-  background: rgba(26, 26, 26, 0.9);
+  background: rgba(0, 0, 0, 0.9);
   border: 2px solid rgba(80, 0, 0, 0.5);
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
 }
 
-.detail-title {
-  font-size: 1.6rem;
-  font-weight: 700;
-}
+/* Detail title styles now handled by GlassTitle component */
 
 .detail-content {
   padding: var(--spacing-md, 1rem);
@@ -435,20 +421,8 @@ watch(() => [route.query.title, route.query.author, route.query.limit], () => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .hero-title {
-    font-size: 1.5rem;
-  }
-
-  .hero-subtitle {
-    font-size: 0.9rem;
-  }
-
   .search-input-item {
     min-width: 100%;
-  }
-
-  .detail-title {
-    font-size: 1.3rem;
   }
 }
 </style>

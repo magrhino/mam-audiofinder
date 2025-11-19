@@ -1,20 +1,39 @@
 <template>
   <div class="search-view">
-    <form class="row" @submit.prevent="runSearch">
-      <input v-model="form.q" type="text" placeholder="Search title/author/narrator" />
-      <select v-model="form.sort">
-        <option value="default">Sort: Default</option>
-        <option value="seedersDesc">Seeders ↓</option>
-        <option value="dateDesc">Date Added ↓</option>
-        <option value="sizeDesc">Size ↓</option>
-      </select>
-      <select v-model="form.perpage">
-        <option value="25">25</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-      </select>
-      <button type="submit">Search</button>
-    </form>
+    <n-space :size="12" :wrap="true" align="end" class="search-form">
+      <div class="search-input-wrapper">
+        <GlassSearchBar
+          v-model="form.q"
+          placeholder="Search title/author/narrator"
+          @search="runSearch"
+        />
+      </div>
+
+      <GlassSelect
+        v-model="form.sort"
+        :options="sortOptions"
+        width="160px"
+      />
+
+      <GlassSelect
+        v-model="form.perpage"
+        :options="perpageOptions"
+        width="100px"
+      />
+
+      <n-button
+        type="primary"
+        @click="runSearch"
+        :loading="loading"
+        :disabled="!form.q.trim()"
+        class="glass-button-primary"
+      >
+        <template #icon>
+          <span>🔍</span>
+        </template>
+        Search
+      </n-button>
+    </n-space>
 
     <div class="muted" v-text="status"></div>
 
@@ -37,9 +56,11 @@
 import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBreakpoints } from '@vueuse/core'
-import { NDataTable } from 'naive-ui'
+import { NDataTable, NSpace, NButton } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
+import GlassSearchBar from '@components/GlassSearchBar.vue'
+import GlassSelect from '@components/GlassSelect.vue'
 
 const api = useApi()
 const route = useRoute()
@@ -82,6 +103,20 @@ const {
 const form = reactive({ q: '', sort: 'default', perpage: '25' })
 const status = ref('')
 const loading = ref(false)
+
+// Dropdown options
+const sortOptions = [
+  { label: 'Sort: Default', value: 'default' },
+  { label: 'Seeders ↓', value: 'seedersDesc' },
+  { label: 'Date Added ↓', value: 'dateDesc' },
+  { label: 'Size ↓', value: 'sizeDesc' }
+]
+
+const perpageOptions = [
+  { label: '25', value: '25' },
+  { label: '50', value: '50' },
+  { label: '100', value: '100' }
+]
 
 const normalizeQuery = (values) => {
   const query = {}
@@ -187,6 +222,16 @@ watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
 </script>
 
 <style scoped>
+/* Search form spacing */
+.search-form {
+  margin-bottom: var(--spacing-md, 1rem);
+}
+
+.search-input-wrapper {
+  flex: 1;
+  min-width: 200px;
+}
+
 /* Glass table wrapper applied via global .glass-table-wrapper class */
 
 /* Mobile: Optimized padding */
@@ -194,6 +239,11 @@ watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
   .glass-table-wrapper {
     margin-left: calc(-1 * var(--spacing-md, 1rem));
     margin-right: calc(-1 * var(--spacing-md, 1rem));
+  }
+
+  .search-input-wrapper {
+    min-width: 150px;
+    width: 100%;
   }
 }
 </style>

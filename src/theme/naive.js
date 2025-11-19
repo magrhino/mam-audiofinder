@@ -32,8 +32,8 @@ export const customTheme = {
     errorColorPressed: '#8f2727',
 
     // Base backgrounds
-    baseColor: '#1a1a1a',
-    bodyColor: '#1a1a1a',
+    baseColor: '#000000',
+    bodyColor: '#000000',
 
     // Card/Panel backgrounds
     cardColor: '#242424',
