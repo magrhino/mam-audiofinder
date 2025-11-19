@@ -205,6 +205,7 @@ function createColumns(viewType, callbacks) {
         return h(NButton, {
           size: 'small',
           type: 'primary',
+          class: 'glass-button-primary',
           disabled: isDisabled,
           onClick: () => onAdd && onAdd(row)
         }, { default: () => 'Add' })
@@ -236,7 +237,9 @@ function createColumns(viewType, callbacks) {
         }
         return h(NTag, {
           type: typeMap[row.qb_status.toLowerCase()] || 'default',
-          size: 'small'
+          size: 'small',
+          class: 'glass-tag',
+          bordered: false
         }, { default: () => row.qb_status })
       }
     },
@@ -271,7 +274,9 @@ function createColumns(viewType, callbacks) {
         const icon = iconMap[row.abs_verify_status] || ''
         return h(NTag, {
           type: typeMap[row.abs_verify_status] || 'default',
-          size: 'small'
+          size: 'small',
+          class: 'glass-tag',
+          bordered: false
         }, { default: () => `${icon} ${row.abs_verify_status}` })
       }
     },
@@ -285,11 +290,13 @@ function createColumns(viewType, callbacks) {
         return h('div', { style: 'display: flex; gap: 8px;' }, [
           h(NButton, {
             size: 'small',
+            class: 'glass-button',
             onClick: () => onVerify && onVerify(row)
           }, { default: () => '🔄 Verify' }),
           h(NButton, {
             size: 'small',
             type: 'error',
+            class: 'glass-button',
             onClick: () => onDelete && onDelete(row)
           }, { default: () => '🗑 Delete' })
         ])
