@@ -240,30 +240,34 @@ export function useImport(historyItem) {
     }
   })
 
-  // Contextual messaging
+  // Contextual messaging - can show multiple warnings/messages
   const contextualMessage = computed(() => {
-    // Check for torrent mismatch first (highest priority warning)
+    const messages = []
+
+    // Priority 1: Torrent mismatch warning (critical)
     if (torrentMismatchWarning.value) {
-      return `${torrentMismatchWarning.value.warning}\n${torrentMismatchWarning.value.detail}`
+      messages.push(torrentMismatchWarning.value.warning)
+      messages.push(torrentMismatchWarning.value.detail)
     }
 
+    // Priority 2: Missing required fields
     if (!form.author?.trim() || !form.title?.trim()) {
-      return '⚠️ Author and title are required for import'
+      messages.push('⚠️ Author and title are required for import')
     }
 
+    // Priority 3: Multi-disc detection (can appear alongside mismatch warning)
     if (hasMultiDisc.value && !form.flatten) {
-      return '💿 Multi-disc structure detected - consider enabling flatten'
+      messages.push('💿 Multi-disc structure detected - consider enabling flatten')
+    } else if (hasMultiDisc.value && form.flatten) {
+      messages.push('✓ Multi-disc will be flattened to sequential files')
     }
 
-    if (hasMultiDisc.value && form.flatten) {
-      return '✓ Multi-disc will be flattened to sequential files'
+    // Priority 4: No torrent selected
+    if (!form.selectedHash && messages.length === 0) {
+      messages.push('Select a torrent to import')
     }
 
-    if (!form.selectedHash) {
-      return 'Select a torrent to import'
-    }
-
-    return ''
+    return messages.join('\n')
   })
 
   // Watch for torrent selection changes to auto-fetch tree
