@@ -1,58 +1,236 @@
 <template>
-  <div class="series-view card">
-    <div class="series-header">
-      <h3>Series Discovery</h3>
-      <div class="series-controls">
-        <input v-model="form.title" type="text" placeholder="Book title..." style="width: 250px" @keyup.enter="runSearch">
-        <input v-model="form.author" type="text" placeholder="Author (optional)" style="width: 200px" @keyup.enter="runSearch">
-        <select v-model="form.limit">
-          <option value="5">5 results</option>
-          <option value="10">10 results</option>
-          <option value="20">20 results</option>
-          <option value="30">30 results</option>
-          <option value="40">40 results</option>
-          <option value="50">50 results</option>
-        </select>
-        <button class="primary" @click="runSearch">🔍 Search Series</button>
-      </div>
-    </div>
-    <div class="muted" style="margin: 1rem 0;" v-text="status"></div>
-
-    <div v-if="!detail">
-      <SeriesTable :items="results" @select="loadDetail" />
-    </div>
-
-    <div v-else>
-      <div style="margin: 1rem 0;">
-        <button class="secondary" @click="detail = null">← Back to Series List</button>
-      </div>
-      <h3>{{ detail.series_name }}</h3>
-      <div class="showcase-grid">
-        <div class="showcase-card" v-for="book in detail.books" :key="book.book_id">
-          <div class="showcase-title">{{ book.title }}</div>
-          <div class="showcase-author">{{ book.author || book.author_name }}</div>
-          <div class="muted">{{ book.release_year }} • {{ book.page_count || '?' }} pages</div>
-          <div class="showcase-description">{{ book.description || 'No description available.' }}</div>
+  <div class="series-view">
+    <!-- Hero Panel - Glassmorphism Style -->
+    <n-card class="hero-panel" :bordered="false">
+      <n-space vertical :size="24">
+        <!-- Hero Header -->
+        <div class="hero-header">
+          <n-text tag="h1" class="hero-title">
+            Series Discovery
+          </n-text>
+          <n-text :depth="2" class="hero-subtitle">
+            Discover audiobook series powered by Hardcover API
+          </n-text>
         </div>
-      </div>
+
+        <!-- Search Form -->
+        <n-form ref="formRef" :model="form" :show-feedback="false">
+          <n-space :size="12" align="end" :wrap="true">
+            <n-form-item label="Book Title" path="title" class="search-input-item">
+              <n-input
+                v-model:value="form.title"
+                placeholder="Search by title..."
+                :style="{ width: inputWidth }"
+                clearable
+                @keyup.enter="runSearch"
+                @clear="clearSearch"
+              >
+                <template #prefix>
+                  <span style="opacity: 0.5">📚</span>
+                </template>
+              </n-input>
+            </n-form-item>
+
+            <n-form-item label="Author (Optional)" path="author">
+              <n-input
+                v-model:value="form.author"
+                placeholder="Author name..."
+                :style="{ width: '200px' }"
+                clearable
+                @keyup.enter="runSearch"
+              />
+            </n-form-item>
+
+            <n-form-item label="Results Limit" path="limit">
+              <n-select
+                v-model:value="form.limit"
+                :options="limitOptions"
+                :style="{ width: '140px' }"
+              />
+            </n-form-item>
+
+            <n-form-item label=" " path="action">
+              <n-button
+                type="primary"
+                size="medium"
+                @click="runSearch"
+                :loading="loading"
+                :disabled="!form.title.trim()"
+              >
+                <template #icon>
+                  <span>🔍</span>
+                </template>
+                Search Series
+              </n-button>
+            </n-form-item>
+          </n-space>
+        </n-form>
+      </n-space>
+    </n-card>
+
+    <!-- Status Card -->
+    <n-card v-if="status" class="status-card" :bordered="false">
+      <n-text :depth="2">{{ status }}</n-text>
+    </n-card>
+
+    <!-- Series Results Table -->
+    <div v-if="!detailItem && results.length" class="table-wrapper">
+      <n-data-table
+        ref="seriesTableRef"
+        :columns="seriesColumns"
+        :data="results"
+        :pagination="seriesPagination"
+        :bordered="false"
+        :scroll-x="scrollX"
+        striped
+      />
     </div>
+
+    <!-- Detail View -->
+    <n-card v-if="detailItem" class="detail-card" :bordered="false" ref="detailElement">
+      <template #header>
+        <n-space justify="space-between" align="center">
+          <n-text tag="h2" class="detail-title">{{ detailItem.series_name }}</n-text>
+          <n-button @click="closeDetail" quaternary circle>
+            <template #icon>
+              <span style="font-size: 18px">✕</span>
+            </template>
+          </n-button>
+        </n-space>
+      </template>
+
+      <div class="detail-content">
+        <!-- Series Metadata -->
+        <n-space :size="12" style="margin-bottom: 1.5rem">
+          <n-tag v-if="detailItem.author_name" type="info" :bordered="false" size="medium">
+            📝 {{ detailItem.author_name }}
+          </n-tag>
+          <n-tag type="default" :bordered="false" size="medium">
+            📚 {{ detailItem.book_count || 0 }} books
+          </n-tag>
+          <n-tag v-if="detailItem.readers_count" type="success" :bordered="false" size="medium">
+            📖 {{ detailItem.readers_count.toLocaleString() }} readers
+          </n-tag>
+        </n-space>
+
+        <n-divider />
+
+        <!-- Books Table -->
+        <n-text tag="h3" :depth="1" style="margin-bottom: 16px">
+          Books in Series
+        </n-text>
+
+        <n-data-table
+          ref="booksTableRef"
+          :columns="booksColumns"
+          :data="booksData"
+          :pagination="booksPagination"
+          :bordered="false"
+          :scroll-x="scrollX"
+          striped
+          class="books-table"
+        />
+      </div>
+    </n-card>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import SeriesTable from '@components/SeriesTable.vue'
+import { useBreakpoints } from '@vueuse/core'
+import {
+  NCard,
+  NSpace,
+  NText,
+  NForm,
+  NFormItem,
+  NInput,
+  NSelect,
+  NButton,
+  NTag,
+  NDivider,
+  NDataTable
+} from 'naive-ui'
 import { useApi } from '@composables/useApi'
+import { useSeriesDataTable, useBooksDataTable } from '@composables/naive/useSeriesDataTable'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
-const form = reactive({ title: '', author: '', limit: '20' })
-const status = ref('Search for a title to see matching series.')
-const results = ref([])
-const detail = ref(null)
 
+// Responsive breakpoints for dynamic input width
+const breakpoints = useBreakpoints({
+  mobile: 0,
+  tablet: 768,
+  desktop: 1024
+})
+
+// Dynamic input width based on screen size
+const inputWidth = computed(() => {
+  if (breakpoints.greater('desktop').value) {
+    return '400px'
+  } else if (breakpoints.greater('tablet').value) {
+    return '300px'
+  } else {
+    return '100%'
+  }
+})
+
+// Dynamic scroll-x for responsive tables
+const scrollX = computed(() => {
+  if (breakpoints.greater('desktop').value) {
+    return 1000
+  } else if (breakpoints.greater('tablet').value) {
+    return 900
+  } else {
+    return 700
+  }
+})
+
+// Form configuration
+const formRef = ref(null)
+const form = reactive({ title: '', author: '', limit: '20' })
+const limitOptions = [
+  { label: '5 results', value: '5' },
+  { label: '10 results', value: '10' },
+  { label: '20 results', value: '20' },
+  { label: '30 results', value: '30' },
+  { label: '40 results', value: '40' },
+  { label: '50 results', value: '50' }
+]
+
+const status = ref('Search for a title to see matching series.')
+const loading = ref(false)
+const results = ref([])
+
+// Detail view state
+const detailItem = ref(null)
+const detailElement = ref(null)
+
+// Initialize series results table
+const {
+  tableRef: seriesTableRef,
+  columns: seriesColumns,
+  pagination: seriesPagination
+} = useSeriesDataTable({
+  onSelect: loadDetail,
+  defaultPageSize: 20
+})
+
+// Initialize books table
+const {
+  tableRef: booksTableRef,
+  data: booksData,
+  columns: booksColumns,
+  pagination: booksPagination,
+  setData: setBooksData,
+  clearData: clearBooksData
+} = useBooksDataTable({
+  defaultPageSize: 10
+})
+
+// URL parameter normalization
 const normalizeQuery = (values) => {
   const query = {}
   Object.entries(values).forEach(([key, value]) => {
@@ -63,6 +241,7 @@ const normalizeQuery = (values) => {
   return query
 }
 
+// Sync form with URL query parameters
 const syncForm = () => {
   const getValue = (key, fallback) => {
     const value = route.query[key]
@@ -77,23 +256,33 @@ const syncForm = () => {
   form.limit = getValue('limit', '20')
 }
 
+// Run series search
 const runSearch = async () => {
   if (!form.title.trim()) {
     status.value = 'Please enter a book title.'
     results.value = []
-    detail.value = null
+    detailItem.value = null
     return
   }
+
+  loading.value = true
   status.value = 'Searching for series…'
-  detail.value = null
+  detailItem.value = null
+  clearBooksData()
+
   try {
     const data = await api.searchSeries({
       title: form.title.trim(),
       author: form.author.trim(),
       limit: parseInt(form.limit, 10)
     })
+
     results.value = data.hardcover_series || []
-    status.value = results.value.length ? `Found ${results.value.length} series` : 'No series found.'
+    status.value = results.value.length
+      ? `Found ${results.value.length} series`
+      : 'No series found.'
+
+    // Update URL with search parameters
     router.replace({
       query: normalizeQuery({
         title: form.title.trim(),
@@ -103,20 +292,48 @@ const runSearch = async () => {
     })
   } catch (err) {
     status.value = `Series search failed: ${err.message}`
+  } finally {
+    loading.value = false
   }
 }
 
-const loadDetail = async (series) => {
+// Clear search
+const clearSearch = () => {
+  form.title = ''
+  form.author = ''
+  results.value = []
+  detailItem.value = null
+  clearBooksData()
+  status.value = 'Search for a title to see matching series.'
+}
+
+// Load series detail
+async function loadDetail(series) {
   status.value = 'Loading series books…'
+  detailItem.value = series
+
   try {
     const data = await api.getSeriesBooks(series.series_id)
-    detail.value = data
+
+    // Set books data
+    setBooksData(data.books || [])
+
     status.value = `${data.books?.length || 0} books in this series`
   } catch (err) {
     status.value = `Failed to load series: ${err.message}`
   }
 }
 
+// Close detail view
+const closeDetail = () => {
+  detailItem.value = null
+  clearBooksData()
+  status.value = results.value.length
+    ? `Found ${results.value.length} series`
+    : 'Search for a title to see matching series.'
+}
+
+// Lifecycle hooks
 onMounted(() => {
   syncForm()
   if (form.title) {
@@ -124,6 +341,7 @@ onMounted(() => {
   }
 })
 
+// Watch for URL parameter changes
 watch(() => [route.query.title, route.query.author, route.query.limit], () => {
   const previous = form.title
   syncForm()
@@ -132,12 +350,105 @@ watch(() => [route.query.title, route.query.author, route.query.limit], () => {
   }
   if (!form.title) {
     results.value = []
-    detail.value = null
+    detailItem.value = null
     status.value = 'Please enter a book title.'
   }
 })
 </script>
 
 <style scoped>
-/* Uses main.css styles */
+.series-view {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--spacing-md, 1rem);
+}
+
+/* Hero Panel - Glassmorphism */
+.hero-panel {
+  background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(26, 26, 26, 0.8) 100%);
+  border-radius: 16px;
+  margin-bottom: var(--spacing-lg, 1.5rem);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.hero-header {
+  text-align: center;
+  padding: var(--spacing-md, 1rem) 0;
+}
+
+.hero-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-sm, 0.5rem);
+  background: linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+
+/* Make search input take priority in layout */
+.search-input-item {
+  flex: 1;
+  min-width: 250px;
+}
+
+/* Status Card */
+.status-card {
+  margin-bottom: var(--spacing-lg, 1.5rem);
+  background: rgba(36, 36, 36, 0.5);
+  border-radius: 8px;
+}
+
+/* Table Wrapper */
+.table-wrapper {
+  margin-top: var(--spacing-lg, 1.5rem);
+}
+
+/* Detail Card - Glassmorphism */
+.detail-card {
+  margin-top: var(--spacing-xl, 2rem);
+  background: rgba(26, 26, 26, 0.9);
+  border: 2px solid rgba(80, 0, 0, 0.5);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.detail-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.detail-content {
+  padding: var(--spacing-md, 1rem);
+}
+
+.books-table {
+  margin-top: var(--spacing-md, 1rem);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 1.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .search-input-item {
+    min-width: 100%;
+  }
+
+  .detail-title {
+    font-size: 1.3rem;
+  }
+}
 </style>
