@@ -138,11 +138,40 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
 
     logger.info(f"📋 Raw book titles from Hardcover API ({len(book_titles)} total): {book_titles}")
 
-    # Deduplicate book titles (Hardcover API sometimes returns duplicates)
+    # Step 1: Filter out combined/omnibus titles (e.g., "Book 1 / Book 2 / Book 3")
+    # These are box sets or collections that contain multiple books in one title
+    def is_combined_title(title: str) -> bool:
+        """Detect if a title is a combined/omnibus edition."""
+        if not isinstance(title, str):
+            return False
+        # Check for slash separators (common in omnibus titles)
+        # Must have spaces around slash to avoid false positives like "and/or"
+        if " / " in title:
+            # Count how many slashes - 2+ slashes likely means combined title
+            slash_count = title.count(" / ")
+            if slash_count >= 2:
+                return True
+            # Even with 1 slash, if title is very long (>80 chars), likely omnibus
+            if slash_count >= 1 and len(title) > 80:
+                return True
+        return False
+
+    filtered_titles = []
+    for title in book_titles:
+        if isinstance(title, str):
+            if is_combined_title(title):
+                logger.warning(f"🗑️  Filtered out combined/omnibus title: '{title}'")
+            else:
+                filtered_titles.append(title)
+
+    if len(filtered_titles) < len(book_titles):
+        logger.info(f"🔍 Filtered out {len(book_titles) - len(filtered_titles)} combined/omnibus title(s)")
+
+    # Step 2: Deduplicate book titles (Hardcover API sometimes returns duplicates)
     # Use dict to preserve order while removing case-insensitive duplicates
     seen_titles = {}
     unique_titles = []
-    for title in book_titles:
+    for title in filtered_titles:
         if isinstance(title, str):
             # Normalize title for comparison (lowercase, strip whitespace)
             normalized = title.strip().lower()
@@ -153,14 +182,14 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
                 # Log each duplicate found
                 logger.warning(f"⚠️  Duplicate book title detected and removed: '{title}'")
 
-    if len(unique_titles) < len(book_titles):
-        logger.warning(f"🔍 Deduplication: Removed {len(book_titles) - len(unique_titles)} duplicate(s) from series '{series_data.get('series_name')}'")
-        logger.info(f"   Before: {book_titles}")
-        logger.info(f"   After: {unique_titles}")
+    if len(unique_titles) < len(filtered_titles):
+        logger.warning(f"🔍 Deduplication: Removed {len(filtered_titles) - len(unique_titles)} duplicate(s) from series '{series_data.get('series_name')}'")
+        logger.info(f"   Before dedup: {filtered_titles}")
+        logger.info(f"   After dedup: {unique_titles}")
 
     logger.info(f"📖 Enriching {len(unique_titles)} unique books for series '{series_data.get('series_name')}'")
 
-    # Step 2: Enrich each book title with full details
+    # Step 3: Enrich each book title with full details
     enriched_books = []
     for book_title in unique_titles:
         if not book_title or not isinstance(book_title, str):
