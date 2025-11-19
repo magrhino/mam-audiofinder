@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch, computed } from 'vue'
+import { onMounted, reactive, ref, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBreakpoints } from '@vueuse/core'
 import {
@@ -194,6 +194,13 @@ const results = ref([])
 const detailItem = ref(null)
 const detailElement = ref(null)
 
+const scrollToDetailCard = async () => {
+  await nextTick()
+  if (detailElement.value?.$el) {
+    detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
 // Initialize series results table
 const {
   tableRef: seriesTableRef,
@@ -216,7 +223,7 @@ const {
   defaultPageSize: 10
 })
 
-// URL parameter normalization
+// URL parameter handling helpers
 const normalizeQuery = (values) => {
   const query = {}
   Object.entries(values).forEach(([key, value]) => {
@@ -227,19 +234,18 @@ const normalizeQuery = (values) => {
   return query
 }
 
+const getQueryValue = (value, fallback = undefined) => {
+  if (Array.isArray(value)) {
+    return value[value.length - 1] ?? fallback
+  }
+  return value ?? fallback
+}
+
 // Sync form with URL query parameters
 const syncForm = () => {
-  const getValue = (key, fallback) => {
-    const value = route.query[key]
-    if (Array.isArray(value)) {
-      return value[value.length - 1] ?? fallback
-    }
-    return value ?? fallback
-  }
-
-  form.title = getValue('title', '')
-  form.author = getValue('author', '')
-  form.limit = getValue('limit', '20')
+  form.title = getQueryValue(route.query.title, '')
+  form.author = getQueryValue(route.query.author, '')
+  form.limit = getQueryValue(route.query.limit, '20')
 }
 
 // Run series search
@@ -269,13 +275,20 @@ const runSearch = async () => {
       : 'No series found.'
 
     // Update URL with search parameters
+    const detailParam = getQueryValue(route.query.detail)
     router.replace({
+      name: 'series',
       query: normalizeQuery({
         title: form.title.trim(),
         author: form.author.trim(),
-        limit: form.limit
+        limit: form.limit,
+        detail: detailParam
       })
     })
+
+    if (detailParam) {
+      await restoreDetailFromUrl()
+    }
   } catch (err) {
     status.value = `Series search failed: ${err.message}`
   } finally {
@@ -294,9 +307,22 @@ const clearSearch = () => {
 }
 
 // Load series detail
-async function loadDetail(series) {
+async function loadDetail(series, options = {}) {
+  const { suppressNavigation = false } = options
   status.value = 'Loading series books…'
   detailItem.value = series
+  clearBooksData()
+  await scrollToDetailCard()
+
+  if (!suppressNavigation) {
+    router.push({
+      name: 'series',
+      query: {
+        ...route.query,
+        detail: String(series.series_id)
+      }
+    })
+  }
 
   try {
     const data = await api.getSeriesBooks(series.series_id)
@@ -311,12 +337,37 @@ async function loadDetail(series) {
 }
 
 // Close detail view
-const closeDetail = () => {
+const closeDetail = (options = {}) => {
+  const { suppressNavigation = false } = options
   detailItem.value = null
   clearBooksData()
   status.value = results.value.length
     ? `Found ${results.value.length} series`
     : 'Search for a title to see matching series.'
+
+  if (!suppressNavigation) {
+    const query = { ...route.query }
+    delete query.detail
+    router.replace({
+      name: 'series',
+      query
+    })
+  }
+}
+
+async function restoreDetailFromUrl() {
+  const detailId = getQueryValue(route.query.detail)
+  if (!detailId || !results.value.length) {
+    return
+  }
+
+  const match = results.value.find(
+    (series) => String(series.series_id) === String(detailId)
+  )
+
+  if (match) {
+    await loadDetail(match, { suppressNavigation: true })
+  }
 }
 
 // Lifecycle hooks
@@ -338,6 +389,26 @@ watch(() => [route.query.title, route.query.author, route.query.limit], () => {
     results.value = []
     detailItem.value = null
     status.value = 'Please enter a book title.'
+  }
+})
+
+// Watch detail query parameter for navigation events (back/forward)
+watch(() => route.query.detail, async (newDetail, oldDetail) => {
+  const normalizedNew = getQueryValue(newDetail)
+  const normalizedOld = getQueryValue(oldDetail)
+
+  if (
+    normalizedNew &&
+    detailItem.value &&
+    String(detailItem.value.series_id) === String(normalizedNew)
+  ) {
+    return
+  }
+
+  if (normalizedNew && normalizedNew !== normalizedOld) {
+    await restoreDetailFromUrl()
+  } else if (!normalizedNew && normalizedOld && detailItem.value) {
+    closeDetail({ suppressNavigation: true })
   }
 })
 </script>
