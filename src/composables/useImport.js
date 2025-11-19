@@ -204,8 +204,49 @@ export function useImport(historyItem) {
     return showTree.value ? 'Hide Files' : '📁 View Files'
   })
 
+  // Check for torrent mismatch (selected torrent doesn't match history item)
+  const torrentMismatchWarning = computed(() => {
+    if (!historyItem || !form.selectedHash) return null
+
+    const selected = selectedTorrent.value
+    if (!selected) return null
+
+    const historyMamId = String(historyItem.mam_id || '').trim()
+    const selectedMamId = String(selected.mam_id || '').trim()
+    const historyHash = historyItem.qb_hash
+
+    // If matched by hash, no mismatch
+    if (historyHash && form.selectedHash === historyHash) {
+      return null
+    }
+
+    // If both have mam_id and they match, no mismatch
+    if (historyMamId && selectedMamId && historyMamId === selectedMamId) {
+      return null
+    }
+
+    // If neither has mam_id, we can't determine mismatch reliably
+    if (!historyMamId && !selectedMamId) {
+      return null
+    }
+
+    // Otherwise, it's a potential mismatch
+    const selectedName = selected.name || 'Unknown'
+    const expectedName = historyItem.title || 'Unknown'
+
+    return {
+      warning: '⚠️ This torrent does not match the history item',
+      detail: `Selected: ${selectedName} | Expected: ${expectedName}`
+    }
+  })
+
   // Contextual messaging
   const contextualMessage = computed(() => {
+    // Check for torrent mismatch first (highest priority warning)
+    if (torrentMismatchWarning.value) {
+      return `${torrentMismatchWarning.value.warning}\n${torrentMismatchWarning.value.detail}`
+    }
+
     if (!form.author?.trim() || !form.title?.trim()) {
       return '⚠️ Author and title are required for import'
     }
