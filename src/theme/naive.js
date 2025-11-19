@@ -93,36 +93,36 @@ export const customTheme = {
   },
 
   DataTable: {
-    // Header styling
-    thColor: '#2a2a2a',
-    thColorHover: '#323232',
+    // Header styling - Glassmorphic
+    thColor: 'rgba(42, 42, 42, 0.7)',
+    thColorHover: 'rgba(50, 50, 50, 0.8)',
     thTextColor: '#e8e8e8',
     thFontWeight: '600',
-    thButtonColorHover: 'rgba(80, 0, 0, 0.1)',
+    thButtonColorHover: 'rgba(80, 0, 0, 0.2)',
     thIconColor: '#b8b8b8',
-    thIconColorActive: '#500000',
+    thIconColorActive: '#6a0000',
 
-    // Cell styling
-    tdColor: 'transparent',
-    tdColorHover: 'rgba(80, 0, 0, 0.05)',
-    tdColorStriped: 'rgba(80, 0, 0, 0.03)',
+    // Cell styling - Glassmorphic
+    tdColor: 'rgba(36, 36, 36, 0.3)',
+    tdColorHover: 'rgba(80, 0, 0, 0.15)',
+    tdColorStriped: 'rgba(80, 0, 0, 0.08)',
     tdTextColor: '#e8e8e8',
 
-    // Borders
-    borderColor: '#3a3a3a',
-    borderRadius: '8px',
+    // Borders - Subtle glass borders
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: '12px',
 
     // Filter/Sort indicators
-    filterColor: '#500000',
+    filterColor: '#6a0000',
 
     // Loading state
     loadingColor: 'rgba(80, 0, 0, 0.12)',
 
     // Pagination
-    paginationBorderColor: '#3a3a3a',
+    paginationBorderColor: 'rgba(255, 255, 255, 0.08)',
 
     // Action column
-    actionDividerColor: '#2a2a2a',
+    actionDividerColor: 'rgba(255, 255, 255, 0.05)',
 
     // Font size
     thFontSize: '14px',
@@ -236,37 +236,113 @@ export const customTheme = {
     textColorFocus: '#e8e8e8',
     textColorDisabled: '#5a5a5a',
 
-    color: 'transparent',
-    colorHover: 'rgba(80, 0, 0, 0.1)',
-    colorPressed: 'rgba(80, 0, 0, 0.15)',
-    colorFocus: 'rgba(80, 0, 0, 0.1)',
-    colorDisabled: 'transparent',
+    // Secondary/Default buttons - Glassmorphic
+    color: 'rgba(42, 42, 42, 0.4)',
+    colorHover: 'rgba(80, 0, 0, 0.2)',
+    colorPressed: 'rgba(80, 0, 0, 0.3)',
+    colorFocus: 'rgba(80, 0, 0, 0.2)',
+    colorDisabled: 'rgba(36, 36, 36, 0.2)',
 
-    border: '1px solid #4a4a4a',
-    borderHover: '1px solid #500000',
-    borderPressed: '1px solid #3a0000',
-    borderFocus: '1px solid #500000',
-    borderDisabled: '1px solid #2a2a2a',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderHover: '1px solid rgba(80, 0, 0, 0.5)',
+    borderPressed: '1px solid rgba(80, 0, 0, 0.7)',
+    borderFocus: '1px solid rgba(80, 0, 0, 0.5)',
+    borderDisabled: '1px solid rgba(255, 255, 255, 0.03)',
 
-    rippleColor: '#500000',
+    rippleColor: 'rgba(80, 0, 0, 0.3)',
 
-    // Primary button (maroon gradient)
+    // Primary button - Glassmorphic maroon
     textColorPrimary: '#ffffff',
     textColorHoverPrimary: '#ffffff',
     textColorPressedPrimary: '#ffffff',
     textColorFocusPrimary: '#ffffff',
     textColorDisabledPrimary: '#5a5a5a',
 
-    colorPrimary: '#500000',
-    colorHoverPrimary: '#6a0000',
-    colorPressedPrimary: '#3a0000',
-    colorFocusPrimary: '#500000',
-    colorDisabledPrimary: '#2a2a2a',
+    colorPrimary: 'rgba(80, 0, 0, 0.7)',
+    colorHoverPrimary: 'rgba(106, 0, 0, 0.8)',
+    colorPressedPrimary: 'rgba(58, 0, 0, 0.9)',
+    colorFocusPrimary: 'rgba(80, 0, 0, 0.7)',
+    colorDisabledPrimary: 'rgba(42, 42, 42, 0.3)',
 
-    borderPrimary: '1px solid #500000',
-    borderHoverPrimary: '1px solid #6a0000',
-    borderPressedPrimary: '1px solid #3a0000',
-    borderFocusPrimary: '1px solid #500000',
-    borderDisabledPrimary: '1px solid #2a2a2a'
+    borderPrimary: '1px solid rgba(106, 0, 0, 0.6)',
+    borderHoverPrimary: '1px solid rgba(106, 0, 0, 0.8)',
+    borderPressedPrimary: '1px solid rgba(58, 0, 0, 0.9)',
+    borderFocusPrimary: '1px solid rgba(106, 0, 0, 0.6)',
+    borderDisabledPrimary: '1px solid rgba(255, 255, 255, 0.03)'
+  },
+
+  Card: {
+    // Glassmorphic card backgrounds
+    color: 'rgba(36, 36, 36, 0.7)',
+    colorModal: 'rgba(26, 26, 26, 0.9)',
+    colorEmbedded: 'rgba(42, 42, 42, 0.5)',
+    colorTarget: 'rgba(80, 0, 0, 0.05)',
+
+    // Text colors
+    textColor: '#e8e8e8',
+    titleTextColor: '#e8e8e8',
+
+    // Borders
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: '12px',
+
+    // Padding
+    paddingSmall: '12px 16px',
+    paddingMedium: '16px 20px',
+    paddingLarge: '20px 24px',
+    paddingHuge: '28px 32px',
+
+    // Title font
+    titleFontSizeSmall: '16px',
+    titleFontSizeMedium: '18px',
+    titleFontSizeLarge: '20px',
+    titleFontSizeHuge: '22px',
+
+    // Close button
+    closeColorHover: 'rgba(80, 0, 0, 0.2)',
+    closeColorPressed: 'rgba(80, 0, 0, 0.3)',
+    closeIconColor: '#b8b8b8',
+    closeIconColorHover: '#e8e8e8',
+    closeIconColorPressed: '#888888'
+  },
+
+  Tag: {
+    // Glassmorphic tags
+    color: 'rgba(42, 42, 42, 0.5)',
+    textColor: '#e8e8e8',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: '12px',
+
+    // Primary tag (maroon)
+    colorPrimary: 'rgba(80, 0, 0, 0.6)',
+    textColorPrimary: '#ffffff',
+    borderPrimary: '1px solid rgba(106, 0, 0, 0.5)',
+
+    // Info tag
+    colorInfo: 'rgba(159, 174, 214, 0.2)',
+    textColorInfo: '#9faed6',
+    borderInfo: '1px solid rgba(159, 174, 214, 0.3)',
+
+    // Success tag
+    colorSuccess: 'rgba(45, 122, 62, 0.2)',
+    textColorSuccess: '#2d7a3e',
+    borderSuccess: '1px solid rgba(45, 122, 62, 0.4)',
+
+    // Warning tag
+    colorWarning: 'rgba(184, 115, 51, 0.2)',
+    textColorWarning: '#b87333',
+    borderWarning: '1px solid rgba(184, 115, 51, 0.4)',
+
+    // Error tag
+    colorError: 'rgba(168, 50, 50, 0.2)',
+    textColorError: '#a83232',
+    borderError: '1px solid rgba(168, 50, 50, 0.4)',
+
+    // Close button
+    closeIconColor: '#b8b8b8',
+    closeIconColorHover: '#e8e8e8',
+    closeIconColorPressed: '#888888',
+    closeColorHover: 'rgba(255, 255, 255, 0.08)',
+    closeColorPressed: 'rgba(255, 255, 255, 0.12)'
   }
 }

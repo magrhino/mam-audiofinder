@@ -18,7 +18,7 @@
 
     <div class="muted" v-text="status"></div>
 
-    <div class="table-responsive" v-if="data.length">
+    <div class="glass-table-wrapper" v-if="data.length">
       <n-data-table
         ref="tableRef"
         :columns="columns"
@@ -187,36 +187,13 @@ watch(() => [route.query.q, route.query.sort, route.query.perpage], () => {
 </script>
 
 <style scoped>
-/* Uses main.css styles */
+/* Glass table wrapper applied via global .glass-table-wrapper class */
 
-.table-responsive {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-  margin-top: var(--spacing-md, 1rem);
-}
-
-/* Desktop: Full width, no constraints */
-@media (min-width: 1024px) {
-  .table-responsive {
-    max-width: 100%;
-  }
-}
-
-/* Tablet: Comfortable scrolling */
-@media (min-width: 768px) and (max-width: 1023px) {
-  .table-responsive {
-    max-width: 100%;
-    overflow-x: auto;
-  }
-}
-
-/* Mobile: Optimized padding and scroll */
+/* Mobile: Optimized padding */
 @media (max-width: 767px) {
-  .table-responsive {
+  .glass-table-wrapper {
     margin-left: calc(-1 * var(--spacing-md, 1rem));
     margin-right: calc(-1 * var(--spacing-md, 1rem));
-    padding: 0 var(--spacing-md, 1rem);
   }
 }
 </style>
