@@ -1,7 +1,22 @@
 <template>
   <tr>
     <td style="padding:0.25rem;">
-      <img v-if="item.abs_cover_url" :src="item.abs_cover_url" alt="Cover" loading="lazy" style="max-width:60px;max-height:90px;" />
+      <n-image
+        v-if="item.abs_cover_url"
+        :src="item.abs_cover_url"
+        alt="Cover"
+        lazy
+        :width="60"
+        :height="90"
+        object-fit="cover"
+        :intersection-observer-options="{ rootMargin: '50px' }"
+      >
+        <template #placeholder>
+          <div style="width: 60px; height: 90px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; color: #888; font-size: 0.7em;">
+            Loading...
+          </div>
+        </template>
+      </n-image>
       <span v-else class="muted" style="font-size:0.8em;">No cover</span>
     </td>
     <td>{{ item.title }}</td>
@@ -21,13 +36,59 @@
       <StatusBadge v-if="verifyBadge" :label="verifyBadge.label" :variant="verifyBadge.variant" :title="verifyBadge.title" />
     </td>
     <td>
-      <ActionButton label="Import" variant="primary" :loading="loading && showForm" @click="toggleForm" />
+      <n-button
+        type="success"
+        :ghost="!showForm"
+        round
+        :loading="loading && showForm"
+        @click="toggleForm"
+      >
+        {{ showForm ? '📋 Close' : '📥 Import' }}
+      </n-button>
     </td>
     <td>
-      <ActionButton :label="verifyButtonLabel" variant="secondary" :loading="verifyLoading" :disabled="!item.imported_at || verifyLoading" @click="verifyItem" />
+      <n-button
+        type="info"
+        ghost
+        round
+        :loading="verifyLoading"
+        :disabled="!item.imported_at || verifyLoading"
+        @click="verifyItem"
+      >
+        {{ verifyButtonLabel }}
+      </n-button>
+      <n-button
+        v-if="libraryItemUrl"
+        tag="a"
+        :href="libraryItemUrl"
+        target="_blank"
+        type="warning"
+        ghost
+        round
+        size="tiny"
+        style="margin-left: 4px;"
+      >
+        📚 Library
+      </n-button>
     </td>
     <td>
-      <ActionButton label="Remove" variant="danger" :loading="removeLoading" @click="removeItem" />
+      <n-popconfirm
+        positive-text="Yes, remove"
+        negative-text="Cancel"
+        @positive-click="removeItem"
+      >
+        <template #trigger>
+          <n-button
+            type="error"
+            ghost
+            round
+            :loading="removeLoading"
+          >
+            🗑️ Remove
+          </n-button>
+        </template>
+        Remove this history item?
+      </n-popconfirm>
     </td>
   </tr>
   <tr v-if="showForm">
@@ -54,8 +115,25 @@
           <label class="import-form__inline">
             <input type="checkbox" v-model="form.flatten" /> Flatten multi-disc
           </label>
-          <ActionButton :label="buttonLabel" variant="success" :loading="loading" :disabled="!canImport" @click="handleImport" />
-          <ActionButton :label="toggleTreeLabel" variant="secondary" :disabled="!form.selectedHash" @click="toggleTree" />
+          <n-button
+            type="success"
+            round
+            size="small"
+            :loading="loading"
+            :disabled="!canImport"
+            @click="handleImport"
+          >
+            {{ buttonLabel }}
+          </n-button>
+          <n-button
+            secondary
+            round
+            size="small"
+            :disabled="!form.selectedHash"
+            @click="toggleTree"
+          >
+            {{ toggleTreeLabel }}
+          </n-button>
         </div>
         <div class="import-form__status" v-if="statusMessage">{{ statusMessage }}</div>
         <div class="import-form__context" v-if="contextualMessage && !statusMessage" style="color: #f39c12; padding: 0.5rem 0;">
@@ -72,10 +150,10 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
+import { NButton, NImage, NPopconfirm } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useImport } from '@composables/useImport'
-import ActionButton from './ActionButton.vue'
 import StatusBadge from './StatusBadge.vue'
 
 const props = defineProps({
@@ -96,6 +174,17 @@ const showForm = ref(false)
 const verifyLoading = ref(false)
 const verifyButtonLabel = ref('🔄 Verify')
 const removeLoading = ref(false)
+const absBaseUrl = ref('')
+
+// Load config to get ABS base URL
+onMounted(async () => {
+  try {
+    const config = await api.getConfig()
+    absBaseUrl.value = config.abs_base_url || ''
+  } catch (err) {
+    console.error('[HistoryRow] Failed to load config:', err)
+  }
+})
 
 // Use import composable for all import workflow
 const {
@@ -172,7 +261,6 @@ const verifyItem = async () => {
 }
 
 const removeItem = async () => {
-  if (!confirm('Remove this history item?')) return
   removeLoading.value = true
   try {
     await api.deleteHistoryItem(props.item.id)
@@ -220,6 +308,14 @@ const verifyBadge = computed(() => {
 })
 
 const detailUrl = computed(() => props.item.mam_id ? `https://www.myanonamouse.net/t/${encodeURIComponent(props.item.mam_id)}` : '')
+
+const libraryItemUrl = computed(() => {
+  // Only show library link for mismatch status with ABS item ID
+  if (props.item.abs_verify_status === 'mismatch' && props.item.abs_item_id && absBaseUrl.value) {
+    return `${absBaseUrl.value}/item/${props.item.abs_item_id}`
+  }
+  return null
+})
 </script>
 
 <style scoped>

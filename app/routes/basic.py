@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from config import IMPORT_MODE, FLATTEN_DISCS, HARDCOVER_SERIES_LIMIT
+from config import IMPORT_MODE, FLATTEN_DISCS, HARDCOVER_SERIES_LIMIT, ABS_BASE_URL
 
 router = APIRouter()
 
@@ -57,4 +57,5 @@ async def config():
         "import_mode": IMPORT_MODE,
         "flatten_discs": FLATTEN_DISCS,
         "hardcover_series_limit": HARDCOVER_SERIES_LIMIT,
+        "abs_base_url": ABS_BASE_URL,
     }
