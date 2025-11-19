@@ -136,6 +136,8 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
     book_titles = series_data.get("books", [])
     series_author = series_data.get("author_name", "")
 
+    logger.info(f"📋 Raw book titles from Hardcover API ({len(book_titles)} total): {book_titles}")
+
     # Deduplicate book titles (Hardcover API sometimes returns duplicates)
     # Use dict to preserve order while removing case-insensitive duplicates
     seen_titles = {}
@@ -147,9 +149,14 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
             if normalized and normalized not in seen_titles:
                 seen_titles[normalized] = True
                 unique_titles.append(title)
+            else:
+                # Log each duplicate found
+                logger.warning(f"⚠️  Duplicate book title detected and removed: '{title}'")
 
     if len(unique_titles) < len(book_titles):
-        logger.info(f"🔍 Removed {len(book_titles) - len(unique_titles)} duplicate titles from series")
+        logger.warning(f"🔍 Deduplication: Removed {len(book_titles) - len(unique_titles)} duplicate(s) from series '{series_data.get('series_name')}'")
+        logger.info(f"   Before: {book_titles}")
+        logger.info(f"   After: {unique_titles}")
 
     logger.info(f"📖 Enriching {len(unique_titles)} unique books for series '{series_data.get('series_name')}'")
 
