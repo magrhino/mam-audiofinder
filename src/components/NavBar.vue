@@ -130,7 +130,7 @@ const healthText = computed(() => {
   width: calc(100% + 2 * var(--spacing-xl));
 
   /* Glass effect */
-  background: rgba(26, 26, 26, 0.4) !important;
+  background: rgba(0, 0, 0, 0.4) !important;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 

@@ -88,11 +88,41 @@ const handleClick = () => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* Shimmer effect on hover */
+.showcase-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 0.6s ease;
+  z-index: 1;
+}
+
+.showcase-card:hover::before {
+  left: 100%;
+}
+
 .showcase-card:hover {
   background: rgba(36, 36, 36, 0.7);
   border-color: rgba(80, 0, 0, 0.4);
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(80, 0, 0, 0.3);
+  box-shadow:
+    0 8px 20px rgba(80, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure content stays above shimmer */
+.showcase-card > * {
+  position: relative;
+  z-index: 2;
 }
 
 /* Cover wrapper */
@@ -102,7 +132,7 @@ const handleClick = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(26, 26, 26, 0.6);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   border-radius: var(--radius-md);
@@ -125,7 +155,7 @@ const handleClick = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(26, 26, 26, 0.6);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   border: 1px solid rgba(255, 255, 255, 0.05);

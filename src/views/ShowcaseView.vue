@@ -14,47 +14,36 @@
         </div>
 
         <!-- Search Form -->
-        <n-form ref="formRef" :model="form" :show-feedback="false">
-          <n-space :size="12" align="end" :wrap="true">
-            <n-form-item label="Search Query" path="q" class="search-input-item">
-              <n-input
-                v-model:value="form.q"
-                placeholder="Search audiobooks..."
-                :style="{ width: inputWidth }"
-                clearable
-                @keyup.enter="runSearch"
-                @clear="clearSearch"
-              >
-                <template #prefix>
-                  <span style="opacity: 0.5">🔍</span>
-                </template>
-              </n-input>
-            </n-form-item>
+        <n-space :size="12" align="end" :wrap="true">
+          <div class="search-input-wrapper">
+            <GlassSearchBar
+              v-model="form.q"
+              placeholder="Search audiobooks..."
+              @search="runSearch"
+              @clear="clearSearch"
+            />
+          </div>
 
-            <n-form-item label="Results Limit" path="limit">
-              <n-select
-                v-model:value="form.limit"
-                :options="limitOptions"
-                :style="{ width: '140px' }"
-              />
-            </n-form-item>
+          <GlassSelect
+            v-model="form.limit"
+            :options="limitOptions"
+            width="140px"
+          />
 
-            <n-form-item label=" " path="action">
-              <n-button
-                type="primary"
-                size="medium"
-                @click="runSearch"
-                :loading="loading"
-                :disabled="!form.q.trim()"
-              >
-                <template #icon>
-                  <span>🔍</span>
-                </template>
-                Search
-              </n-button>
-            </n-form-item>
-          </n-space>
-        </n-form>
+          <n-button
+            type="primary"
+            size="medium"
+            @click="runSearch"
+            :loading="loading"
+            :disabled="!form.q.trim()"
+            class="glass-button-primary"
+          >
+            <template #icon>
+              <span>🔍</span>
+            </template>
+            Search
+          </n-button>
+        </n-space>
       </n-space>
     </n-card>
 
@@ -194,10 +183,6 @@ import {
   NCard,
   NSpace,
   NText,
-  NForm,
-  NFormItem,
-  NInput,
-  NSelect,
   NButton,
   NTag,
   NDivider,
@@ -206,6 +191,8 @@ import {
   NSkeleton
 } from 'naive-ui'
 import ShowcaseCard from '@components/ShowcaseCard.vue'
+import GlassSearchBar from '@components/GlassSearchBar.vue'
+import GlassSelect from '@components/GlassSelect.vue'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 
@@ -530,7 +517,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 
 /* Hero Panel - Audible/Jellyseerr Inspired */
 .hero-panel {
-  background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(26, 26, 26, 0.8) 100%);
+  background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.8) 100%);
   border-radius: 16px;
   margin-bottom: var(--spacing-lg, 1.5rem);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -556,10 +543,17 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   opacity: 0.85;
 }
 
-/* Make search input take priority in layout */
-.search-input-item {
+/* Make search input responsive */
+.search-input-wrapper {
   flex: 1;
   min-width: 200px;
+}
+
+@media (max-width: 768px) {
+  .search-input-wrapper {
+    min-width: 150px;
+    width: 100%;
+  }
 }
 
 /* Status Card */
@@ -580,7 +574,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 /* Detail Card */
 .detail-card {
   margin-top: var(--spacing-xl, 2rem);
-  background: rgba(26, 26, 26, 0.9);
+  background: rgba(0, 0, 0, 0.9);
   border: 2px solid rgba(80, 0, 0, 0.5);
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
