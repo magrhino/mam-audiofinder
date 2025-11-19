@@ -640,6 +640,133 @@ async def test_books_by_author(author="Brandon Sanderson", limit=10):
         return False
 
 
+async def test_pagination_formats():
+    """Test pagination with offset vs page-based approaches."""
+    print_header("Pagination Format Test")
+
+    if not hardcover_client.is_configured:
+        print("⚠️  Skipping test - Hardcover API not configured")
+        return False
+
+    try:
+        start_req = hardcover_client.get_request_count()
+        start_cache = hardcover_client.get_cache_hit_count()
+
+        test_query = "Mistborn"
+        per_page = 5
+
+        # Test 1: Search with per_page only (baseline)
+        print(f"\n🔍 Test 1: Baseline search (per_page={per_page})")
+        baseline = await hardcover_client.search_series(test_query, limit=per_page)
+
+        if baseline is None:
+            print("  ❌ Baseline search failed")
+            return False
+
+        print(f"  ✅ Baseline returned {len(baseline)} results")
+        if baseline:
+            print(f"     First result: {baseline[0].get('series_name')}")
+
+        await asyncio.sleep(1.0)
+
+        # Test 2: Try GraphQL with page parameter
+        print(f"\n🔍 Test 2: GraphQL with page parameter (per_page={per_page}, page=1)")
+
+        query_with_page = """
+        query SearchSeriesWithPage($query: String!, $queryType: String!, $perPage: Int!, $page: Int!) {
+          search(query: $query, query_type: $queryType, per_page: $perPage, page: $page) {
+            results
+          }
+        }
+        """
+
+        variables_page = {
+            "query": test_query,
+            "queryType": "Series",
+            "perPage": per_page,
+            "page": 1
+        }
+
+        data_page = await hardcover_client._execute_graphql(query_with_page, variables_page)
+
+        if data_page is None:
+            print("  ❌ Page-based query failed")
+        else:
+            search_data = data_page.get("search", {})
+            results = search_data.get("results", {})
+
+            if isinstance(results, str):
+                import json
+                results = json.loads(results)
+
+            hits = results.get("hits", []) if isinstance(results, dict) else []
+            print(f"  ✅ Page-based query returned {len(hits)} hits")
+
+            if hits and baseline:
+                # Compare first result IDs
+                page_first_id = hits[0].get("document", {}).get("id")
+                baseline_first_id = baseline[0].get("series_id")
+
+                if page_first_id == baseline_first_id:
+                    print(f"     ✓ First result matches baseline (ID: {page_first_id})")
+                else:
+                    print(f"     ⚠️  Different first result (page: {page_first_id}, baseline: {baseline_first_id})")
+
+        await asyncio.sleep(1.0)
+
+        # Test 3: Try GraphQL with page=2 to see if pagination works
+        print(f"\n🔍 Test 3: GraphQL with page=2 (per_page={per_page}, page=2)")
+
+        variables_page2 = {
+            "query": test_query,
+            "queryType": "Series",
+            "perPage": per_page,
+            "page": 2
+        }
+
+        data_page2 = await hardcover_client._execute_graphql(query_with_page, variables_page2)
+
+        if data_page2 is None:
+            print("  ❌ Page 2 query failed")
+        else:
+            search_data = data_page2.get("search", {})
+            results = search_data.get("results", {})
+
+            if isinstance(results, str):
+                import json
+                results = json.loads(results)
+
+            hits = results.get("hits", []) if isinstance(results, dict) else []
+            print(f"  ✅ Page 2 query returned {len(hits)} hits")
+
+            # Check if results are different from page 1
+            if hits and data_page:
+                page1_results = data_page.get("search", {}).get("results", {})
+                if isinstance(page1_results, str):
+                    page1_results = json.loads(page1_results)
+                page1_hits = page1_results.get("hits", []) if isinstance(page1_results, dict) else []
+
+                if page1_hits:
+                    page1_first_id = page1_hits[0].get("document", {}).get("id")
+                    page2_first_id = hits[0].get("document", {}).get("id") if hits else None
+
+                    if page1_first_id != page2_first_id:
+                        print(f"     ✓ Page 2 has different results (pagination working!)")
+                        print(f"       Page 1 first: {page1_hits[0].get('document', {}).get('name')}")
+                        print(f"       Page 2 first: {hits[0].get('document', {}).get('name') if hits else 'N/A'}")
+                    else:
+                        print(f"     ⚠️  Page 2 returns same results as page 1 (pagination may not work)")
+
+        print_request_stats(start_req, start_cache, "Pagination Format Test")
+        return True
+
+    except Exception as e:
+        print(f"\n❌ Pagination test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 async def test_framework_basic():
     """Basic testing framework - simple searches with request counting."""
     print_header("Framework: Basic Tests")
@@ -762,6 +889,7 @@ async def main():
     parser.add_argument("--series-limits", metavar="ID", type=int, help="Test series books limit variations (default: 997)")
     parser.add_argument("--limits", action="store_true", help="Test limit variations")
     parser.add_argument("--fields", action="store_true", help="Test field extraction")
+    parser.add_argument("--pagination", action="store_true", help="Test pagination formats (offset vs page)")
     parser.add_argument("--framework", metavar="NAME", choices=["basic"],
                         help="Run specific framework: basic")
     parser.add_argument("--all", action="store_true", help="Run all tests (default)")
@@ -801,6 +929,11 @@ async def main():
         success = await test_configuration()
         if success:
             success = await test_field_extraction()
+
+    elif args.pagination:
+        success = await test_configuration()
+        if success:
+            success = await test_pagination_formats()
 
     elif args.framework:
         success = await test_configuration()

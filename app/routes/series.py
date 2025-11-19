@@ -3,12 +3,14 @@ Series routes for Hardcover API integration.
 Handles series discovery and book listings.
 """
 import logging
+import asyncio
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict
 
 from hardcover_client import hardcover_client
+from abs_client import abs_client
 from utils import normalize_title, normalize_author
 
 router = APIRouter()
@@ -256,15 +258,160 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
     }
 
 
-@router.get("/api/series/{series_id}/books")
-async def get_series_books(series_id: int):
+async def enrich_books_with_abs(
+    books: List[dict],
+    series_author: str,
+    per_page: int = 5,
+    page: int = 1
+) -> dict:
     """
-    Get all books in a series from Hardcover with enriched details.
+    Translation layer: Enrich Hardcover books with ABS data.
+
+    Fetches covers and library status from Audiobookshelf for each book,
+    returning ShowcaseCard-compatible format with pagination.
+
+    Args:
+        books: Hardcover-enriched books from get_book_series_info()
+        series_author: Series author for ABS lookups
+        per_page: Number of books per page (default: 5)
+        page: Page number, 1-indexed (default: 1)
+
+    Returns:
+        Dictionary with:
+        - books: List of ShowcaseCard-compatible book objects
+        - total: Total number of books
+        - page: Current page number
+        - per_page: Books per page
+        - total_pages: Total number of pages
+        - has_next: Whether there's a next page
+        - has_prev: Whether there's a previous page
+    """
+    logger.info(f"📚 Enriching {len(books)} books with ABS data (page {page}, per_page {per_page})")
+
+    # Calculate pagination indices (page is 1-indexed)
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+
+    paginated_books = books[start_idx:end_idx]
+    total_pages = (len(books) + per_page - 1) // per_page  # Ceiling division
+
+    logger.info(f"📄 Processing books {start_idx + 1}-{min(end_idx, len(books))} of {len(books)}")
+
+    # Enrich each book with ABS data (5 concurrent requests max)
+    semaphore = asyncio.Semaphore(5)
+
+    async def enrich_single_book(book: dict) -> dict:
+        """Enrich a single book with ABS cover and library status."""
+        async with semaphore:
+            book_title = book.get('title', '')
+            book_author = book.get('author', series_author)
+
+            # Fetch ABS cover (with cache)
+            cover_data = {}
+            if abs_client.is_configured:
+                try:
+                    cover_data = await abs_client.fetch_cover(
+                        title=book_title,
+                        author=book_author,
+                        mam_id='',  # No MAM ID for Hardcover books
+                        force_refresh=False
+                    )
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to fetch ABS cover for '{book_title}': {e}")
+
+            # Check if in ABS library
+            in_library = False
+            if abs_client.is_configured and abs_client.library_id:
+                try:
+                    library_check = await abs_client.check_library_items([
+                        (book_title, book_author)
+                    ])
+                    cache_key = f"{book_title.lower().strip()}||{book_author.lower().strip()}"
+                    in_library = library_check.get(cache_key, False)
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to check library for '{book_title}': {e}")
+
+            # Return ShowcaseCard-compatible format
+            return {
+                "display_title": book_title,
+                "author": book_author,
+                "cover_url": cover_data.get('cover_url', ''),
+                "abs_item_id": cover_data.get('item_id'),
+                "in_abs_library": in_library,
+                "description": book.get('description', ''),
+                "release_year": book.get('release_year'),
+                "book_id": book.get('book_id'),
+                "formats": [],  # N/A for Hardcover
+                "total_versions": 1,  # Always 1 for Hardcover
+                "normalized_title": book_title.lower().replace(' ', '-'),
+                # Additional metadata for potential future use
+                "mam_id": None,  # No MAM ID for Hardcover books
+                "narrator": None  # Not available from Hardcover
+            }
+
+    # Enrich books concurrently
+    enriched = await asyncio.gather(*[
+        enrich_single_book(book) for book in paginated_books
+    ])
+
+    logger.info(f"✅ Enriched {len(enriched)} books with ABS data")
+
+    return {
+        "books": enriched,
+        "total": len(books),
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_prev": page > 1
+    }
+
+
+@router.get("/api/series/{series_id}/books")
+async def get_series_books(
+    series_id: int,
+    per_page: int = 5,
+    page: int = 1,
+    enrich_abs: bool = True
+):
+    """
+    Get books in a series from Hardcover with optional ABS enrichment and pagination.
 
     Path parameter:
         series_id: Hardcover series ID
 
-    Response:
+    Query parameters:
+        per_page: Number of books per page (default: 5, max: 50)
+        page: Page number, 1-indexed (default: 1)
+        enrich_abs: Enable ABS enrichment (covers, library check) (default: true)
+
+    Response (with enrich_abs=true):
+        {
+            "series_id": 49075,
+            "series_name": "The Stormlight Archive",
+            "author_name": "Brandon Sanderson",
+            "books": [
+                {
+                    "display_title": "The Way of Kings",
+                    "author": "Brandon Sanderson",
+                    "cover_url": "/covers/...",
+                    "in_abs_library": true,
+                    "description": "...",
+                    "release_year": 2010,
+                    ...
+                },
+                ...
+            ],
+            "total": 10,
+            "page": 1,
+            "per_page": 5,
+            "total_pages": 2,
+            "has_next": true,
+            "has_prev": false,
+            "timestamp": "2025-11-19T10:30:00Z"
+        }
+
+    Response (with enrich_abs=false):
         {
             "series_id": 49075,
             "series_name": "The Stormlight Archive",
@@ -276,12 +423,12 @@ async def get_series_books(series_id: int):
                     "author": "Brandon Sanderson",
                     "release_year": 2010,
                     "description": "...",
-                    "cover_url": "https://..."
+                    "cover_url": "https://..."  // Hardcover URL
                 },
                 ...
             ],
-            "cached": false,
-            "timestamp": "2025-11-17T10:30:00Z"
+            "total": 10,
+            "timestamp": "2025-11-19T10:30:00Z"
         }
     """
     if not hardcover_client.is_configured:
@@ -290,10 +437,17 @@ async def get_series_books(series_id: int):
             detail="Hardcover API not configured. Set HARDCOVER_API_TOKEN in environment."
         )
 
-    logger.info(f"📚 Fetching enriched books for series ID {series_id}")
+    # Validate pagination parameters
+    if page < 1:
+        raise HTTPException(status_code=400, detail="Page must be >= 1")
+
+    if per_page < 1 or per_page > 50:
+        raise HTTPException(status_code=400, detail="per_page must be between 1 and 50")
+
+    logger.info(f"📚 Fetching books for series ID {series_id} (page={page}, per_page={per_page}, enrich_abs={enrich_abs})")
 
     try:
-        # Use the backend translation composable to get enriched book info
+        # Get Hardcover-enriched books
         result = await get_book_series_info(series_id)
 
         if not result:
@@ -303,11 +457,44 @@ async def get_series_books(series_id: int):
             )
 
         from datetime import datetime
-        result["cached"] = False  # TODO: Detect cache hit
-        result["timestamp"] = datetime.utcnow().isoformat() + "Z"
 
-        logger.info(f"✅ Returned {len(result.get('books', []))} enriched books for series '{result.get('series_name')}'")
-        return JSONResponse(result)
+        if enrich_abs and abs_client.is_configured:
+            # Apply ABS enrichment + pagination
+            logger.info(f"🔍 Applying ABS enrichment to {len(result['books'])} books")
+
+            enriched_result = await enrich_books_with_abs(
+                books=result['books'],
+                series_author=result['author_name'],
+                per_page=per_page,
+                page=page
+            )
+
+            response = {
+                "series_id": result['series_id'],
+                "series_name": result['series_name'],
+                "author_name": result['author_name'],
+                **enriched_result,  # books, total, page, per_page, total_pages, has_next, has_prev
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+
+            logger.info(f"✅ Returned {len(enriched_result['books'])} ABS-enriched books (page {page}/{enriched_result['total_pages']})")
+            return JSONResponse(response)
+        else:
+            # Return original Hardcover data (no ABS enrichment, no pagination)
+            if not abs_client.is_configured and enrich_abs:
+                logger.warning("⚠️  ABS enrichment requested but ABS is not configured")
+
+            response = {
+                "series_id": result['series_id'],
+                "series_name": result['series_name'],
+                "author_name": result['author_name'],
+                "books": result['books'],
+                "total": len(result['books']),
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+
+            logger.info(f"✅ Returned {len(result['books'])} Hardcover books (no ABS enrichment)")
+            return JSONResponse(response)
 
     except HTTPException:
         raise

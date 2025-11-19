@@ -101,21 +101,46 @@
 
         <n-divider />
 
-        <!-- Books Table -->
-        <n-text tag="h3" :depth="1" style="margin-bottom: 16px">
-          Books in Series
-        </n-text>
+        <!-- Books Grid -->
+        <n-space justify="space-between" align="center" style="margin-bottom: 16px">
+          <n-text tag="h3" :depth="1">
+            Books in Series ({{ booksTotal }})
+          </n-text>
+          <n-text v-if="booksLoading" :depth="3">Loading...</n-text>
+        </n-space>
 
-        <n-data-table
-          ref="booksTableRef"
-          :columns="booksColumns"
-          :data="booksData"
-          :pagination="booksPagination"
-          :bordered="false"
-          :scroll-x="scrollX"
-          striped
-          class="books-table"
-        />
+        <!-- Responsive Card Grid -->
+        <div class="books-grid" :style="gridStyle">
+          <ShowcaseCard
+            v-for="book in enrichedBooks"
+            :key="book.normalized_title"
+            :group="book"
+            @select="handleBookClick"
+          />
+        </div>
+
+        <!-- Pagination Controls -->
+        <n-space justify="center" style="margin-top: 1.5rem" v-if="booksTotalPages > 1">
+          <n-button
+            secondary
+            @click="loadPrevPage"
+            :disabled="!hasPrevPage || booksLoading"
+          >
+            ← Previous
+          </n-button>
+
+          <n-text :depth="2">
+            Page {{ booksPage }} of {{ booksTotalPages }}
+          </n-text>
+
+          <n-button
+            secondary
+            @click="loadNextPage"
+            :disabled="!hasNextPage || booksLoading"
+          >
+            Next →
+          </n-button>
+        </n-space>
       </div>
     </n-card>
   </div>
@@ -135,11 +160,12 @@ import {
   NDataTable
 } from 'naive-ui'
 import { useApi } from '@composables/useApi'
-import { useSeriesDataTable, useBooksDataTable } from '@composables/naive/useSeriesDataTable'
+import { useSeriesDataTable } from '@composables/naive/useSeriesDataTable'
 import GlassSearchBar from '@components/GlassSearchBar.vue'
 import GlassSelect from '@components/GlassSelect.vue'
 import GlassTitle from '@components/GlassTitle.vue'
 import GlassSubtitle from '@components/GlassSubtitle.vue'
+import ShowcaseCard from '@components/ShowcaseCard.vue'
 
 const api = useApi()
 const route = useRoute()
@@ -149,7 +175,8 @@ const router = useRouter()
 const breakpoints = useBreakpoints({
   mobile: 0,
   tablet: 768,
-  desktop: 1024
+  desktop: 1024,
+  wide: 1400
 })
 
 // Dynamic input width based on screen size
@@ -211,17 +238,29 @@ const {
   defaultPageSize: 20
 })
 
-// Initialize books table
-const {
-  tableRef: booksTableRef,
-  data: booksData,
-  columns: booksColumns,
-  pagination: booksPagination,
-  setData: setBooksData,
-  clearData: clearBooksData
-} = useBooksDataTable({
-  defaultPageSize: 10
+// Books state for card grid
+const enrichedBooks = ref([])
+const booksTotal = ref(0)
+const booksPage = ref(1)
+const booksPerPage = ref(5)
+const booksTotalPages = ref(0)
+const hasNextPage = ref(false)
+const hasPrevPage = ref(false)
+const booksLoading = ref(false)
+
+// Responsive grid configuration
+const gridColumns = computed(() => {
+  if (breakpoints.greater('wide').value) return 6
+  if (breakpoints.greater('desktop').value) return 5
+  if (breakpoints.greater('tablet').value) return 4
+  return 2
 })
+
+const gridStyle = computed(() => ({
+  display: 'grid',
+  gridTemplateColumns: `repeat(${gridColumns.value}, 1fr)`,
+  gap: breakpoints.greater('desktop').value ? '1.5rem' : '1rem'
+}))
 
 // URL parameter handling helpers
 const normalizeQuery = (values) => {
@@ -260,7 +299,7 @@ const runSearch = async () => {
   loading.value = true
   status.value = 'Searching for series…'
   detailItem.value = null
-  clearBooksData()
+  enrichedBooks.value = []
 
   try {
     const data = await api.searchSeries({
@@ -302,7 +341,7 @@ const clearSearch = () => {
   form.author = ''
   results.value = []
   detailItem.value = null
-  clearBooksData()
+  enrichedBooks.value = []
   status.value = 'Search for a title to see matching series.'
 }
 
@@ -311,7 +350,12 @@ async function loadDetail(series, options = {}) {
   const { suppressNavigation = false } = options
   status.value = 'Loading series books…'
   detailItem.value = series
-  clearBooksData()
+
+  // Reset books state
+  enrichedBooks.value = []
+  booksPage.value = 1
+  booksLoading.value = true
+
   await scrollToDetailCard()
 
   if (!suppressNavigation) {
@@ -325,22 +369,79 @@ async function loadDetail(series, options = {}) {
   }
 
   try {
-    const data = await api.getSeriesBooks(series.series_id)
+    const data = await api.getSeriesBooks(series.series_id, {
+      per_page: booksPerPage.value,
+      page: 1,
+      enrich_abs: true
+    })
 
-    // Set books data
-    setBooksData(data.books || [])
+    enrichedBooks.value = data.books || []
+    booksTotal.value = data.total || 0
+    booksTotalPages.value = data.total_pages || 0
+    hasNextPage.value = data.has_next || false
+    hasPrevPage.value = data.has_prev || false
 
-    status.value = `${data.books?.length || 0} books in this series`
+    status.value = `${booksTotal.value} books in this series`
   } catch (err) {
     status.value = `Failed to load series: ${err.message}`
+  } finally {
+    booksLoading.value = false
   }
+}
+
+// Load next page of books
+async function loadNextPage() {
+  if (!hasNextPage.value || booksLoading.value || !detailItem.value) return
+
+  booksPage.value++
+  await loadBooksPage(booksPage.value)
+}
+
+// Load previous page of books
+async function loadPrevPage() {
+  if (!hasPrevPage.value || booksLoading.value || !detailItem.value) return
+
+  booksPage.value--
+  await loadBooksPage(booksPage.value)
+}
+
+// Helper to load a specific page
+async function loadBooksPage(page) {
+  booksLoading.value = true
+
+  try {
+    const data = await api.getSeriesBooks(detailItem.value.series_id, {
+      per_page: booksPerPage.value,
+      page: page,
+      enrich_abs: true
+    })
+
+    enrichedBooks.value = data.books || []
+    hasNextPage.value = data.has_next || false
+    hasPrevPage.value = data.has_prev || false
+  } catch (err) {
+    status.value = `Failed to load page ${page}: ${err.message}`
+  } finally {
+    booksLoading.value = false
+  }
+}
+
+// Handle book card click - navigate to ShowcaseView for MAM search
+function handleBookClick(book) {
+  router.push({
+    name: 'showcase',
+    query: {
+      q: book.display_title,
+      limit: '25'
+    }
+  })
 }
 
 // Close detail view
 const closeDetail = (options = {}) => {
   const { suppressNavigation = false } = options
   detailItem.value = null
-  clearBooksData()
+  enrichedBooks.value = []
   status.value = results.value.length
     ? `Found ${results.value.length} series`
     : 'Search for a title to see matching series.'
@@ -408,7 +509,8 @@ watch(() => route.query.detail, async (newDetail, oldDetail) => {
   if (normalizedNew && normalizedNew !== normalizedOld) {
     await restoreDetailFromUrl()
   } else if (!normalizedNew && normalizedOld && detailItem.value) {
-    closeDetail({ suppressNavigation: true })
+    detailItem.value = null
+    enrichedBooks.value = []
   }
 })
 </script>
@@ -486,14 +588,19 @@ watch(() => route.query.detail, async (newDetail, oldDetail) => {
   padding: var(--spacing-md, 1rem);
 }
 
-.books-table {
-  margin-top: var(--spacing-md, 1rem);
+/* Books Grid */
+.books-grid {
+  width: 100%;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .search-input-item {
     min-width: 100%;
+  }
+
+  .books-grid {
+    gap: 0.75rem !important;
   }
 }
 </style>

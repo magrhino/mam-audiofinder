@@ -262,12 +262,24 @@ export const api = {
   },
 
   /**
-   * Get books in a series from Hardcover
+   * Get books in a series from Hardcover with optional ABS enrichment and pagination.
    * @param {number} seriesId - Hardcover series ID
-   * @returns {Promise<{series_id: number, series_name: string, author_name: string, books: Array, cached: boolean, timestamp: string}>}
+   * @param {Object} options - Query options
+   * @param {number} options.per_page - Books per page (default: 5)
+   * @param {number} options.page - Page number, 1-indexed (default: 1)
+   * @param {boolean} options.enrich_abs - Enable ABS enrichment (default: true)
+   * @returns {Promise<{series_id: number, series_name: string, author_name: string, books: Array, total: number, page: number, per_page: number, total_pages: number, has_next: boolean, has_prev: boolean, timestamp: string}>}
    */
-  async getSeriesBooks(seriesId) {
-    const resp = await fetch(`/api/series/${seriesId}/books`);
+  async getSeriesBooks(seriesId, options = {}) {
+    const { per_page = 5, page = 1, enrich_abs = true } = options;
+
+    const params = new URLSearchParams({
+      per_page: String(per_page),
+      page: String(page),
+      enrich_abs: String(enrich_abs)
+    });
+
+    const resp = await fetch(`/api/series/${seriesId}/books?${params}`);
     if (!resp.ok) {
       let msg = `HTTP ${resp.status}`;
       try {
