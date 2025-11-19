@@ -5,12 +5,12 @@
       <n-space vertical :size="24">
         <!-- Hero Header -->
         <div class="hero-header">
-          <n-text tag="h1" class="hero-title" :depth="1">
+          <GlassTitle tag="h1">
             Audiobook Showcase
-          </n-text>
-          <n-text :depth="2" class="hero-subtitle">
+          </GlassTitle>
+          <GlassSubtitle>
             Discover audiobooks grouped by title with advanced search powered by Naive UI components
-          </n-text>
+          </GlassSubtitle>
         </div>
 
         <!-- Search Form -->
@@ -61,7 +61,7 @@
     <n-card v-if="detailGroup" class="detail-card" :bordered="false" ref="detailElement">
       <template #header>
         <n-space justify="space-between" align="center">
-          <n-text tag="h2" class="detail-title">{{ detailGroup.display_title }}</n-text>
+          <GlassTitle tag="h2">{{ detailGroup.display_title }}</GlassTitle>
           <n-space :size="8">
             <n-button secondary @click="searchThisTitle" title="Search MAM for this title (25 results)">
               🔍 Search MAM
@@ -193,6 +193,8 @@ import {
 import ShowcaseCard from '@components/ShowcaseCard.vue'
 import GlassSearchBar from '@components/GlassSearchBar.vue'
 import GlassSelect from '@components/GlassSelect.vue'
+import GlassTitle from '@components/GlassTitle.vue'
+import GlassSubtitle from '@components/GlassSubtitle.vue'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 
@@ -526,22 +528,13 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 .hero-header {
   text-align: center;
   padding: var(--spacing-md, 1rem) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm, 0.5rem);
 }
 
-.hero-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: var(--spacing-sm, 0.5rem);
-  background: linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.hero-subtitle {
-  font-size: 1rem;
-  opacity: 0.85;
-}
+/* Title styles now handled by GlassTitle/GlassSubtitle components */
 
 /* Make search input responsive */
 .search-input-wrapper {
@@ -580,10 +573,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
-.detail-title {
-  font-size: 1.6rem;
-  font-weight: 700;
-}
+/* Detail title styles now handled by GlassTitle component */
 
 .detail-content {
   padding: var(--spacing-md, 1rem);
@@ -658,14 +648,6 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .hero-title {
-    font-size: 1.5rem;
-  }
-
-  .hero-subtitle {
-    font-size: 0.9rem;
-  }
-
   .showcase-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: var(--spacing-md, 1rem);
