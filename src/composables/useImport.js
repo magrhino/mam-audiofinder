@@ -17,7 +17,7 @@ export function useImport(historyItem) {
   const loading = ref(false)
   const torrents = ref([])
   const torrentTree = ref(null)
-  const statusMessage = ref('')
+  const statusMessage = ref('') // Transient action feedback (importing, loading, etc.)
   const buttonLabel = ref('Copy to Library')
   const formLoaded = ref(false)
   const showTree = ref(false)
@@ -56,7 +56,7 @@ export function useImport(historyItem) {
       const data = await api.getCompletedTorrents()
       torrents.value = data.items || []
 
-      // Auto-select matching torrent
+      // Auto-select matching torrent (don't set status message - let contextual message handle it)
       if (!form.selectedHash && historyItem) {
         const match = torrents.value.find(t =>
           t.hash === historyItem.qb_hash ||
@@ -65,7 +65,7 @@ export function useImport(historyItem) {
 
         if (match) {
           form.selectedHash = match.hash
-          statusMessage.value = '✓ Auto-selected matching torrent'
+          // Don't set statusMessage here - validation warnings go in contextualMessage
         }
       }
     } catch (err) {
@@ -91,10 +91,10 @@ export function useImport(historyItem) {
       const data = await api.getTorrentTree(hash)
       torrentTree.value = data
 
-      // Auto-enable flatten if multi-disc detected
+      // Auto-enable flatten if multi-disc detected (don't set status - contextualMessage shows this)
       if (data?.has_multi_disc && !form.flatten) {
         form.flatten = true
-        statusMessage.value = '💿 Multi-disc structure detected - flatten enabled'
+        // Don't set statusMessage - let contextualMessage handle disc detection warnings
       }
     } catch (err) {
       console.error('Failed to load torrent tree', err)
@@ -215,29 +215,58 @@ export function useImport(historyItem) {
     const selectedMamId = String(selected.mam_id || '').trim()
     const historyHash = historyItem.qb_hash
 
-    // If matched by hash, no mismatch
+    // Positive match criteria (no warning if these match)
+    // 1. Hash match (most reliable)
     if (historyHash && form.selectedHash === historyHash) {
       return null
     }
 
-    // If both have mam_id and they match, no mismatch
+    // 2. MAM ID match (reliable if both present)
     if (historyMamId && selectedMamId && historyMamId === selectedMamId) {
       return null
     }
 
-    // If neither has mam_id, we can't determine mismatch reliably
-    if (!historyMamId && !selectedMamId) {
-      return null
+    // If we reach here, we don't have a positive match
+    // Show warning if we have evidence of mismatch
+
+    // 3. Hash mismatch (different known hashes)
+    if (historyHash && historyHash !== form.selectedHash) {
+      const selectedName = selected.name || 'Unknown'
+      const expectedName = historyItem.title || 'Unknown'
+      return {
+        warning: '⚠️ This torrent does not match the history item',
+        detail: `Selected: ${selectedName} | Expected: ${expectedName}`
+      }
     }
 
-    // Otherwise, it's a potential mismatch
-    const selectedName = selected.name || 'Unknown'
-    const expectedName = historyItem.title || 'Unknown'
-
-    return {
-      warning: '⚠️ This torrent does not match the history item',
-      detail: `Selected: ${selectedName} | Expected: ${expectedName}`
+    // 4. MAM ID mismatch (different known IDs)
+    if (historyMamId && selectedMamId && historyMamId !== selectedMamId) {
+      const selectedName = selected.name || 'Unknown'
+      const expectedName = historyItem.title || 'Unknown'
+      return {
+        warning: '⚠️ This torrent does not match the history item',
+        detail: `Selected: ${selectedName} | Expected: ${expectedName}`
+      }
     }
+
+    // 5. One has MAM ID, other doesn't (likely mismatch unless it's the auto-selected one)
+    if ((historyMamId && !selectedMamId) || (!historyMamId && selectedMamId)) {
+      // If this was auto-selected and we don't have both IDs to compare, trust the auto-selection
+      // Otherwise show warning
+      if (!historyHash) {
+        // No hash to verify against, and MAM IDs don't both exist
+        const selectedName = selected.name || 'Unknown'
+        const expectedName = historyItem.title || 'Unknown'
+        return {
+          warning: '⚠️ This torrent does not match the history item',
+          detail: `Selected: ${selectedName} | Expected: ${expectedName}`
+        }
+      }
+    }
+
+    // If we can't determine either way, don't show warning
+    // (e.g., neither has hash or MAM ID to compare)
+    return null
   })
 
   // Contextual messaging - can show multiple warnings/messages

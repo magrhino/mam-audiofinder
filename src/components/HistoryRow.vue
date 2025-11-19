@@ -135,10 +135,12 @@
             {{ toggleTreeLabel }}
           </n-button>
         </div>
-        <div class="import-form__status" v-if="statusMessage">{{ statusMessage }}</div>
-        <div class="import-form__context" v-if="contextualMessage && !statusMessage" style="color: #f39c12; padding: 0.5rem 0;">
+        <!-- Persistent validation warnings (always visible when present) -->
+        <div class="import-form__warnings" v-if="contextualMessage" style="color: #f39c12; padding: 0.5rem 0; white-space: pre-line; font-weight: 500;">
           {{ contextualMessage }}
         </div>
+        <!-- Transient action feedback (loading, importing, etc.) -->
+        <div class="import-form__status" v-if="statusMessage" style="padding: 0.5rem 0;">{{ statusMessage }}</div>
         <div class="import-form__tree" v-if="showTree">
           <ul>
             <li v-for="file in treeContents" :key="file.path">{{ file.path }} ({{ file.type }})</li>
