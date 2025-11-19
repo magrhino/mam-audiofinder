@@ -136,11 +136,26 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
     book_titles = series_data.get("books", [])
     series_author = series_data.get("author_name", "")
 
-    logger.info(f"📖 Enriching {len(book_titles)} books for series '{series_data.get('series_name')}'")
+    # Deduplicate book titles (Hardcover API sometimes returns duplicates)
+    # Use dict to preserve order while removing case-insensitive duplicates
+    seen_titles = {}
+    unique_titles = []
+    for title in book_titles:
+        if isinstance(title, str):
+            # Normalize title for comparison (lowercase, strip whitespace)
+            normalized = title.strip().lower()
+            if normalized and normalized not in seen_titles:
+                seen_titles[normalized] = True
+                unique_titles.append(title)
+
+    if len(unique_titles) < len(book_titles):
+        logger.info(f"🔍 Removed {len(book_titles) - len(unique_titles)} duplicate titles from series")
+
+    logger.info(f"📖 Enriching {len(unique_titles)} unique books for series '{series_data.get('series_name')}'")
 
     # Step 2: Enrich each book title with full details
     enriched_books = []
-    for book_title in book_titles:
+    for book_title in unique_titles:
         if not book_title or not isinstance(book_title, str):
             continue
 
