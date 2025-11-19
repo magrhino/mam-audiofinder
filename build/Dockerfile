@@ -6,12 +6,13 @@ FROM node:20-alpine AS vue-builder
 WORKDIR /build
 
 # Copy package files and install dependencies
-COPY package.json package-lock.json* ./
+COPY build/frontend/package*.json ./
 RUN npm install
 
 # Copy Vue source and build configuration
-COPY index.html vite.config.js ./
-COPY src/ ./src/
+COPY build/frontend/index.html build/frontend/vite.config.js ./
+COPY build/frontend/src/ ./src/
+COPY build/frontend/static/ ./static/
 COPY app/static/js/ ./app/static/js/
 COPY app/static/css/ ./app/static/css/
 
@@ -38,14 +39,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd -g ${PGID} appuser && \
     useradd -u ${PUID} -g ${PGID} -m -s /bin/bash appuser
 
-COPY requirements.txt .
+COPY build/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ /app/
-COPY validate_env.py /app/
+COPY build/validate_env.py /app/
 
 # Copy Vue build output from the vue-builder stage
-COPY --from=vue-builder /build/app/static/dist /app/static/dist
+COPY --from=vue-builder /app/static/dist /app/static/dist
 
 # Ensure the app directory and files are owned by appuser
 RUN chown -R ${PUID}:${PGID} /app
@@ -81,12 +82,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python test dependencies
-COPY requirements-dev.txt .
+COPY build/requirements-dev.txt .
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
 # Copy test suite
 COPY app/tests/ /app/tests/
-COPY Makefile /app/
+COPY build/Makefile /app/
 
 # Set environment variables for Selenium to use local Chrome
 ENV SELENIUM_DRIVER_TYPE=local \

@@ -66,9 +66,10 @@ mam-audiofinder/
 │       ├── useCoverLoader.js  # Lazy image loading
 │       └── useHistoryLiveUpdates.js  # Real-time history updates
 ├── tests/                     # 223 test functions across 6 files
-├── index.html                 # Vite entry point
-├── vite.config.js             # Vite build configuration
-├── package.json               # Node dependencies
+├── frontend/
+│   ├── index.html             # Vite entry point
+│   ├── vite.config.js         # Vite build configuration
+│   └── package.json           # Node dependencies
 ├── BACKEND.md                 # Technical implementation details
 ├── FRONTEND.md                # UI architecture documentation
 ├── README.md                  # User-facing documentation

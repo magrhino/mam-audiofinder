@@ -2,14 +2,15 @@
 
 A lightweight web app to search MyAnonamouse for audiobooks, add them to qBittorrent, and import completed downloads into your Audiobookshelf library.
 
-![Search](documentation/screenshots/search.jpg)
-![History](documentation/screenshots/history.jpg)
-![Showcase](documentation/screenshots/showcase.jpg)
+![Search](docs/documentation/screenshots/search.jpg)
+![History](docs/documentation/screenshots/history.jpg)
+![Showcase](docs/documentation/screenshots/showcase.jpg)
 
 ## Table of Contents
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+  - [Repository Layout](#repository-layout)
   - [1. Clone & Configure](#1-clone--configure)
   - [2. Edit `.env` File](#2-edit-env-file)
   - [3. Start Container](#3-start-container)
@@ -52,6 +53,13 @@ A lightweight web app to search MyAnonamouse for audiobooks, add them to qBittor
 - **Download History** - Track all audiobooks you've added
 
 ## Quick Start
+
+### Repository Layout
+
+- `app/` – FastAPI backend (unchanged deployment path).
+- `build/` – Docker build tooling, requirements, Makefile, `docker-compose.test.yml`, and the Vue SPA; run `npm install`/`npm run build` from `build/frontend/` and invoke build/test targets with `make -f build/Makefile <target>`.
+- `docs/` – All project documentation and screenshots (previously `documentation/`).
+- `data/` – User-provided runtime volume (ignored by git); leave in place.
 
 ### 1. Clone & Configure
 

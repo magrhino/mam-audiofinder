@@ -7,8 +7,8 @@ This roadmap enumerates the concurrent-ready tasks AI assistants can execute to 
 - `[CON]` — Can run concurrently with other `[CON]` tasks in the same phase.
 
 ## Phase 0 — Research & Guardrails
-1. `[SEQ]` Review `documentation/hardcover-api-ref.md` and confirm current request/response schemas, auth headers, and rate-limit notes (target: summary + open questions).
-2. `[CON]` Capture explicit Hardcover API rate limits (per key, per endpoint) and document throttle strategy (retry/backoff policy doc stub in `documentation/hardcover-api-ref.md`).
+1. `[SEQ]` Review `docs/documentation/hardcover-api-ref.md` and confirm current request/response schemas, auth headers, and rate-limit notes (target: summary + open questions).
+2. `[CON]` Capture explicit Hardcover API rate limits (per key, per endpoint) and document throttle strategy (retry/backoff policy doc stub in `docs/documentation/hardcover-api-ref.md`).
 3. `[CON]` Inventory data the Series tab must display (series title, position, release data, cover URL) and map to existing UI helpers (esp. `card_helper`).
 
 ## Phase 1 — Unified Title Search Controls

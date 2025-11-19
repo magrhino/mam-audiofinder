@@ -14,14 +14,25 @@ PYTEST := pytest
 PIP := pip3
 DOCKER_COMPOSE := docker compose
 
+# Path helpers (support running make from repo root or build/)
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ROOT_DIR := $(abspath $(MAKEFILE_DIR)/..)
+APP_DIR := $(ROOT_DIR)/app
+REQ_FILE := $(MAKEFILE_DIR)/requirements.txt
+REQ_DEV_FILE := $(MAKEFILE_DIR)/requirements-dev.txt
+COMPOSE_FILE := $(ROOT_DIR)/docker-compose.yml
+COMPOSE_TEST_FILE := $(MAKEFILE_DIR)/docker-compose.test.yml
+COMPOSE_CMD := $(DOCKER_COMPOSE) -f $(COMPOSE_FILE) -f $(COMPOSE_TEST_FILE)
+
 # Test directories
-BACKEND_TESTS := app/tests/
-FRONTEND_TESTS := app/tests/frontend/
-ALL_TESTS := app/tests/
+BACKEND_TESTS := $(APP_DIR)/tests/
+FRONTEND_TESTS := $(APP_DIR)/tests/frontend/
+ALL_TESTS := $(APP_DIR)/tests/
 
 # Coverage settings
 COVERAGE_MIN := 70
-COVERAGE_HTML := htmlcov/
+COVERAGE_HTML := $(ROOT_DIR)/htmlcov/
+TEST_RESULTS := $(ROOT_DIR)/test-results/
 
 # Selenium settings
 SELENIUM_HUB := http://localhost:4444
@@ -92,17 +103,17 @@ test-ci: ## Run tests in CI environment (with XML reports)
 	@echo "Running tests for CI/CD..."
 	@$(PYTEST) $(BACKEND_TESTS) -v \
 		--ignore=$(FRONTEND_TESTS) \
-		--junitxml=test-results/junit-backend.xml \
+		--junitxml=$(TEST_RESULTS)junit-backend.xml \
 		--cov=app \
 		--cov-report=xml \
 		--cov-report=term
 	@if [ -d "$(FRONTEND_TESTS)" ]; then \
 		$(PYTEST) $(FRONTEND_TESTS) -v \
-			--junitxml=test-results/junit-frontend.xml \
-			--html=test-results/frontend-report.html \
+			--junitxml=$(TEST_RESULTS)junit-frontend.xml \
+			--html=$(TEST_RESULTS)frontend-report.html \
 			--self-contained-html; \
 	fi
-	@echo "✓ CI test reports generated in test-results/"
+	@echo "✓ CI test reports generated in $(TEST_RESULTS)"
 
 test-quick: ## Run quick smoke tests (fastest tests only)
 	@echo "Running quick smoke tests..."
@@ -137,9 +148,9 @@ format: ## Auto-format Python code (black + isort)
 ##@ Setup
 
 venv: ## Create a virtual environment (recommended for local development)
-	@if [ ! -d "venv" ]; then \
+	@if [ ! -d "$(ROOT_DIR)/venv" ]; then \
 		echo "Creating virtual environment..."; \
-		python3 -m venv venv; \
+		python3 -m venv $(ROOT_DIR)/venv; \
 		echo "✓ Virtual environment created at ./venv"; \
 		echo ""; \
 		echo "Activate it with:"; \
@@ -151,7 +162,7 @@ venv: ## Create a virtual environment (recommended for local development)
 
 install: ## Install production dependencies
 	@echo "Installing production dependencies..."
-	@$(PIP) install -r requirements.txt
+	@$(PIP) install -r $(REQ_FILE)
 	@echo "✓ Production dependencies installed"
 
 install-dev: ## Install development dependencies (including test tools)
@@ -163,7 +174,7 @@ install-dev: ## Install development dependencies (including test tools)
 		echo ""; \
 		echo "Attempting install anyway..."; \
 	fi
-	@$(PIP) install -r requirements-dev.txt
+	@$(PIP) install -r $(REQ_DEV_FILE)
 	@echo "✓ Development dependencies installed"
 
 setup-selenium: ## [DEPRECATED] Selenium now integrated in test container
@@ -178,7 +189,7 @@ stop-selenium: ## [DEPRECATED] Selenium now integrated in test container
 setup-frontend-tests: ## Initialize frontend test structure (run once)
 	@echo "Setting up frontend test infrastructure..."
 	@mkdir -p $(FRONTEND_TESTS)utils
-	@mkdir -p test-results
+	@mkdir -p $(TEST_RESULTS)
 	@echo "✓ Frontend test directories created"
 	@echo "  Next: Implement tests in $(FRONTEND_TESTS)"
 
@@ -188,41 +199,41 @@ clean: clean-pyc clean-test ## Clean all generated files
 
 clean-pyc: ## Remove Python cache files
 	@echo "Cleaning Python cache files..."
-	@find . -type f -name '*.pyc' -delete
-	@find . -type d -name '__pycache__' -delete
-	@find . -type d -name '*.egg-info' -exec rm -rf {} + || true
+	@cd $(ROOT_DIR) && find . -type f -name '*.pyc' -delete
+	@cd $(ROOT_DIR) && find . -type d -name '__pycache__' -delete
+	@cd $(ROOT_DIR) && find . -type d -name '*.egg-info' -exec rm -rf {} + || true
 	@echo "✓ Python cache cleaned"
 
 clean-test: ## Remove test artifacts and coverage reports
 	@echo "Cleaning test artifacts..."
 	@rm -rf $(COVERAGE_HTML)
-	@rm -rf .pytest_cache
-	@rm -rf test-results/
-	@rm -f .coverage
-	@rm -f coverage.xml
+	@rm -rf $(ROOT_DIR)/.pytest_cache
+	@rm -rf $(TEST_RESULTS)
+	@rm -f $(ROOT_DIR)/.coverage
+	@rm -f $(ROOT_DIR)/coverage.xml
 	@echo "✓ Test artifacts cleaned"
 
 ##@ Docker Testing
 
 docker-test-build: ## Build test container image
 	@echo "Building test container image..."
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml build mam-audiofinder-test
+	@$(COMPOSE_CMD) build mam-audiofinder-test
 	@echo "✓ Test container image built successfully"
 
 docker-test-run: ## Run full test suite in container with docker networking
 	@echo "Running tests in test container..."
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml run --rm mam-audiofinder-test
+	@$(COMPOSE_CMD) run --rm mam-audiofinder-test
 	@echo "✓ Container tests completed"
 
 docker-test-backend: ## Run backend unit tests in container
 	@echo "Running backend tests in container..."
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml run --rm mam-audiofinder-test \
+	@$(COMPOSE_CMD) run --rm mam-audiofinder-test \
 		pytest tests/ -v --tb=short --ignore=tests/frontend -W ignore::DeprecationWarning
 	@echo "✓ Backend tests completed"
 
 docker-test-frontend: ## Run frontend Selenium tests in container
 	@echo "Running frontend tests in container (integrated Selenium)..."
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml run --rm mam-audiofinder-test \
+	@$(COMPOSE_CMD) run --rm mam-audiofinder-test \
 		pytest tests/frontend/ -v --tb=short
 	@echo "✓ Frontend tests completed"
 
@@ -233,13 +244,13 @@ docker-test-specific: ## Run specific test file in container (usage: make docker
 		exit 1; \
 	fi
 	@echo "Running specific test: $(TEST)"
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml run --rm mam-audiofinder-test \
+	@$(COMPOSE_CMD) run --rm mam-audiofinder-test \
 		pytest tests/$(TEST) -v --tb=short
 	@echo "✓ Test completed"
 
 docker-test-coverage: ## Run tests with coverage report in container
 	@echo "Running tests with coverage in container..."
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml run --rm mam-audiofinder-test \
+	@$(COMPOSE_CMD) run --rm mam-audiofinder-test \
 		pytest tests/ --ignore=tests/frontend --cov=app --cov-report=html --cov-report=term -v
 	@echo "✓ Coverage tests completed"
 	@echo "📊 Coverage report available in htmlcov/index.html"
@@ -247,11 +258,11 @@ docker-test-coverage: ## Run tests with coverage report in container
 docker-test-shell: ## Open shell in test container for debugging
 	@echo "Opening shell in test container..."
 	@echo "💡 TIP: You can run 'pytest tests/ -v' or 'make test-backend' inside the container"
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml run --rm mam-audiofinder-test /bin/bash
+	@$(COMPOSE_CMD) run --rm mam-audiofinder-test /bin/bash
 
 docker-test-clean: ## Stop and remove test containers and volumes
 	@echo "Cleaning up test containers and volumes..."
-	@$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.test.yml down -v
+	@$(COMPOSE_CMD) down -v
 	@echo "✓ Test containers and volumes removed"
 
 ##@ Development

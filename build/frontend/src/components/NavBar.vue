@@ -105,7 +105,7 @@ const navLinks = [
 ]
 
 const brandLogoPrimary = '/static/favicon.svg'
-const brandLogoFallback = '/static/icon.png'
+const brandLogoFallback = '/static/dist/icon.png'
 const brandLogoSrc = ref(brandLogoPrimary)
 
 const handleLogoError = () => {

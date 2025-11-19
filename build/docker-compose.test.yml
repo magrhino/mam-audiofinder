@@ -1,5 +1,5 @@
 # Docker Compose override for testing
-# Usage: docker compose -f docker-compose.yml -f docker-compose.test.yml <command>
+# Usage: docker compose -f docker-compose.yml -f build/docker-compose.test.yml <command>
 # Or use the Makefile targets: make docker-test-build, make docker-test-run
 
 services:
@@ -7,6 +7,7 @@ services:
   mam-audiofinder-test:
     build:
       context: .
+      dockerfile: build/Dockerfile
       target: testing  # Uses the testing stage from Dockerfile
       args:
         PUID: ${PUID:-1000}

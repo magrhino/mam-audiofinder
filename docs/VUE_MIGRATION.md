@@ -37,20 +37,22 @@ mam-audiofinder/
 │   │   ├── HistoryRow.vue
 │   │   ├── ShowcaseCard.vue
 │   │   └── SeriesTable.vue
-│   ├── views/                    # Page-level components
-│   │   ├── SearchView.vue
-│   │   ├── HistoryView.vue
-│   │   ├── ShowcaseView.vue
-│   │   ├── LogsView.vue
-│   │   └── SeriesView.vue
-│   ├── composables/              # Vue composables
-│   │   ├── useApi.js
-│   │   └── useCoverLoader.js
-│   └── router/                   # Vue Router config
-│       └── index.js
-├── index.html                    # NEW: SPA entry HTML
-├── vite.config.js                # NEW: Vite configuration
-├── package.json                  # NEW: Node.js dependencies
+├── frontend/                     # NEW: Vue SPA home
+│   ├── index.html                # SPA entry HTML
+│   ├── vite.config.js            # Vite configuration
+│   ├── package.json              # Node.js dependencies
+│   └── src/
+│       ├── views/                # Page-level components
+│       │   ├── SearchView.vue
+│       │   ├── HistoryView.vue
+│       │   ├── ShowcaseView.vue
+│       │   ├── LogsView.vue
+│       │   └── SeriesView.vue
+│       ├── composables/          # Vue composables
+│       │   ├── useApi.js
+│       │   └── useCoverLoader.js
+│       └── router/               # Vue Router config
+│           └── index.js
 ├── app/
 │   ├── static/
 │   │   ├── dist/                 # NEW: Built Vue assets (gitignored)

@@ -242,7 +242,7 @@ This test can be integrated into automated testing:
 
 - **Test File**: `app/tests/test_library_matching_intelligence.py` (~900 lines)
 - **Tested Module**: `app/abs_client.py` (verify_import method)
-- **Documentation**: `documentation/library-matching-test.md` (this file)
+- **Documentation**: `docs/documentation/library-matching-test.md` (this file)
 
 ## Troubleshooting
 
