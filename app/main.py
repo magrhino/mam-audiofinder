@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # Import configuration first
@@ -60,6 +61,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Include all routes
 from routes import main_router
 app.include_router(main_router)
+
+# ---------------------------- SPA Fallback ----------------------------
+# Serve Vue SPA for any route not matched by API endpoints
+# This must come AFTER all API routes are registered
+
+@app.get("/{full_path:path}")
+async def spa_fallback(full_path: str):
+    """
+    Fallback route for Vue Router history mode.
+    Serves the SPA index.html for any GET request not handled by API routes.
+    """
+    return FileResponse("static/dist/index.html")
 
 # ---------------------------- Startup Event ----------------------------
 from abs_client import abs_client

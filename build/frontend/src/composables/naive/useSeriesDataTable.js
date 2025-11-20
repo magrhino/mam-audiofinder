@@ -6,7 +6,7 @@
 
 import { ref, computed, h } from 'vue'
 import { NButton, NTooltip } from 'naive-ui'
-import { escapeHtml } from '../../../app/static/js/core/utils.js'
+import { escapeHtml } from '@core/utils.js'
 
 /**
  * Create column definitions for series results table

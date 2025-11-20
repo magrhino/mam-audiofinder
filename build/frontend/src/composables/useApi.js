@@ -3,7 +3,7 @@
  * Provides access to the centralized API client
  */
 
-import { api } from '../../app/static/js/core/api.js'
+import { api } from '@core/api.js'
 
 /**
  * Composable for accessing the API client

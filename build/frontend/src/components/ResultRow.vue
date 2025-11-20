@@ -23,7 +23,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { formatSize } from '../../app/static/js/core/utils.js'
+import { formatSize } from '@core/utils.js'
 import ActionButton from './ActionButton.vue'
 
 const props = defineProps({

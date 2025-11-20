@@ -6,7 +6,7 @@
 
 import { ref, computed, h } from 'vue'
 import { NButton, NTag, NTooltip } from 'naive-ui'
-import { formatSize, escapeHtml } from '../../../app/static/js/core/utils.js'
+import { formatSize, escapeHtml } from '@core/utils.js'
 import CoverImage from '../../components/CoverImage.vue'
 import AudiobookFormatIcon from '../../components/icons/AudiobookFormatIcon.vue'
 import FileSizeIcon from '../../components/icons/FileSizeIcon.vue'

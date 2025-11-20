@@ -12,14 +12,14 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
       '@views': fileURLToPath(new URL('./src/views', import.meta.url)),
-      '@core': fileURLToPath(new URL('../app/static/js/core', import.meta.url)),
-      '@services': fileURLToPath(new URL('../app/static/js/services', import.meta.url)),
+      '@core': fileURLToPath(new URL('../../app/static/js/core', import.meta.url)),
+      '@services': fileURLToPath(new URL('../../app/static/js/services', import.meta.url)),
       '@composables': fileURLToPath(new URL('./src/composables', import.meta.url))
     }
   },
   publicDir: 'static',
   build: {
-    outDir: '../app/static/dist',
+    outDir: '../../app/static/dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {

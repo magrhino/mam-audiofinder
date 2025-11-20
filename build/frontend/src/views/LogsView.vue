@@ -19,7 +19,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { NSelect, NButton, NCheckbox } from 'naive-ui'
 import { useApi } from '@composables/useApi'
-import { escapeHtml } from '../../app/static/js/core/utils.js'
+import { escapeHtml } from '@core/utils.js'
 
 const api = useApi()
 const logLevel = ref('')

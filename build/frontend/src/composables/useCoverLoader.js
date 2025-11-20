@@ -2,7 +2,7 @@
  * Vue Composable for shared cover loader service
  */
 
-import { CoverLoader } from '../../app/static/js/services/coverLoader.js'
+import { CoverLoader } from '@services/coverLoader.js'
 
 let sharedLoader = null
 let rowCounter = 0

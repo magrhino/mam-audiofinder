@@ -42,6 +42,12 @@ const routes = [
     name: 'series',
     component: SeriesView,
     meta: { title: 'Series - Audiobook Finder' }
+  },
+  // Catch-all route for unmatched paths - redirect to home
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    redirect: '/'
   }
 ]
 
