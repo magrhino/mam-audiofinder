@@ -46,5 +46,38 @@ const labelText = computed(() => {
 </script>
 
 <style scoped>
-/* Uses main.css styles */
+.action-btn {
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.action-btn--primary {
+  background: var(--btn-primary-bg);
+  border-color: transparent;
+}
+
+.action-btn--secondary {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.action-btn--danger {
+  background: rgba(168, 50, 50, 0.2);
+  border-color: #a83232;
+}
+
+.action-btn--success {
+  background: rgba(45, 122, 62, 0.2);
+  border-color: var(--success);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 </style>

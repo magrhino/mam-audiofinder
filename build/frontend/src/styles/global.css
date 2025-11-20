@@ -1,0 +1,48 @@
+/* ========================================
+   Global Vue SPA Styles
+   ========================================
+   Global styles for the Vue SPA that complement
+   component-scoped styles and Naive UI theme.
+   ======================================== */
+
+/* ========================================
+   NaiveUI DataTable Row Shimmer Effect
+   ======================================== */
+
+/* Add shimmer effect to table rows on hover */
+:deep(.n-data-table-tr),
+.n-data-table-tr {
+  position: relative;
+  overflow: hidden;
+}
+
+:deep(.n-data-table-tr::before),
+.n-data-table-tr::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.05),
+    transparent
+  );
+  transition: left 0.5s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+:deep(.n-data-table-tr:hover::before),
+.n-data-table-tr:hover::before {
+  left: 100%;
+}
+
+/* Ensure table cell content stays above shimmer */
+:deep(.n-data-table-td),
+.n-data-table-td {
+  position: relative;
+  z-index: 2;
+}
