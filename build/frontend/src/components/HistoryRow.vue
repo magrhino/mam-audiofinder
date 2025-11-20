@@ -321,5 +321,89 @@ const libraryItemUrl = computed(() => {
 </script>
 
 <style scoped>
-/* Uses main.css styles */
+.import-form {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.import-form__inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-sm);
+  align-items: end;
+}
+
+.import-form__inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.import-form__inputs input,
+.import-form__inputs select {
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.import-form__inputs input:focus,
+.import-form__inputs select:focus {
+  outline: none;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.2);
+}
+
+.import-form__inline {
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.import-form__inline input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.import-form__status {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.import-form__warnings {
+  color: #f39c12;
+  padding: 0.5rem 0;
+  white-space: pre-line;
+  font-weight: 500;
+}
+
+.import-form__tree {
+  max-height: 220px;
+  overflow: auto;
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--spacing-sm);
+}
+
+.import-form__tree ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-family: monospace;
+}
+
+.import-form__tree li {
+  padding: 0.25rem 0;
+  color: var(--text-secondary);
+}
 </style>

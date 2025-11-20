@@ -3,23 +3,10 @@
     <div class="logs-header">
       <h3>Application Logs</h3>
       <div class="logs-controls">
-        <select v-model="logLevel" @change="loadLogs">
-          <option value="">All Levels</option>
-          <option value="INFO">INFO</option>
-          <option value="WARNING">WARNING</option>
-          <option value="ERROR">ERROR</option>
-        </select>
-        <select v-model="logLines" @change="loadLogs">
-          <option value="50">50 lines</option>
-          <option value="100">100 lines</option>
-          <option value="250">250 lines</option>
-          <option value="500">500 lines</option>
-          <option value="1000">1000 lines</option>
-        </select>
-        <button class="primary" @click="loadLogs">🔄 Refresh</button>
-        <label>
-          <input type="checkbox" v-model="autoScroll" /> Auto-scroll
-        </label>
+        <n-select v-model:value="logLevel" @update:value="loadLogs" :options="levelOptions" placeholder="All Levels" style="width: 140px" />
+        <n-select v-model:value="logLines" @update:value="loadLogs" :options="linesOptions" style="width: 120px" />
+        <n-button type="primary" @click="loadLogs">🔄 Refresh</n-button>
+        <n-checkbox v-model:checked="autoScroll">Auto-scroll</n-checkbox>
       </div>
     </div>
     <div ref="logsContainer" class="logs-container">
@@ -30,6 +17,7 @@
 
 <script setup>
 import { ref, onMounted, watch, nextTick } from 'vue'
+import { NSelect, NButton, NCheckbox } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { escapeHtml } from '../../app/static/js/core/utils.js'
 
@@ -39,6 +27,21 @@ const logLines = ref('100')
 const autoScroll = ref(true)
 const highlightedLogs = ref('Loading logs...')
 const logsContainer = ref(null)
+
+const levelOptions = [
+  { label: 'All Levels', value: '' },
+  { label: 'INFO', value: 'INFO' },
+  { label: 'WARNING', value: 'WARNING' },
+  { label: 'ERROR', value: 'ERROR' }
+]
+
+const linesOptions = [
+  { label: '50 lines', value: '50' },
+  { label: '100 lines', value: '100' },
+  { label: '250 lines', value: '250' },
+  { label: '500 lines', value: '500' },
+  { label: '1000 lines', value: '1000' }
+]
 
 const highlightLogs = (text) => {
   return escapeHtml(text)
@@ -99,5 +102,74 @@ watch(highlightedLogs, async () => {
 </script>
 
 <style scoped>
-/* Uses main.css styles */
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.logs-controls {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.logs-container {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  max-height: 600px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.logs-container pre {
+  margin: 0;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
+
+/* Syntax highlighting for log levels */
+:deep(.log-info) {
+  color: #6ab7ff;
+}
+
+:deep(.log-warning) {
+  color: var(--warning);
+}
+
+:deep(.log-error) {
+  color: var(--error);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .logs-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .logs-controls {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .logs-controls :deep(.n-select),
+  .logs-controls :deep(.n-button) {
+    width: 100%;
+  }
+
+  .logs-container {
+    max-height: 400px;
+  }
+}
 </style>
