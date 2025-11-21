@@ -474,57 +474,179 @@ class HardcoverClient:
 
         return series_list
 
-    async def list_series_books(self, series_id: int) -> Optional[Dict[str, Any]]:
+    def _normalize_title(self, title: str, debug: bool = False) -> str:
         """
-        List books in a series using the documented search endpoint.
+        Normalize title for deduplication by removing articles, punctuation, and whitespace.
 
-        NOTE: This function now uses only the documented Hardcover search API.
-        Book information is limited to titles only (up to 5 books).
+        Args:
+            title: Book title to normalize
+            debug: If True, log normalization steps
 
-        Strategy:
-        1. First, get series basic info (id, name, author) using series_by_pk
-        2. Then search for the series by name to get books array
-        3. Return combined results
+        Returns:
+            Normalized title string (lowercase, no articles/punctuation/series markers)
+        """
+        import re
+        original = title
+
+        # Convert to lowercase
+        normalized = title.lower()
+
+        # Remove series markers (Book 1, Bk. 1, Part 1, Vol. 1, #1, etc.)
+        normalized = re.sub(r'\b(book|bk|part|pt|vol|volume|edition|ed)\.?\s*\d+\b', '', normalized)
+        normalized = re.sub(r'#\d+\b', '', normalized)
+
+        # Remove leading articles (the, a, an)
+        normalized = re.sub(r'^(the|a|an)\s+', '', normalized)
+
+        # Remove ALL internal articles (with spaces around them)
+        normalized = re.sub(r'\s+(the|a|an)\s+', ' ', normalized)
+
+        # Remove punctuation (colons, dashes, apostrophes, quotes, etc.)
+        # Keep only alphanumeric and spaces
+        normalized = re.sub(r'[^\w\s]', '', normalized)
+
+        # Normalize whitespace (multiple spaces to single space)
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+
+        if debug:
+            logger.debug(f"🔍 Title normalization: '{original}' → '{normalized}'")
+
+        return normalized
+
+    def _deduplicate_books(self, books: List[Dict[str, Any]], debug: bool = False) -> List[Dict[str, Any]]:
+        """
+        Deduplicate books by normalized title, keeping the one with lowest position.
+
+        Args:
+            books: List of book dictionaries with 'title' and 'position' keys
+            debug: If True, log detailed deduplication process
+
+        Returns:
+            Deduplicated list of books
+        """
+        if not books:
+            return books
+
+        if debug:
+            logger.debug(f"📚 Deduplication starting with {len(books)} books")
+
+        # Group by normalized title
+        title_groups = {}
+        for book in books:
+            title = book.get("title", "")
+            normalized = self._normalize_title(title, debug=debug)
+
+            if normalized not in title_groups:
+                title_groups[normalized] = []
+            title_groups[normalized].append(book)
+
+        if debug:
+            logger.debug(f"📚 Grouped into {len(title_groups)} unique normalized titles")
+            for normalized_title, book_list in title_groups.items():
+                if len(book_list) > 1:
+                    logger.debug(f"   Duplicates found for '{normalized_title}':")
+                    for book in book_list:
+                        logger.debug(f"      - '{book.get('title')}' (ID: {book.get('id', book.get('book_id'))}, Position: {book.get('position')})")
+
+        # Keep book with lowest position for each title
+        deduplicated = []
+        for normalized_title, book_list in title_groups.items():
+            # Sort by position (handle None values)
+            sorted_books = sorted(
+                book_list,
+                key=lambda b: (b.get("position") is None, b.get("position", float('inf')))
+            )
+            kept_book = sorted_books[0]
+            deduplicated.append(kept_book)
+
+            if debug and len(book_list) > 1:
+                logger.debug(f"   ✓ Kept '{kept_book.get('title')}' (Position: {kept_book.get('position')})")
+
+        # Sort final list by position
+        deduplicated.sort(key=lambda b: (b.get("position") is None, b.get("position", float('inf'))))
+
+        logger.debug(f"📚 Deduplication: {len(books)} books → {len(deduplicated)} unique books")
+
+        return deduplicated
+
+    async def list_series_books(
+        self,
+        series_id: int,
+        include_featured: bool = False,
+        deduplicate: bool = True,
+        debug: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """
+        List books in a series using GraphQL book_series relationship.
+
+        Uses the Hardcover GraphQL API to fetch complete book details with ordering.
+        Filters for non-canonical books (canonical_id is null) and optionally featured books.
 
         Args:
             series_id: Hardcover series ID
+            include_featured: If True, only return featured books (default: False)
+            deduplicate: If True, remove duplicate books by normalized title (default: True)
+            debug: If True, log detailed book information (default: False)
 
         Returns:
             Dictionary with keys:
             - series_id: Hardcover series ID
             - series_name: Series name
             - author_name: Primary author
-            - books: List of book titles (strings, limited to top 5 from search)
+            - books_count: Total number of books in series
+            - books: List of book dictionaries with:
+                - book_id: Hardcover book ID
+                - title: Book title
+                - subtitle: Book subtitle (may be None)
+                - position: Position in series (float or int)
             Returns None if series not found or API fails.
         """
         if not self.is_configured:
             return None
 
-        # Generate cache key
-        cache_key = self._get_cache_key("series", str(series_id))
+        # Generate cache key with parameters
+        cache_key = self._get_cache_key("series", f"{series_id}|feat:{include_featured}|dedup:{deduplicate}")
 
         # Check cache
         cached = await self._get_cached(cache_key)
         if cached:
             return cached
 
-        # Step 1: Get series basic info (without books field which doesn't exist)
-        query = """
-        query GetSeriesInfo($seriesId: Int!) {
-          series_by_pk(id: $seriesId) {
+        # Build GraphQL query with conditional featured filter
+        featured_filter = 'featured: {_eq: true}' if include_featured else ''
+
+        query = f"""
+        query GetBooksBySeries($seriesId: Int!) {{
+          series_by_pk(id: $seriesId) {{
             id
             name
-            author {
-              id
+            author {{
               name
-            }
-          }
-        }
+            }}
+            books_count
+            book_series(
+              order_by: {{position: asc}}
+              where: {{
+                book: {{
+                  {featured_filter}
+                  canonical_id: {{_is_null: true}}
+                }}
+              }}
+            ) {{
+              position
+              book {{
+                id
+                title
+                subtitle
+              }}
+            }}
+          }}
+        }}
         """
 
         variables = {"seriesId": series_id}
 
-        logger.info(f"📚 Fetching series info for ID {series_id}")
+        logger.info(f"📚 Fetching series books for ID {series_id} (featured={include_featured}, dedup={deduplicate})")
 
         data = await self._execute_graphql(query, variables)
 
@@ -536,33 +658,48 @@ class HardcoverClient:
         series_name = series_data["name"]
         author_obj = series_data.get("author", {})
         author_name = author_obj.get("name", "") if author_obj else ""
+        books_count = series_data.get("books_count", 0)
 
-        logger.info(f"✅ Found series: '{series_name}' by {author_name}")
+        logger.info(f"✅ Found series: '{series_name}' by {author_name} ({books_count} total books)")
 
-        # Step 2: Search for this series to get books array
-        logger.info(f"🔍 Searching for books in series '{series_name}'")
-        search_results = await self.search_series(title=series_name, limit=1)
-
+        # Extract books from book_series relationship
+        book_series = series_data.get("book_series", [])
         books = []
-        if search_results and len(search_results) > 0:
-            # Use the first result (should be exact match)
-            first_result = search_results[0]
-            if first_result.get("series_id") == str(series_id) or first_result.get("series_id") == series_id:
-                books = first_result.get("books", [])
-                logger.info(f"✅ Found {len(books)} books from search results")
-            else:
-                logger.warning(f"⚠️  Search result mismatch: got ID {first_result.get('series_id')}, expected {series_id}")
-                # Still use the books but log the discrepancy
-                books = first_result.get("books", [])
+
+        for bs in book_series:
+            book_data = bs.get("book", {})
+            position = bs.get("position")
+
+            books.append({
+                "book_id": book_data.get("id"),
+                "title": book_data.get("title", ""),
+                "subtitle": book_data.get("subtitle"),
+                "position": position
+            })
+
+        logger.info(f"✅ Retrieved {len(books)} books from GraphQL")
+
+        # Debug logging: show all books if requested
+        if debug and books:
+            logger.debug(f"📚 All {len(books)} books retrieved from series:")
+            for idx, book in enumerate(books, 1):
+                logger.debug(f"   {idx}. '{book.get('title')}' (ID: {book.get('book_id')}, Position: {book.get('position')})")
+                if book.get('subtitle'):
+                    logger.debug(f"      Subtitle: {book.get('subtitle')}")
+
+        # Apply deduplication if requested
+        if deduplicate and len(books) > 0:
+            books = self._deduplicate_books(books, debug=debug)
 
         result = {
             "series_id": series_data["id"],
             "series_name": series_name,
             "author_name": author_name,
-            "books": books  # Array of book title strings (up to 5)
+            "books_count": books_count,
+            "books": books
         }
 
-        logger.info(f"✅ Returning {len(books)} book titles for series '{series_name}'")
+        logger.info(f"✅ Returning {len(books)} books for series '{series_name}'")
 
         # Cache results
         await self._set_cache(
@@ -663,6 +800,35 @@ class HardcoverClient:
         )
 
         return books
+# todo # 2: evaluate and test new query which provides more detailed book info and allows for better duplcate handling
+# example query:
+# query LordOfTheRingsBooks {
+#     search(
+#         query: "lord of the rings",
+#         query_type: "Book",
+#         per_page: 1,
+#         page: 1,
+#         fields: "title,alternative_titles,author_names,isbns,audio_seconds,has_audiobook,rating",
+#         sort: "users_count:desc,ratings_count:desc",
+#         weights: "5,3,2,1,1,1,1"
+#     ) {
+#         results
+#     }
+# }
+# Key changes:
+
+# per_page: 1 - Returns only the single most popular result
+# sort: "users_count:desc,ratings_count:desc" - Sorts by number of users (most popular metric) first, then by number of ratings
+# fields - Includes alternative_titles to get the alternate titles you need
+# weights: "5,3,2,1" - Prioritizes exact title matches (5), then alternative titles (3), author names (2), and ISBNs (1)
+# Added fields:
+
+# audio_seconds - Number of seconds for the default audiobook edition
+# has_audiobook - Boolean indicating if an audiobook is available
+# rating - Hardcover average rating
+# This will return the most popular "Lord of the Rings" book based on user count, along with all its alternative titles that you can then filter out from subsequent searches.
+# all response fields should be extracted and stored in the local database for more advanced searching and filtering later on.
+
 
     async def search_book_by_title(
         self,
@@ -841,6 +1007,290 @@ class HardcoverClient:
         )
 
         return books_list
+
+    async def search_book_advanced(
+        self,
+        title: str,
+        author: str = "",
+        limit: int = 5,
+        fields: Optional[str] = None,
+        sort: Optional[str] = None,
+        weights: Optional[str] = None,
+        deduplicate: bool = False
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Advanced book search with extended metadata fields.
+
+        Uses Hardcover search API with custom fields, sorting, and weighting.
+        Supports deduplication based on alternative titles.
+
+        Args:
+            title: Book title to search for
+            author: Author name for filtering (optional)
+            limit: Maximum number of results (default: 5)
+            fields: Comma-separated field list (default: includes alternative_titles, isbns, audio metadata, rating)
+            sort: Sort order (default: "users_count:desc,ratings_count:desc")
+            weights: Field weights for relevance (default: "5,3,2,1,1,1,1")
+            deduplicate: If True, keep only most popular version of duplicate books (default: False)
+
+        Returns:
+            List of book dictionaries with keys:
+            - book_id: Hardcover book ID
+            - title: Book title
+            - authors: List of author names
+            - author_names: Alternative format of authors (list of strings)
+            - alternative_titles: List of alternative titles
+            - isbns: List of ISBN numbers
+            - audio_seconds: Audiobook duration in seconds
+            - has_audiobook: Boolean indicating audiobook availability
+            - rating: Hardcover average rating (float)
+            - release_year: Publication year
+            - description: Book description
+            - cover_url: Cover image URL
+            - users_count: Number of users (for popularity ranking)
+            Returns None if API call fails, empty list [] if no results found.
+        """
+        if not self.is_configured:
+            return None
+
+        # Set defaults for advanced search
+        if fields is None:
+            fields = "title,alternative_titles,author_names,isbns,audio_seconds,has_audiobook,rating,description,image,release_year,users_count"
+        if sort is None:
+            sort = "users_count:desc,ratings_count:desc"
+        if weights is None:
+            weights = "5,3,2,1,1,1,1"
+
+        # Generate cache key
+        cache_key = self._get_cache_key("book_advanced", f"{title}|{author}|{limit}|{fields[:20]}|dedup:{deduplicate}")
+
+        # Check cache
+        cached = await self._get_cached(cache_key)
+        if cached is not None:
+            return cached.get("books", [])
+
+        # Build GraphQL query with advanced parameters
+        query = """
+        query SearchBooksAdvanced($query: String!, $queryType: String!, $perPage: Int!, $fields: String!, $sort: String!, $weights: String!) {
+          search(query: $query, query_type: $queryType, per_page: $perPage, fields: $fields, sort: $sort, weights: $weights) {
+            results
+          }
+        }
+        """
+
+        variables = {
+            "query": title,
+            "queryType": "Book",
+            "perPage": limit,
+            "fields": fields,
+            "sort": sort,
+            "weights": weights
+        }
+
+        logger.info(f"🔍 Advanced search for book: '{title}' (author: '{author}', limit: {limit}, dedup: {deduplicate})")
+        logger.debug(f"   fields: {fields}")
+        logger.debug(f"   sort: {sort}, weights: {weights}")
+
+        # Execute query
+        data = await self._execute_graphql(query, variables)
+
+        # If advanced query failed, fall back to basic search
+        if data is None or "search" not in data:
+            logger.warning(f"⚠️  Advanced search failed for '{title}', falling back to basic search")
+
+            # Use basic search query (no advanced params)
+            basic_query = """
+            query SearchBooks($query: String!, $queryType: String!, $perPage: Int!) {
+              search(query: $query, query_type: $queryType, per_page: $perPage) {
+                results
+              }
+            }
+            """
+
+            basic_variables = {
+                "query": title,
+                "queryType": "Book",
+                "perPage": limit
+            }
+
+            logger.debug(f"🔄 Retrying with basic search query")
+            data = await self._execute_graphql(basic_query, basic_variables)
+
+            if data is None:
+                logger.error(f"❌ Basic search also failed for '{title}'")
+                return None
+
+        # Debug: log raw response structure
+        logger.debug(f"🔍 Raw GraphQL response keys: {list(data.keys())}")
+
+        if "search" not in data:
+            logger.warning(f"⚠️  No 'search' field in response for '{title}'")
+            logger.debug(f"   Available fields: {list(data.keys())}")
+            return []
+
+        search_data = data["search"]
+        logger.debug(f"🔍 Search data type: {type(search_data)}")
+        if isinstance(search_data, dict):
+            logger.debug(f"   Search data keys: {list(search_data.keys())}")
+
+        results = search_data.get("results") if isinstance(search_data, dict) else None
+
+        if results is None:
+            logger.warning(f"⚠️  No 'results' field in search response for '{title}'")
+            logger.debug(f"   Search data content: {str(search_data)[:500]}")
+            return []
+
+        # Handle string response (parse JSON)
+        if isinstance(results, str):
+            try:
+                results = json.loads(results)
+                logger.debug("📝 Parsed results from JSON string")
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ Failed to parse results JSON: {e}")
+                return []
+
+        # Expected format: results is a dict with 'found' and 'hits' keys
+        books_list = []
+
+        if isinstance(results, dict):
+            found_count = results.get("found", 0)
+            hits = results.get("hits", [])
+
+            logger.debug(f"🔍 Results structure: found={found_count}, hits={len(hits)}")
+
+            if not hits:
+                logger.info(f"ℹ️  No books found matching '{title}' (found={found_count})")
+                return []
+
+            # Process hits array
+            for idx, hit in enumerate(hits):
+                doc = hit.get("document", {})
+
+                if idx == 0:
+                    logger.debug(f"🔍 First book document keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
+
+                # Extract extended fields
+                authors_field = doc.get("authors", [])
+                author_names = doc.get("author_names", [])
+                alternative_titles = doc.get("alternative_titles", [])
+                isbns = doc.get("isbns", [])
+
+                # Handle various author formats
+                if isinstance(authors_field, list) and len(authors_field) > 0:
+                    if isinstance(authors_field[0], dict):
+                        authors = [a.get("name", "") for a in authors_field]
+                    else:
+                        authors = authors_field
+                else:
+                    authors = []
+
+                # Ensure lists
+                if not isinstance(alternative_titles, list):
+                    alternative_titles = []
+                if not isinstance(isbns, list):
+                    isbns = []
+                if not isinstance(author_names, list):
+                    author_names = authors if not author_names else [author_names]
+
+                # Apply author filter if provided
+                if author:
+                    author_match = False
+                    for a in (authors + author_names):
+                        if author.lower() in str(a).lower():
+                            author_match = True
+                            break
+                    if not author_match:
+                        continue
+
+                books_list.append({
+                    "book_id": doc.get("id"),
+                    "title": doc.get("title", ""),
+                    "authors": authors,
+                    "author_names": author_names,
+                    "alternative_titles": alternative_titles,
+                    "isbns": isbns,
+                    "audio_seconds": doc.get("audio_seconds"),
+                    "has_audiobook": doc.get("has_audiobook", False),
+                    "rating": doc.get("rating"),
+                    "release_year": doc.get("release_year"),
+                    "description": doc.get("description", ""),
+                    "cover_url": doc.get("image", ""),
+                    "users_count": doc.get("users_count", 0)
+                })
+
+        logger.info(f"✅ Found {len(books_list)} book matches (before dedup)")
+
+        # Apply deduplication if requested
+        if deduplicate and len(books_list) > 1:
+            books_list = self._deduplicate_books_by_alt_titles(books_list)
+            logger.info(f"✅ After deduplication: {len(books_list)} unique books")
+
+        # Cache results
+        await self._set_cache(
+            cache_key,
+            "book_advanced",
+            {"books": books_list},
+            {"title": title, "author": author, "normalized": title.lower()}
+        )
+
+        return books_list
+
+    def _deduplicate_books_by_alt_titles(self, books: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Deduplicate books using alternative titles, keeping the most popular version.
+
+        Args:
+            books: List of book dictionaries with 'alternative_titles' and 'users_count' keys
+
+        Returns:
+            Deduplicated list of books
+        """
+        if not books:
+            return books
+
+        # Build a set of all titles (main + alternatives) for each book
+        book_title_sets = []
+        for book in books:
+            title_set = {self._normalize_title(book.get("title", ""))}
+            for alt in book.get("alternative_titles", []):
+                title_set.add(self._normalize_title(alt))
+            book_title_sets.append((book, title_set))
+
+        # Find groups of overlapping books
+        used = set()
+        groups = []
+
+        for i, (book1, titles1) in enumerate(book_title_sets):
+            if i in used:
+                continue
+
+            group = [book1]
+            used.add(i)
+
+            # Find all books with overlapping titles
+            for j, (book2, titles2) in enumerate(book_title_sets):
+                if j <= i or j in used:
+                    continue
+                if titles1 & titles2:  # Set intersection
+                    group.append(book2)
+                    used.add(j)
+
+            groups.append(group)
+
+        # Keep most popular book from each group
+        deduplicated = []
+        for group in groups:
+            # Sort by users_count (descending)
+            sorted_group = sorted(
+                group,
+                key=lambda b: b.get("users_count", 0),
+                reverse=True
+            )
+            deduplicated.append(sorted_group[0])
+
+        logger.debug(f"📚 Alt-title deduplication: {len(books)} books → {len(deduplicated)} unique books ({len(groups)} groups)")
+
+        return deduplicated
 
     async def get_series_by_author(
         self,
