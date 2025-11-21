@@ -91,10 +91,13 @@ export function useImport(historyItem) {
       const data = await api.getTorrentTree(hash)
       torrentTree.value = data
 
-      // Auto-enable flatten if multi-disc detected (don't set status - contextualMessage shows this)
+      // Auto-enable flatten if multi-disc detected
       if (data?.has_multi_disc && !form.flatten) {
         form.flatten = true
-        // Don't set statusMessage - let contextualMessage handle disc detection warnings
+      }
+      // Auto-disable flatten if no multi-disc detected
+      else if (!data?.has_multi_disc && form.flatten) {
+        form.flatten = false
       }
     } catch (err) {
       console.error('Failed to load torrent tree', err)
@@ -134,7 +137,30 @@ export function useImport(historyItem) {
         flatten: form.flatten
       })
 
-      statusMessage.value = '✓ Import requested'
+      // Build detailed status message based on import results
+      const { files_copied = 0, files_linked = 0, files_moved = 0, import_mode = 'link' } = result
+      let statusParts = []
+
+      if (import_mode === 'link') {
+        if (files_linked > 0) {
+          statusParts.push(`✓ Hard linked ${files_linked} file${files_linked !== 1 ? 's' : ''} successfully`)
+        }
+        const failed_links = files_copied - files_linked
+        if (failed_links > 0) {
+          statusParts.push(`⚠️ Copied ${failed_links} file${failed_links !== 1 ? 's' : ''} (hardlink failed)`)
+        }
+      } else if (import_mode === 'copy') {
+        statusParts.push(`✓ Copied ${files_copied} file${files_copied !== 1 ? 's' : ''} successfully`)
+      } else if (import_mode === 'move') {
+        statusParts.push(`✓ Moved ${files_moved} file${files_moved !== 1 ? 's' : ''} successfully`)
+      }
+
+      // Add destination path
+      if (result.dest) {
+        statusParts.push(`📁 ${result.dest}`)
+      }
+
+      statusMessage.value = statusParts.join('\n')
 
       // Dispatch event for live status updates
       if (historyItem?.id) {

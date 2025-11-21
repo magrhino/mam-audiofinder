@@ -1,43 +1,100 @@
 <template>
   <div class="history-view card">
-    <h3>Download History & Imports</h3>
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 80px">Cover</th>
-          <th>Title</th>
-          <th>Author</th>
-          <th>Narrator</th>
-          <th class="center">Link</th>
-          <th>When</th>
-          <th>Status</th>
-          <th>Import</th>
-          <th>Verify</th>
-          <th>Remove</th>
-        </tr>
-      </thead>
-      <tbody>
-        <HistoryRow v-for="entry in history" :key="entry.id" :item="entry" :column-count="10" @updated="loadHistory" />
-        <tr v-if="!history.length">
-          <td colspan="10" class="center muted">No items in history yet.</td>
-        </tr>
-      </tbody>
-    </table>
+    <GlassTitle>Download History & Imports</GlassTitle>
+    <div class="glass-table-wrapper">
+      <n-data-table
+        ref="tableRef"
+        :columns="columns"
+        :data="enrichedHistory"
+        :pagination="pagination"
+        :bordered="false"
+        :row-key="(row) => row.id"
+        :scroll-x="scrollX"
+        striped
+      />
+      <div v-if="!history.length" class="center muted" style="padding: 2rem;">
+        No items in history yet.
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import HistoryRow from '@components/HistoryRow.vue'
+import { computed, onMounted, ref } from 'vue'
+import { useBreakpoints } from '@vueuse/core'
+import { NDataTable } from 'naive-ui'
+import GlassTitle from '@components/GlassTitle.vue'
 import { useHistoryLiveUpdates } from '@composables/useHistoryLiveUpdates'
+import { useHistoryDataTable } from '@composables/naive/useHistoryDataTable'
+import { useApi } from '@composables/useApi'
+
+const api = useApi()
+
+// Responsive breakpoints for dynamic scroll-x
+const breakpoints = useBreakpoints({
+  mobile: 0,
+  tablet: 768,
+  desktop: 1024
+})
+
+// Dynamic scroll-x based on screen size
+const scrollX = computed(() => {
+  if (breakpoints.greater('desktop').value) {
+    return 1400
+  } else if (breakpoints.greater('tablet').value) {
+    return 1200
+  } else {
+    return 900
+  }
+})
 
 // Use the live updates composable for auto-refresh and event handling
-// - Auto-refreshes every 5 seconds to show live torrent status
-// - Listens to 'torrentAdded' events for immediate updates
-// - Automatically cleans up interval and listeners on unmount
-// - Exposes start/stop methods for future router integration (pause on navigation)
 const { history, loadHistory } = useHistoryLiveUpdates({ interval: 5000 })
+
+// Initialize history data table
+const {
+  tableRef,
+  columns,
+  isMobile,
+  enrichData,
+  setAbsBaseUrl
+} = useHistoryDataTable({
+  onUpdated: loadHistory
+})
+
+// Enrich history data with update callback
+const enrichedHistory = computed(() => enrichData(history.value))
+
+// Pagination configuration
+const pagination = ref({
+  pageSize: 25,
+  pageSizes: [25, 50, 100],
+  showSizePicker: true,
+  showQuickJumper: true
+})
+
+// Load ABS base URL on mount
+onMounted(async () => {
+  try {
+    const config = await api.getConfig()
+    setAbsBaseUrl(config.abs_base_url || '')
+  } catch (err) {
+    console.error('[HistoryView] Failed to load config:', err)
+  }
+})
 </script>
 
 <style scoped>
-/* Uses main.css styles */
+/* Glass table wrapper styling */
+.glass-table-wrapper {
+  margin-top: var(--spacing-md, 1rem);
+}
+
+/* Mobile: Optimized padding */
+@media (max-width: 767px) {
+  .glass-table-wrapper {
+    margin-left: calc(-1 * var(--spacing-md, 1rem));
+    margin-right: calc(-1 * var(--spacing-md, 1rem));
+  }
+}
 </style>

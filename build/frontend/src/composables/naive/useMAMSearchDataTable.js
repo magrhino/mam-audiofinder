@@ -16,11 +16,11 @@ import DateUploadedIcon from '../../components/icons/DateUploadedIcon.vue'
 /**
  * Create column definitions based on view type
  * @param {string} viewType - 'search' | 'history' | 'showcase'
- * @param {object} callbacks - { onAdd, onVerify, onDelete }
+ * @param {object} callbacks - { onAdd, onVerify, onDelete, isItemLoading }
  * @returns {Array} Column configuration for n-data-table
  */
 function createColumns(viewType, callbacks) {
-  const { onAdd, onVerify, onDelete } = callbacks
+  const { onAdd, onVerify, onDelete, isItemLoading } = callbacks
 
   const columns = {
     // Cover column with library indicator using NaiveUI n-image with lazy loading
@@ -199,16 +199,21 @@ function createColumns(viewType, callbacks) {
     addAction: {
       title: 'Add',
       key: 'action',
-      width: 100,
+      width: 120,
       render(row) {
         const isDisabled = !(row.dl || row.id)
+        const itemLoading = isItemLoading ? isItemLoading(row.id) : false
         return h(NButton, {
           size: 'small',
           type: 'primary',
           class: 'glass-button-primary',
-          disabled: isDisabled,
+          disabled: isDisabled || itemLoading,
+          loading: itemLoading,
           onClick: () => onAdd && onAdd(row)
-        }, { default: () => 'Add' })
+        }, {
+          default: () => itemLoading ? 'Adding...' : 'Add',
+          icon: itemLoading ? undefined : () => h('span', '+')
+        })
       }
     },
 
@@ -347,6 +352,7 @@ function createColumns(viewType, callbacks) {
  * @param {function} config.onAdd - Callback for Add button
  * @param {function} config.onVerify - Callback for Verify button (history only)
  * @param {function} config.onDelete - Callback for Delete button (history only)
+ * @param {function} config.isItemLoading - Function to check if item is loading (optional)
  * @param {number} config.defaultPageSize - Default pagination size (default: 25)
  * @returns {object} Table state and methods
  */
@@ -356,6 +362,7 @@ export function useMAMSearchDataTable(config = {}) {
     onAdd = null,
     onVerify = null,
     onDelete = null,
+    isItemLoading = null,
     defaultPageSize = 25
   } = config
 
@@ -378,7 +385,7 @@ export function useMAMSearchDataTable(config = {}) {
   const columns = computed(() => {
     return createColumns(
       viewType,
-      { onAdd, onVerify, onDelete }
+      { onAdd, onVerify, onDelete, isItemLoading }
     )
   })
 

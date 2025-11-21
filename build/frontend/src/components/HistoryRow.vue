@@ -1,23 +1,14 @@
 <template>
   <tr>
     <td style="padding:0.25rem;">
-      <n-image
-        v-if="item.abs_cover_url"
-        :src="item.abs_cover_url"
-        alt="Cover"
-        lazy
+      <CoverImage
+        :mam-id="String(item.mam_id || '')"
+        :title="item.title || ''"
+        :author="item.author || ''"
         :width="60"
         :height="90"
-        object-fit="cover"
-        :intersection-observer-options="{ rootMargin: '50px' }"
-      >
-        <template #placeholder>
-          <div style="width: 60px; height: 90px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; color: #888; font-size: 0.7em;">
-            Loading...
-          </div>
-        </template>
-      </n-image>
-      <span v-else class="muted" style="font-size:0.8em;">No cover</span>
+        :in-library="false"
+      />
     </td>
     <td>{{ item.title }}</td>
     <td>{{ item.author }}</td>
@@ -38,7 +29,7 @@
     <td>
       <n-button
         type="success"
-        :ghost="!showForm"
+        :ghost="showForm"
         round
         :loading="loading && showForm"
         @click="toggleForm"
@@ -122,6 +113,7 @@
             :loading="loading"
             :disabled="!canImport"
             @click="handleImport"
+            strong
           >
             {{ buttonLabel }}
           </n-button>
@@ -153,10 +145,11 @@
 
 <script setup>
 import { computed, ref, watch, onMounted } from 'vue'
-import { NButton, NImage, NPopconfirm } from 'naive-ui'
+import { NButton, NPopconfirm } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useImport } from '@composables/useImport'
 import StatusBadge from './StatusBadge.vue'
+import CoverImage from './CoverImage.vue'
 
 const props = defineProps({
   item: {
@@ -227,7 +220,6 @@ const handleImport = async () => {
 const verifyItem = async () => {
   const originalLabel = verifyButtonLabel.value
   verifyLoading.value = true
-  verifyButtonLabel.value = '⏳ Verifying...'
 
   try {
     const result = await api.verifyHistoryItem(props.item.id)
@@ -237,28 +229,28 @@ const verifyItem = async () => {
       // Trigger parent reload to get updated verification badge
       emit('updated')
 
-      // Reset button after 2 seconds
+      // Reset button label after 2 seconds
       setTimeout(() => {
         verifyButtonLabel.value = originalLabel
-        verifyLoading.value = false
       }, 2000)
     } else {
       verifyButtonLabel.value = '✗ Failed'
-      // Reset button after 2 seconds
+      // Reset button label after 2 seconds
       setTimeout(() => {
         verifyButtonLabel.value = originalLabel
-        verifyLoading.value = false
       }, 2000)
     }
   } catch (err) {
     console.error('[HistoryRow] Verify failed:', err)
     verifyButtonLabel.value = '✗ Error'
 
-    // Reset button after 2 seconds
+    // Reset button label after 2 seconds
     setTimeout(() => {
       verifyButtonLabel.value = originalLabel
-      verifyLoading.value = false
     }, 2000)
+  } finally {
+    // Reset loading state immediately (allows button to be clickable again)
+    verifyLoading.value = false
   }
 }
 
@@ -322,13 +314,15 @@ const libraryItemUrl = computed(() => {
 
 <style scoped>
 .import-form {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border-default);
+  background: rgba(80, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 38, 53, 0.3);
   border-radius: var(--radius-md);
   padding: var(--spacing-sm);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  box-shadow: 0 4px 12px rgba(80, 0, 0, 0.2);
 }
 
 .import-form__inputs {

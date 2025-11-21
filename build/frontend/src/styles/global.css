@@ -6,6 +6,172 @@
    ======================================== */
 
 /* ========================================
+   CSS Variables - Color Palette
+   ========================================
+   Preserved for UnoCSS var() references and NaiveUI compatibility
+   ======================================== */
+
+:root {
+  /* Primary backgrounds */
+  --bg-primary: #000000;
+  --bg-panel: #242424;
+  --bg-panel-hover: #2a2a2a;
+
+  /* Maroon accent colors */
+  --accent-maroon: #500000;
+  --accent-maroon-dark: #3a0000;
+  --accent-maroon-light: #6a0000;
+
+  /* Text colors */
+  --text-primary: #e8e8e8;
+  --text-secondary: #b8b8b8;
+  --text-subtle: #888888;
+  --text-link: #9faed6;
+
+  /* Border colors */
+  --border-default: #3a3a3a;
+  --border-focus: var(--accent-maroon);
+  --border-subtle: #2a2a2a;
+
+  /* Input colors */
+  --input-bg: #2a2a2a;
+  --input-border: #3a3a3a;
+  --input-focus: var(--accent-maroon);
+
+  /* Button colors */
+  --btn-primary-bg: linear-gradient(135deg, var(--accent-maroon) 0%, var(--accent-maroon-dark) 100%);
+  --btn-primary-hover: linear-gradient(135deg, var(--accent-maroon-light) 0%, var(--accent-maroon) 100%);
+  --btn-secondary-bg: transparent;
+  --btn-secondary-border: #4a4a4a;
+
+  /* Status colors */
+  --success: #2d7a3e;
+  --warning: #b87333;
+  --error: #a83232;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-maroon);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-maroon-light);
+}
+
+/* ========================================
+   Utility Classes (for compatibility)
+   ======================================== */
+
+/* Table alignment utilities */
+.right {
+  text-align: right;
+}
+
+.center {
+  text-align: center;
+}
+
+/* Text utilities */
+.muted {
+  color: var(--text-subtle);
+  font-size: 0.9rem;
+}
+
+.text-subtle {
+  color: var(--text-subtle);
+}
+
+/* Cover skeleton for lazy loading */
+.cover-skeleton {
+  width: 60px;
+  height: 90px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 0%,
+    var(--bg-panel-hover) 50%,
+    var(--bg-panel) 100%
+  );
+  background-size: 468px 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+.cover-skeleton.cover-loaded {
+  background: none;
+  animation: none;
+}
+
+/* Loading animation */
+.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+/* Pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* In-library indicator */
+.in-library-indicator {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background-color: rgba(45, 122, 62, 0.95);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+/* ========================================
    NaiveUI DataTable Row Shimmer Effect
    ======================================== */
 

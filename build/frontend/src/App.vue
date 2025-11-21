@@ -1,18 +1,22 @@
 <template>
   <n-config-provider :theme="darkTheme" :theme-overrides="customTheme">
-    <n-global-style />
-    <div id="app">
-      <NavBar :health="healthStatus" />
+    <n-dialog-provider>
+      <n-message-provider>
+        <n-global-style />
+        <div id="app">
+          <NavBar :health="healthStatus" />
 
-      <RouterView />
-    </div>
+          <RouterView />
+        </div>
+      </n-message-provider>
+    </n-dialog-provider>
   </n-config-provider>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
-import { darkTheme, NConfigProvider, NGlobalStyle } from 'naive-ui'
+import { darkTheme, NConfigProvider, NGlobalStyle, NDialogProvider, NMessageProvider } from 'naive-ui'
 import { customTheme } from './theme/naive'
 import NavBar from '@components/NavBar.vue'
 import { useApi } from '@composables/useApi'

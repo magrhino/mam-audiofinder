@@ -7,6 +7,10 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 
+// UnoCSS imports (must be first)
+import '@unocss/reset/tailwind.css'
+import 'uno.css'
+
 // Import global Vue styles (Naive UI table shimmer, etc.)
 import './styles/global.css'
 

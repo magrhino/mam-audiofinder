@@ -197,10 +197,14 @@ import GlassTitle from '@components/GlassTitle.vue'
 import GlassSubtitle from '@components/GlassSubtitle.vue'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
+import { useAddTorrentFlow } from '@composables/useAddTorrentFlow'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
+
+// Unified add torrent flow
+const { addTorrent, isItemLoading } = useAddTorrentFlow()
 
 // Responsive breakpoints for dynamic input width
 const breakpoints = useBreakpoints({
@@ -239,23 +243,10 @@ const detailDescription = ref('')
 const descriptionLoading = ref(false)
 const descriptionCollapsed = ref(true)
 
-// Add torrent handler - defined before data table initialization
-const addTorrent = async (rowState) => {
-  try {
-    await api.addTorrent({
-      id: String(rowState.id ?? ''),
-      title: rowState.title || '',
-      dl: rowState.dl || '',
-      author: rowState.author_info || '',
-      narrator: rowState.narrator_info || '',
-      abs_cover_url: rowState.abs_cover_url || '',
-      abs_item_id: rowState.abs_item_id || ''
-    })
-    status.value = `✓ Added "${rowState.title}" to qBittorrent`
-    window.dispatchEvent(new CustomEvent('torrentAdded'))
-  } catch (err) {
-    status.value = `Add failed: ${err.message}`
-  }
+// Add torrent handler using shared composable
+const handleAddTorrent = async (rowState) => {
+  const result = await addTorrent(rowState)
+  status.value = result.message
 }
 
 // Initialize versions data table with search configuration
@@ -269,7 +260,8 @@ const {
 } = useMAMSearchDataTable({
   viewType: 'search',
   defaultPageSize: 10,
-  onAdd: addTorrent
+  onAdd: handleAddTorrent,
+  isItemLoading
 })
 
 const normalizeQuery = (values) => {

@@ -59,12 +59,16 @@ import { useBreakpoints } from '@vueuse/core'
 import { NDataTable, NSpace, NButton } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
+import { useAddTorrentFlow } from '@composables/useAddTorrentFlow'
 import GlassSearchBar from '@components/GlassSearchBar.vue'
 import GlassSelect from '@components/GlassSelect.vue'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
+
+// Unified add torrent flow
+const { addTorrent, isItemLoading } = useAddTorrentFlow()
 
 // Responsive breakpoints for dynamic scroll-x
 const breakpoints = useBreakpoints({
@@ -97,7 +101,8 @@ const {
 } = useMAMSearchDataTable({
   viewType: 'search',
   defaultPageSize: 25,
-  onAdd: addTorrent
+  onAdd: handleAddTorrent,
+  isItemLoading
 })
 
 const form = reactive({ q: '', sort: 'default', perpage: '25' })
@@ -183,22 +188,10 @@ const runSearch = async (silent = false) => {
   }
 }
 
-async function addTorrent(rowState) {
-  try {
-    await api.addTorrent({
-      id: String(rowState.id ?? ''),
-      title: rowState.title || '',
-      dl: rowState.dl || '',
-      author: rowState.author_info || '',
-      narrator: rowState.narrator_info || '',
-      abs_cover_url: rowState.abs_cover_url || '',
-      abs_item_id: rowState.abs_item_id || ''
-    })
-    status.value = '✓ Added to qBittorrent'
-    window.dispatchEvent(new CustomEvent('torrentAdded'))
-  } catch (err) {
-    status.value = `Add failed: ${err.message}`
-  }
+// Add torrent handler using shared composable
+async function handleAddTorrent(rowState) {
+  const result = await addTorrent(rowState)
+  status.value = result.message
 }
 
 onMounted(() => {
