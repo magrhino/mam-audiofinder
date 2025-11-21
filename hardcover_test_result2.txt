@@ -1,0 +1,907 @@
+======================================================================
+  Configuration Check
+======================================================================
+✓ API Token:                   Configured (...)
+✓ Base URL:                    https://api.hardcover.app/v1/graphql
+✓ Cache TTL:                   300s
+✓ Client Status:               Ready
+
+======================================================================
+  Deduplication Logic Test
+======================================================================
+
+🔍 Testing _normalize_title method...
+  ✓ 'The Way of Kings' → 'way of kings' (expected: 'way of kings')
+  ✓ 'A Game of Thrones' → 'game of thrones' (expected: 'game of thrones')
+  ✓ 'An Unexpected Journey' → 'unexpected journey' (expected: 'unexpected journey')
+  ✓ 'The Lord of the Rings: The Fellowship' → 'lord of rings fellowship' (expected: 'lord of rings fellowship')
+
+🔍 Testing _deduplicate_books method...
+# todo 1: issue"Dedupe still returns 3 'Way of Kings' variants (4 unique books) instead of collapsing to 1" :solution"Re-run and adjust _deduplicate_books normalization/position sorting per IMPROVEMENTS_SUMMARY.md changes; verify test_hardcover_api.py dedup fixtures expect 1 unique title"
+DEBUG - mam-audiofinder - 📚 Deduplication: 4 books → 4 unique books
+
+  Original: 4 books
+  Deduplicated: 4 books
+  ✗ Should have 1 'Way of Kings', got 3
+  ✓ Kept 'Words of Radiance' unchanged
+
+⚠️  Some deduplication logic tests failed
+appuser@575a05bb41ef:/app$  python3 tests/test_hardcover_api.py --cosmere --debug
+  python3 tests/test_hardcover_api.py --advanced --debug
+
+  # Test ABS integration
+  python3 tests/test_hardcover_api.py --abs-fallback
+
+  # Run all tests (now 16 total, was 15)
+  python3 tests/test_hardcover_api.py --all
+🐛 Debug logging enabled
+
+
+======================================================================
+  Configuration Check
+======================================================================
+✓ API Token:                   Configured (...)
+✓ Base URL:                    https://api.hardcover.app/v1/graphql
+✓ Cache TTL:                   300s
+✓ Client Status:               Ready
+
+======================================================================
+  Cosmere / Way of Kings Test
+======================================================================
+
+🔍 Step 1: Searching for 'The Cosmere' series...
+INFO - mam-audiofinder - ❌ Cache MISS for search:79285ee9c7a3
+INFO - mam-audiofinder - 🔍 Searching Hardcover for series: 'The Cosmere' (author: '', limit: 5)
+DEBUG - httpcore.connection - connect_tcp.started host='api.hardcover.app' port=443 local_address=None timeout=25.0 socket_options=None
+DEBUG - httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f761cd52180>
+DEBUG - httpcore.connection - start_tls.started ssl_context=<ssl.SSLContext object at 0x7f761cd1f050> server_hostname='api.hardcover.app' timeout=25.0
+DEBUG - httpcore.connection - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f761cccac60>
+DEBUG - httpcore.http11 - send_request_headers.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - send_request_headers.complete
+DEBUG - httpcore.http11 - send_request_body.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - send_request_body.complete
+DEBUG - httpcore.http11 - receive_response_headers.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Fri, 21 Nov 2025 18:52:07 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Content-Length', b'874'), (b'Connection', b'keep-alive'), (b'Cache-Control', b'max-age=0, private, must-revalidate'), (b'Content-Encoding', b'gzip'), (b'etag', b'W/"5bae7176213db34517cab2692afca182"'), (b'referrer-policy', b'strict-origin-when-cross-origin'), (b'strict-transport-security', b'max-age=63072000; includeSubDomains'), (b'vary', b'Accept, Origin,Origin'), (b'vary', b'accept-encoding'), (b'x-content-type-options', b'nosniff'), (b'x-frame-options', b'SAMEORIGIN'), (b'x-permitted-cross-domain-policies', b'none'), (b'x-request-id', b'587a7ceb-2845-483f-9657-975a0b432b19'), (b'x-runtime', b'0.143694'), (b'x-xss-protection', b'0'), (b'Nel', b'{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}'), (b'cf-cache-status', b'DYNAMIC'), (b'Report-To', b'{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=mHp77%2B6Uz91bU%2BRrv3f5kxz2FPOc4ZfHZYiZn0hhMvQrEu0s%2BE5Cbai0emg8jaSNI%2Fy4PIyBaUURJ%2FtS1Tu%2FMmKUS2LItzduB0OVwo3tsVYQFk2R0AMyIJZn"}]}'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9a2261e38c1ddaec-DFW')])
+INFO - httpx - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+DEBUG - httpcore.http11 - receive_response_body.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - receive_response_body.complete
+DEBUG - httpcore.http11 - response_closed.started
+DEBUG - httpcore.http11 - response_closed.complete
+DEBUG - mam-audiofinder - ✅ GraphQL response keys: ['search']
+DEBUG - mam-audiofinder - 🔍 Search response keys: ['results']
+DEBUG - mam-audiofinder - 🔍 Results structure: found=2, hits=2
+DEBUG - mam-audiofinder - 🔍 First hit keys: ['document', 'highlight', 'highlights', 'text_match', 'text_match_info']
+DEBUG - mam-audiofinder - 🔍 First document keys: ['author', 'author_name', 'books', 'books_count', 'id', 'name', 'primary_books_count', 'readers_count', 'slug']
+INFO - mam-audiofinder - ✅ Found 2 series matches
+INFO - mam-audiofinder - 💾 Cached search:79285ee9c7a3 (TTL: 300s)
+✅ Found 'The Cosmere' series (ID: 5497)
+   Author: Brandon Sanderson
+   Book count: 32
+
+🔍 Step 2: Fetching books in series 5497...
+INFO - mam-audiofinder - ❌ Cache MISS for series:899a2812421d
+INFO - mam-audiofinder - 📚 Fetching series books for ID 5497 (featured=False, dedup=True)
+DEBUG - httpcore.http11 - send_request_headers.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - send_request_headers.complete
+DEBUG - httpcore.http11 - send_request_body.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - send_request_body.complete
+DEBUG - httpcore.http11 - receive_response_headers.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Fri, 21 Nov 2025 18:52:08 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Content-Length', b'1025'), (b'Connection', b'keep-alive'), (b'Cache-Control', b'max-age=0, private, must-revalidate'), (b'Content-Encoding', b'gzip'), (b'etag', b'W/"4156884fcebba7eaa3f37c40101a8ffc"'), (b'referrer-policy', b'strict-origin-when-cross-origin'), (b'strict-transport-security', b'max-age=63072000; includeSubDomains'), (b'vary', b'Accept, Origin,Origin'), (b'vary', b'accept-encoding'), (b'x-content-type-options', b'nosniff'), (b'x-frame-options', b'SAMEORIGIN'), (b'x-permitted-cross-domain-policies', b'none'), (b'x-request-id', b'170c9ae0-60b1-430d-ad7b-26b12adf4097'), (b'x-runtime', b'0.035704'), (b'x-xss-protection', b'0'), (b'Nel', b'{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}'), (b'cf-cache-status', b'DYNAMIC'), (b'Report-To', b'{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=7LL86EFv7Czeha%2FPmlygu9XVab7TYr6UAvCaT2%2BiUWXAxMUOXAJfFnkeNr%2B7xHCFrF5cEC7cjnMaIDuFYsCBmQc4Taul0jPTgKZmLRy2HuxnnUbu2tgaDmnv"}]}'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9a2261eb3836daec-DFW')])
+INFO - httpx - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+DEBUG - httpcore.http11 - receive_response_body.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - receive_response_body.complete
+DEBUG - httpcore.http11 - response_closed.started
+DEBUG - httpcore.http11 - response_closed.complete
+DEBUG - mam-audiofinder - ✅ GraphQL response keys: ['series_by_pk']
+INFO - mam-audiofinder - ✅ Found series: 'The Cosmere' by Brandon Sanderson (33 total books)
+INFO - mam-audiofinder - ✅ Retrieved 34 books from GraphQL
+DEBUG - mam-audiofinder - 📚 All 34 books retrieved from series:
+DEBUG - mam-audiofinder -    1. 'Elantris' (ID: 338931, Position: 1)
+DEBUG - mam-audiofinder -       Subtitle: 10th Anniversary Edition
+DEBUG - mam-audiofinder -    2. 'Mistborn: The Final Empire' (ID: 369692, Position: 2)
+DEBUG - mam-audiofinder -       Subtitle: The Final Empire
+DEBUG - mam-audiofinder -    3. 'The Hope of Elantris' (ID: 427815, Position: 3)
+DEBUG - mam-audiofinder -    4. 'The Well of Ascension' (ID: 427383, Position: 4)
+DEBUG - mam-audiofinder -       Subtitle: A Mistborn Novel
+DEBUG - mam-audiofinder -    5. 'The Hero of Ages' (ID: 103241, Position: 5)
+DEBUG - mam-audiofinder -       Subtitle: Book Three of Mistborn
+DEBUG - mam-audiofinder -    6. 'Warbreaker' (ID: 385491, Position: 6)
+DEBUG - mam-audiofinder -    7. 'The Way of Kings' (ID: 386446, Position: 7)
+DEBUG - mam-audiofinder -       Subtitle: Bk. 1
+DEBUG - mam-audiofinder -    8. 'The Alloy of Law' (ID: 330249, Position: 8)
+DEBUG - mam-audiofinder -       Subtitle: Alloy of Law
+DEBUG - mam-audiofinder -    9. 'The Eleventh Metal' (ID: 427844, Position: 9)
+DEBUG - mam-audiofinder -    10. 'The Emperor's Soul' (ID: 427626, Position: 10)
+DEBUG - mam-audiofinder -       Subtitle: 10th Anniversary Edition
+DEBUG - mam-audiofinder -    11. 'Shadows for Silence in the Forests of Hell' (ID: 427840, Position: 11)
+DEBUG - mam-audiofinder -    12. 'Words of Radiance' (ID: 374131, Position: 12)
+DEBUG - mam-audiofinder -       Subtitle: Book Two of the Stormlight Archive
+DEBUG - mam-audiofinder -    13. 'Sixth of the Dusk' (ID: 427846, Position: 13)
+DEBUG - mam-audiofinder -    14. 'Warbreaker' (ID: 2158392, Position: 14)
+DEBUG - mam-audiofinder -    15. 'Allomancer Jak and the Pits of Eltania' (ID: 427892, Position: 14)
+DEBUG - mam-audiofinder -    16. 'Shadows of Self' (ID: 135725, Position: 15)
+DEBUG - mam-audiofinder -       Subtitle: A Mistborn Novel [Paperback] Brandon Sanderson
+DEBUG - mam-audiofinder -    17. 'The Bands of Mourning' (ID: 427966, Position: 16)
+DEBUG - mam-audiofinder -       Subtitle: A Mistborn Novel
+DEBUG - mam-audiofinder -    18. 'Mistborn: Secret History' (ID: 427881, Position: 17)
+DEBUG - mam-audiofinder -       Subtitle: Historia Secreta
+DEBUG - mam-audiofinder -    19. 'Arcanum Unbounded: The Cosmere Collection' (ID: 80765, Position: 18)
+DEBUG - mam-audiofinder -       Subtitle: The Cosmere Collection
+DEBUG - mam-audiofinder -    20. 'Edgedancer' (ID: 427544, Position: 19)
+DEBUG - mam-audiofinder -    21. 'White Sand, Vol. 1' (ID: 676415, Position: 20)
+DEBUG - mam-audiofinder -       Subtitle: Volume One
+DEBUG - mam-audiofinder -    22. 'Oathbringer' (ID: 459452, Position: 21)
+DEBUG - mam-audiofinder -       Subtitle: Book Three of the Stormlight Archive
+DEBUG - mam-audiofinder -    23. 'White Sand, Vol. 2' (ID: 429287, Position: 23)
+DEBUG - mam-audiofinder -       Subtitle: Volume Two
+DEBUG - mam-audiofinder -    24. 'White Sand, Vol. 3' (ID: 429355, Position: 24)
+DEBUG - mam-audiofinder -    25. 'Rhythm of War' (ID: 427522, Position: 25)
+DEBUG - mam-audiofinder -    26. 'Dawnshard' (ID: 427945, Position: 26)
+DEBUG - mam-audiofinder -       Subtitle: Una novela de El Archivo de las Tormentas
+DEBUG - mam-audiofinder -    27. 'The Lost Metal' (ID: 427863, Position: 27)
+DEBUG - mam-audiofinder -    28. 'Brandon Sanderson's White Sand Omnibus' (ID: 1070354, Position: 28)
+DEBUG - mam-audiofinder -    29. 'Tress of the Emerald Sea' (ID: 602482, Position: 29)
+DEBUG - mam-audiofinder -    30. 'Yumi and the Nightmare Painter' (ID: 763207, Position: 31)
+DEBUG - mam-audiofinder -    31. 'The Sunlit Man' (ID: 889484, Position: 32)
+DEBUG - mam-audiofinder -    32. 'Wind and Truth' (ID: 665261, Position: 33)
+DEBUG - mam-audiofinder -    33. 'Isles of the Emberdark' (ID: 1179741, Position: 34)
+DEBUG - mam-audiofinder -       Subtitle: A Cosmere Novel
+DEBUG - mam-audiofinder -    34. 'Nightblood' (ID: 460973, Position: None)
+DEBUG - mam-audiofinder - 📚 Deduplication starting with 34 books
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Elantris' → 'elantris'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Mistborn: The Final Empire' → 'mistborn final empire'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Hope of Elantris' → 'hope of elantris'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Well of Ascension' → 'well of ascension'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Hero of Ages' → 'hero of ages'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Warbreaker' → 'warbreaker'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Way of Kings' → 'way of kings'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Alloy of Law' → 'alloy of law'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Eleventh Metal' → 'eleventh metal'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Emperor's Soul' → 'emperors soul'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Shadows for Silence in the Forests of Hell' → 'shadows for silence in forests of hell'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Words of Radiance' → 'words of radiance'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Sixth of the Dusk' → 'sixth of dusk'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Warbreaker' → 'warbreaker'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Allomancer Jak and the Pits of Eltania' → 'allomancer jak and pits of eltania'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Shadows of Self' → 'shadows of self'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Bands of Mourning' → 'bands of mourning'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Mistborn: Secret History' → 'mistborn secret history'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Arcanum Unbounded: The Cosmere Collection' → 'arcanum unbounded cosmere collection'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Edgedancer' → 'edgedancer'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'White Sand, Vol. 1' → 'white sand'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Oathbringer' → 'oathbringer'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'White Sand, Vol. 2' → 'white sand'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'White Sand, Vol. 3' → 'white sand'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Rhythm of War' → 'rhythm of war'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Dawnshard' → 'dawnshard'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Lost Metal' → 'lost metal'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Brandon Sanderson's White Sand Omnibus' → 'brandon sandersons white sand omnibus'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Tress of the Emerald Sea' → 'tress of emerald sea'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Yumi and the Nightmare Painter' → 'yumi and nightmare painter'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'The Sunlit Man' → 'sunlit man'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Wind and Truth' → 'wind and truth'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Isles of the Emberdark' → 'isles of emberdark'
+DEBUG - mam-audiofinder - 🔍 Title normalization: 'Nightblood' → 'nightblood'
+DEBUG - mam-audiofinder - 📚 Grouped into 31 unique normalized titles
+DEBUG - mam-audiofinder -    Duplicates found for 'warbreaker':
+DEBUG - mam-audiofinder -       - 'Warbreaker' (ID: 385491, Position: 6)
+DEBUG - mam-audiofinder -       - 'Warbreaker' (ID: 2158392, Position: 14)
+DEBUG - mam-audiofinder -    Duplicates found for 'white sand':
+DEBUG - mam-audiofinder -       - 'White Sand, Vol. 1' (ID: 676415, Position: 20)
+DEBUG - mam-audiofinder -       - 'White Sand, Vol. 2' (ID: 429287, Position: 23)
+DEBUG - mam-audiofinder -       - 'White Sand, Vol. 3' (ID: 429355, Position: 24)
+DEBUG - mam-audiofinder -    ✓ Kept 'Warbreaker' (Position: 6)
+DEBUG - mam-audiofinder -    ✓ Kept 'White Sand, Vol. 1' (Position: 20)
+DEBUG - mam-audiofinder - 📚 Deduplication: 34 books → 31 unique books
+INFO - mam-audiofinder - ✅ Returning 31 books for series 'The Cosmere'
+INFO - mam-audiofinder - 💾 Cached series:899a2812421d (TTL: 300s)
+✅ Retrieved 31 books from series
+
+🔍 Step 3: Looking for 'The Way of Kings' in the series...
+✅ Found 'The Way of Kings':
+  Book ID:                       386446
+  Title:                         The Way of Kings
+  Subtitle:                      Bk. 1
+  Position:                      7
+
+📊 Cosmere/Way of Kings Test Statistics:
+  API Requests Made:             2
+  Cache Hits:                    0
+  Total Requests (session):      2
+  Total Cache Hits (session):    0
+🐛 Debug logging enabled
+
+
+======================================================================
+  Configuration Check
+======================================================================
+✓ API Token:                   Configured (...)
+✓ Base URL:                    https://api.hardcover.app/v1/graphql
+✓ Cache TTL:                   300s
+✓ Client Status:               Ready
+
+======================================================================
+  Advanced Book Search Test
+======================================================================
+
+🔍 Test 1: Searching for 'The Way of Kings' with advanced fields...
+INFO - mam-audiofinder - ❌ Cache MISS for book_advanced:1a54010c8a7a
+INFO - mam-audiofinder - 🔍 Advanced search for book: 'The Way of Kings' (author: '', limit: 3, dedup: False)
+DEBUG - mam-audiofinder -    fields: title,alternative_titles,author_names,isbns,audio_seconds,has_audiobook,rating,description,image,release_year,users_count
+DEBUG - mam-audiofinder -    sort: users_count:desc,ratings_count:desc, weights: 5,3,2,1,1,1,1
+DEBUG - httpcore.connection - connect_tcp.started host='api.hardcover.app' port=443 local_address=None timeout=25.0 socket_options=None
+DEBUG - httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7fbc04506d20>
+DEBUG - httpcore.connection - start_tls.started ssl_context=<ssl.SSLContext object at 0x7fbc02397050> server_hostname='api.hardcover.app' timeout=25.0
+DEBUG - httpcore.connection - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7fbc047f6de0>
+DEBUG - httpcore.http11 - send_request_headers.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - send_request_headers.complete
+DEBUG - httpcore.http11 - send_request_body.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - send_request_body.complete
+DEBUG - httpcore.http11 - receive_response_headers.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Fri, 21 Nov 2025 18:52:09 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Cache-Control', b'max-age=0, private, must-revalidate'), (b'etag', b'W/"665d4bb76f7fdbe9a182697e2e792ee2"'), (b'referrer-policy', b'strict-origin-when-cross-origin'), (b'strict-transport-security', b'max-age=63072000; includeSubDomains'), (b'vary', b'Accept, Origin,Origin'), (b'x-content-type-options', b'nosniff'), (b'x-frame-options', b'SAMEORIGIN'), (b'x-permitted-cross-domain-policies', b'none'), (b'x-request-id', b'3bf6ac1d-86b5-4d5f-8e1a-67ceffc01776'), (b'x-runtime', b'0.030657'), (b'x-xss-protection', b'0'), (b'Nel', b'{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}'), (b'cf-cache-status', b'DYNAMIC'), (b'Report-To', b'{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=brCqU0BOLJj%2FLtKIbyK2hCAZSR8Py5MS6NaZ0TLnaySbE6dEXeWGIMBcSjAyJCzQBYgNGdxsZjvKpb3P6bk6ImoQa3o%2F0FtbmEgH7UnlpNP3w0okvpZflpa%2F"}]}'), (b'Content-Encoding', b'gzip'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9a2261ef9d70f058-DFW')])
+INFO - httpx - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+DEBUG - httpcore.http11 - receive_response_body.started request=<Request [b'POST']>
+DEBUG - httpcore.http11 - receive_response_body.complete
+DEBUG - httpcore.http11 - response_closed.started
+DEBUG - httpcore.http11 - response_closed.complete
+DEBUG - mam-audiofinder - ✅ GraphQL response keys: ['search']
+DEBUG - mam-audiofinder - 🔍 Raw GraphQL response keys: ['search']
+DEBUG - mam-audiofinder - 🔍 Search data type: <class 'dict'>
+DEBUG - mam-audiofinder -    Search data keys: ['results']
+# todo 3: issue"Advanced search response lacks usable 'results' and fallback not producing matches" :solution"Enforce fallback to basic search when results None and assert success path in test_hardcover_api.py advanced test; inspect hardcover_client.py search_book_advanced"
+WARNING - mam-audiofinder - ⚠️  No 'results' field in search response for 'The Way of Kings'
+DEBUG - mam-audiofinder -    Search data content: {'results': None}
+⚠️  No results found for 'The Way of Kings'
+
+======================================================================
+  Configuration Check
+======================================================================
+✓ API Token:                   Configured (...)
+✓ Base URL:                    https://api.hardcover.app/v1/graphql
+✓ Cache TTL:                   300s
+✓ Client Status:               Ready
+
+======================================================================
+  ABS Fallback Integration Test
+======================================================================
+
+
+❌ Unexpected error: 'bool' object is not callable
+Traceback (most recent call last):
+  File "/app/tests/test_hardcover_api.py", line 1435, in <module>
+    exit_code = asyncio.run(main())
+                ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/app/tests/test_hardcover_api.py", line 1424, in main
+    success = await test_abs_fallback()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/tests/test_hardcover_api.py", line 1157, in test_abs_fallback
+    if not abs_client.is_configured():
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'bool' object is not callable
+
+🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪
+  HARDCOVER API INTEGRATION TEST SUITE
+🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪 🧪
+INFO - 🔄 Reset Hardcover API counters
+
+======================================================================
+  Configuration Check
+======================================================================
+✓ API Token:                   Configured (...)
+✓ Base URL:                    https://api.hardcover.app/v1/graphql
+✓ Cache TTL:                   300s
+✓ Client Status:               Ready
+
+⏱️  Waiting 0.5s between tests...
+
+======================================================================
+  Series Search Test: 'Mistborn'
+======================================================================
+
+🔍 Searching for series: 'Mistborn'
+   Limit: 5
+INFO - ❌ Cache MISS for search:7e89acf2b464
+INFO - 🔍 Searching Hardcover for series: 'Mistborn' (author: '', limit: 5)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 5 series matches
+INFO - 💾 Cached search:7e89acf2b464 (TTL: 300s)
+
+✅ Search returned 5 results
+
+Result #1:
+  Series ID:                     202575
+  Name:                          Mistborn
+  Author:                        Brandon Sanderson
+  Book Count:                    0
+  Readers:                       0
+
+Result #2:
+  Series ID:                     5452
+  Name:                          The Mistborn Saga
+  Author:                        Brandon Sanderson
+  Book Count:                    10
+  Readers:                       17607
+  Book Titles:                   (5 titles)
+    1.                           Mistborn: The Final Empire
+    2.                           The Well of Ascension
+    3.                           The Hero of Ages
+    ...                          (+2 more)
+
+Result #3:
+  Series ID:                     10001
+  Name:                          The Mistborn Saga: The Original Trilogy
+  Author:                        Brandon Sanderson
+  Book Count:                    3
+  Readers:                       11358
+  Book Titles:                   (5 titles)
+    1.                           Mistborn: The Final Empire
+    2.                           The Well of Ascension
+    3.                           The Hero of Ages
+    ...                          (+2 more)
+
+Result #4:
+  Series ID:                     10825
+  Name:                          Mistborn: Wax & Wayne
+  Author:                        Brandon Sanderson
+  Book Count:                    4
+  Readers:                       5977
+  Book Titles:                   (5 titles)
+    1.                           The Alloy of Law
+    2.                           Shadows of Self
+    3.                           The Bands of Mourning
+    ...                          (+2 more)
+
+Result #5:
+  Series ID:                     216625
+  Name:                          Mistborn, Era 2: Wax & Wayne
+  Author:                        Brandon Sanderson
+  Book Count:                    0
+  Readers:                       0
+
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Finding a test series...
+======================================================================
+INFO - ❌ Cache MISS for search:a795e5d9e0d7
+INFO - 🔍 Searching Hardcover for series: 'Stormlight' (author: '', limit: 1)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 1 series matches
+INFO - 💾 Cached search:a795e5d9e0d7 (TTL: 300s)
+✓ Using series: The Stormlight Archive (ID: 997)
+
+======================================================================
+  Series Books Test: ID 997
+======================================================================
+
+📚 Fetching books for series ID 997...
+INFO - ❌ Cache MISS for series:7b8773eae089
+INFO - 📚 Fetching series books for ID 997 (featured=False, dedup=True)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found series: 'The Stormlight Archive' by Brandon Sanderson (22 total books)
+INFO - ✅ Retrieved 29 books from GraphQL
+INFO - ✅ Returning 21 books for series 'The Stormlight Archive'
+INFO - 💾 Cached series:7b8773eae089 (TTL: 300s)
+
+✅ Series found: The Stormlight Archive
+   Author: Brandon Sanderson
+   Books: 21
+
+   📚 Book titles:
+      1. {'book_id': 484948, 'title': 'The Way of Kings Prime', 'subtitle': 'The 2002 Alternate Version', 'position': 0.1}
+      2. {'book_id': 386446, 'title': 'The Way of Kings', 'subtitle': 'Bk. 1', 'position': 1}
+      3. {'book_id': 2150737, 'title': 'Kralların Yolu, Cilt 1', 'subtitle': None, 'position': 1}
+      4. {'book_id': 993856, 'title': 'The Stormlight Archive, Books 1-3: The Way of Kings, Words of Radiance, Oathbringer', 'subtitle': 'The Way of Kings, Words of Radiance, Oathbringer', 'position': 1}
+      5. {'book_id': 973729, 'title': 'The Stormlight Archive, Books 1-4: The Way of Kings, Words of Radiance, Oathbringer, Rhythm of War', 'subtitle': 'The Way of Kings, Words of Radiance, Oathbringer, Rhythm of War', 'position': 1}
+      6. {'book_id': 2075626, 'title': 'The Stormlight Archive Series 6 Books Collection Set by Brandon Sanderson', 'subtitle': None, 'position': 1}
+      7. {'book_id': 2109245, 'title': 'stormlight archive collection 4 books collection', 'subtitle': None, 'position': 1.1}
+      8. {'book_id': 1079953, 'title': 'The Stormlight Archive Bundle: Words of Radiance Part One, Words of Radiance Part Two, The Way of Kings Part Two', 'subtitle': 'Words of Radiance Part One, Words of Radiance Part Two, The Way of Kings Part Two', 'position': 1.2}
+      9. {'book_id': 374131, 'title': 'Words of Radiance', 'subtitle': 'Book Two of the Stormlight Archive', 'position': 2}
+      10. {'book_id': 427544, 'title': 'Edgedancer', 'subtitle': None, 'position': 2.5}
+      11. {'book_id': 459452, 'title': 'Oathbringer', 'subtitle': 'Book Three of the Stormlight Archive', 'position': 3}
+      12. {'book_id': 1624454, 'title': 'Oathbringer Part One', 'subtitle': None, 'position': 3.1}
+      13. {'book_id': 1624456, 'title': 'Oathbringer Part Two', 'subtitle': None, 'position': 3.2}
+      14. {'book_id': 427945, 'title': 'Dawnshard', 'subtitle': 'Una novela de El Archivo de las Tormentas', 'position': 3.5}
+      15. {'book_id': 427522, 'title': 'Rhythm of War', 'subtitle': None, 'position': 4}
+      16. {'book_id': 802273, 'title': 'Rhythm of War Part One', 'subtitle': None, 'position': 4.1}
+      17. {'book_id': 1386746, 'title': 'Rhythm of War, Part Two', 'subtitle': None, 'position': 4.2}
+      18. {'book_id': 665261, 'title': 'Wind and Truth', 'subtitle': None, 'position': 5}
+      19. {'book_id': 2108539, 'title': 'Wind and Truth, Part II', 'subtitle': None, 'position': 5}
+      20. {'book_id': 460907, 'title': 'Untitled Stormlight Archive #6', 'subtitle': None, 'position': 6}
+      21. {'book_id': 463080, 'title': 'The Stormlight Archive - A Pocket Companion to The Way of Kings and Words of Radiance', 'subtitle': 'Una guía de bolsillo para El camino de los reyes y Palabras radiantes', 'position': None}
+
+📊 Series Books (ID 997) Statistics:
+  API Requests Made:             1
+  Cache Hits:                    0
+  Total Requests (session):      3
+  Total Cache Hits (session):    0
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Rate Limiting Test
+======================================================================
+
+🔄 Testing rate limiter (sending 3 rapid requests)...
+
+  Request 1...
+INFO - ❌ Cache MISS for search:7c41317f7e60
+INFO - 🔍 Searching Hardcover for series: 'Test' (author: '', limit: 1)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 1 series matches
+INFO - 💾 Cached search:7c41317f7e60 (TTL: 300s)
+
+  Request 2...
+INFO - ✅ Cache HIT for search:7c41317f7e60 (hits: 1)
+
+  Request 3...
+INFO - ✅ Cache HIT for search:7c41317f7e60 (hits: 2)
+
+✓ Completed 3 requests in 0.12s
+  ✓ Rate limiter allows rapid sequential requests
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Caching Test
+======================================================================
+
+💾 Testing cache (same query twice)...
+
+  Request 1 (should query API)...
+INFO - ❌ Cache MISS for search:5069b2f58547
+INFO - 🔍 Searching Hardcover for series: 'Mistborn' (author: '', limit: 3)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 3 series matches
+INFO - 💾 Cached search:5069b2f58547 (TTL: 300s)
+  ✓ Completed in 0.130s
+
+  Request 2 (should hit cache)...
+INFO - ✅ Cache HIT for search:5069b2f58547 (hits: 1)
+  ✓ Completed in 0.005s
+
+  ✓ Results match
+  ✓ Cache speedup detected (27.2x faster)
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Author Series Search Test: 'Brandon Sanderson'
+======================================================================
+
+🔍 Searching for series by author: 'Brandon Sanderson'
+   Limit: 10
+INFO - 🔍 Getting series by author: 'Brandon Sanderson'
+INFO - ❌ Cache MISS for search:d478a11434fb
+INFO - 🔍 Searching Hardcover for series: '' (author: 'Brandon Sanderson', limit: 10)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 10 series matches
+INFO - 💾 Cached search:d478a11434fb (TTL: 300s)
+INFO - ✅ Found 2 series by Brandon Sanderson (from 10 results)
+
+✅ Search returned 2 series
+
+Series #1:
+  Series ID:                     5497
+  Name:                          The Cosmere
+  Author:                        Brandon Sanderson
+  Book Count:                    32
+  Books:                         5 titles
+    1.                           Mistborn: The Final Empire
+    2.                           The Way of Kings
+    3.                           The Well of Ascension
+
+Series #2:
+  Series ID:                     5452
+  Name:                          The Mistborn Saga
+  Author:                        Brandon Sanderson
+  Book Count:                    10
+  Books:                         5 titles
+    1.                           Mistborn: The Final Empire
+    2.                           The Well of Ascension
+    3.                           The Hero of Ages
+
+
+📊 Author Series Search Statistics:
+  API Requests Made:             1
+  Cache Hits:                    0
+  Total Requests (session):      6
+  Total Cache Hits (session):    3
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Limit Variation Tests
+======================================================================
+
+🔍 Testing limit=1 for query 'Stormlight'
+INFO - ✅ Cache HIT for search:a795e5d9e0d7 (hits: 1)
+  ✅ Requested: 1, Received: 1
+  ✓ Result count respects limit
+
+🔍 Testing limit=5 for query 'Stormlight'
+INFO - ❌ Cache MISS for search:0a572f4da83f
+INFO - 🔍 Searching Hardcover for series: 'Stormlight' (author: '', limit: 5)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 5 series matches
+INFO - 💾 Cached search:0a572f4da83f (TTL: 300s)
+  ✅ Requested: 5, Received: 5
+  ✓ Result count respects limit
+
+🔍 Testing limit=10 for query 'Stormlight'
+INFO - ❌ Cache MISS for search:c1300fdbf037
+INFO - 🔍 Searching Hardcover for series: 'Stormlight' (author: '', limit: 10)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 10 series matches
+INFO - 💾 Cached search:c1300fdbf037 (TTL: 300s)
+  ✅ Requested: 10, Received: 10
+  ✓ Result count respects limit
+
+🔍 Testing limit=20 for query 'Stormlight'
+INFO - ❌ Cache MISS for search:71652b85305c
+INFO - 🔍 Searching Hardcover for series: 'Stormlight' (author: '', limit: 20)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 20 series matches
+INFO - 💾 Cached search:71652b85305c (TTL: 300s)
+  ✅ Requested: 20, Received: 20
+  ✓ Result count respects limit
+
+📊 Limit Variations Statistics:
+  API Requests Made:             3
+  Cache Hits:                    1
+  Total Requests (session):      9
+  Total Cache Hits (session):    4
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Field Extraction Test
+======================================================================
+
+🔍 Searching for series to test field extraction
+INFO - ✅ Cache HIT for search:5069b2f58547 (hits: 2)
+
+✅ Testing field extraction on 3 series
+
+Series #1: Mistborn
+  ✓ series_id:                   202575 (str)
+  ✓ series_name:                 Mistborn (str)
+  ✓ author_name:                 Brandon Sanderson (str)
+  ✓ book_count:                  0 (int)
+  ✓ readers_count:               0 (int)
+  ✓ books:                       list[0] - list
+
+Series #2: The Mistborn Saga
+  ✓ series_id:                   5452 (str)
+  ✓ series_name:                 The Mistborn Saga (str)
+  ✓ author_name:                 Brandon Sanderson (str)
+  ✓ book_count:                  10 (int)
+  ✓ readers_count:               17607 (int)
+  ✓ books:                       list[5] - list
+
+Series #3: The Mistborn Saga: The Original Trilogy
+  ✓ series_id:                   10001 (str)
+  ✓ series_name:                 The Mistborn Saga: The Original Trilogy (str)
+  ✓ author_name:                 Brandon Sanderson (str)
+  ✓ book_count:                  3 (int)
+  ✓ readers_count:               11358 (int)
+  ✓ books:                       list[5] - list
+
+
+📊 Field Extraction Statistics:
+  API Requests Made:             0
+  Cache Hits:                    1
+  Total Requests (session):      9
+  Total Cache Hits (session):    5
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Books By Author Test: 'Brandon Sanderson'
+======================================================================
+
+🔍 Test 1: Fetching books with fields: title, description
+INFO - ❌ Cache MISS for books_by_author:dc38f05b9a45
+INFO - 🔍 Searching Hardcover for books by author: 'Brandon Sanderson' (limit: 10)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 10 books by Brandon Sanderson
+INFO - 💾 Cached books_by_author:dc38f05b9a45 (TTL: 300s)
+  ✅ Retrieved 10 books
+
+  Example (first book):
+    title:                         Mistborn: The Final Empire
+    description:                   What if the whole world were a dead, blasted wasteland?
+
+M...
+
+🔍 Test 2: Fetching books with fields: title
+INFO - ❌ Cache MISS for books_by_author:74af13c55540
+INFO - 🔍 Searching Hardcover for books by author: 'Brandon Sanderson' (limit: 10)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 10 books by Brandon Sanderson
+INFO - 💾 Cached books_by_author:74af13c55540 (TTL: 300s)
+  ✅ Retrieved 10 books
+
+  Example (first book):
+    title:                         Mistborn: The Final Empire
+
+📊 Books By Author Statistics:
+  API Requests Made:             2
+  Cache Hits:                    0
+  Total Requests (session):      11
+  Total Cache Hits (session):    5
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Series Books Limit Test: ID 997
+======================================================================
+
+📚 Testing series ID 997 with various limits...
+INFO - ✅ Cache HIT for series:7b8773eae089 (hits: 1)
+
+✅ Series: 'The Stormlight Archive'
+   Author: Brandon Sanderson
+   Default books count: 21
+
+======================================================================
+Testing search with different limit values:
+======================================================================
+
+🔍 Test with limit=5
+INFO - ❌ Cache MISS for search:cde473ba2903
+INFO - 🔍 Searching Hardcover for series: 'The Stormlight Archive' (author: '', limit: 5)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 5 series matches
+INFO - 💾 Cached search:cde473ba2903 (TTL: 300s)
+  ✅ Found series in results
+     Books returned: 5
+     Total results: 5
+     New unique books: 5
+     Sample books:
+       1. The Way of Kings
+       2. Words of Radiance
+       3. Oathbringer
+       ... (+2 more)
+
+🔍 Test with limit=10
+INFO - ❌ Cache MISS for search:8d806ea7e38a
+INFO - 🔍 Searching Hardcover for series: 'The Stormlight Archive' (author: '', limit: 10)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 10 series matches
+INFO - 💾 Cached search:8d806ea7e38a (TTL: 300s)
+  ✅ Found series in results
+     Books returned: 5
+     Total results: 10
+     New unique books: 0
+     Sample books:
+       1. The Way of Kings
+       2. Words of Radiance
+       3. Oathbringer
+       ... (+2 more)
+
+🔍 Test with limit=20
+INFO - ❌ Cache MISS for search:ab1cf6aecd60
+INFO - 🔍 Searching Hardcover for series: 'The Stormlight Archive' (author: '', limit: 20)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 20 series matches
+INFO - 💾 Cached search:ab1cf6aecd60 (TTL: 300s)
+  ✅ Found series in results
+     Books returned: 5
+     Total results: 20
+     New unique books: 0
+     Sample books:
+       1. The Way of Kings
+       2. Words of Radiance
+       3. Oathbringer
+       ... (+2 more)
+
+🔍 Test with limit=30
+INFO - ❌ Cache MISS for search:b8f16968d138
+INFO - 🔍 Searching Hardcover for series: 'The Stormlight Archive' (author: '', limit: 30)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 23 series matches
+INFO - 💾 Cached search:b8f16968d138 (TTL: 300s)
+  ✅ Found series in results
+     Books returned: 5
+     Total results: 23
+     New unique books: 0
+     Sample books:
+       1. The Way of Kings
+       2. Words of Radiance
+       3. Oathbringer
+       ... (+2 more)
+
+======================================================================
+📊 Summary:
+   Unique books discovered: 5
+   Limits tested: [5, 10, 20, 30]
+======================================================================
+
+📚 All unique book titles found:
+   1. Edgedancer
+   2. Oathbringer
+   3. Rhythm of War
+   4. The Way of Kings
+   5. Words of Radiance
+
+📊 Series 997 Limit Test Statistics:
+  API Requests Made:             4
+  Cache Hits:                    1
+  Total Requests (session):      15
+  Total Cache Hits (session):    6
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Framework: Basic Tests
+======================================================================
+INFO - 🔄 Reset Hardcover API counters
+
+🔍 Searching: 'Mistborn'
+INFO - ✅ Cache HIT for search:7e89acf2b464 (hits: 1)
+  ✅ Found 5 results
+
+🔍 Searching: 'Stormlight'
+INFO - ✅ Cache HIT for search:0a572f4da83f (hits: 1)
+  ✅ Found 5 results
+
+🔍 Searching: 'Kingkiller'
+INFO - ❌ Cache MISS for search:1b84364e9036
+INFO - 🔍 Searching Hardcover for series: 'Kingkiller' (author: '', limit: 5)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found 5 series matches
+INFO - 💾 Cached search:1b84364e9036 (TTL: 300s)
+  ✅ Found 5 results
+
+✅ Basic framework completed in 1.76s
+
+📊 Basic Framework Statistics:
+  API Requests Made:             1
+  Cache Hits:                    2
+  Total Requests (session):      1
+  Total Cache Hits (session):    2
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Cosmere / Way of Kings Test
+======================================================================
+
+🔍 Step 1: Searching for 'The Cosmere' series...
+INFO - ✅ Cache HIT for search:79285ee9c7a3 (hits: 1)
+✅ Found 'The Cosmere' series (ID: 5497)
+   Author: Brandon Sanderson
+   Book count: 32
+
+🔍 Step 2: Fetching books in series 5497...
+INFO - ✅ Cache HIT for series:899a2812421d (hits: 1)
+✅ Retrieved 31 books from series
+
+🔍 Step 3: Looking for 'The Way of Kings' in the series...
+✅ Found 'The Way of Kings':
+  Book ID:                       386446
+  Title:                         The Way of Kings
+  Subtitle:                      Bk. 1
+  Position:                      7
+
+📊 Cosmere/Way of Kings Test Statistics:
+  API Requests Made:             0
+  Cache Hits:                    2
+  Total Requests (session):      1
+  Total Cache Hits (session):    4
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Series Books Toggles Test: ID 997
+======================================================================
+
+🔍 Test 1: Default settings (featured=False, deduplicate=True)
+INFO - ✅ Cache HIT for series:7b8773eae089 (hits: 2)
+✅ Retrieved 21 books
+   Series: The Stormlight Archive
+
+🔍 Test 2: Without deduplication (featured=False, deduplicate=False)
+INFO - ❌ Cache MISS for series:9dde75ee3b78
+INFO - 📚 Fetching series books for ID 997 (featured=False, dedup=False)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+INFO - ✅ Found series: 'The Stormlight Archive' by Brandon Sanderson (22 total books)
+INFO - ✅ Retrieved 29 books from GraphQL
+INFO - ✅ Returning 29 books for series 'The Stormlight Archive'
+INFO - 💾 Cached series:9dde75ee3b78 (TTL: 300s)
+✅ Retrieved 29 books
+   ✓ Without dedup has same or more books (29 vs 21)
+
+🔍 Test 3: Featured books only (featured=True, deduplicate=True)
+INFO - ❌ Cache MISS for series:0778074a6d26
+INFO - 📚 Fetching series books for ID 997 (featured=True, dedup=True)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+# todo 2: issue"Featured filter query not supported; GraphQL rejects featured bool exp and causes None result" :solution"Update test_hardcover_api.py toggle test to skip/guard featured filtering or adjust query to supported field; handle None responses before dereferencing"
+ERROR - ❌ GraphQL errors: [{'message': "field 'featured' not found in type: 'books_bool_exp'", 'extensions': {'path': '$.selectionSet.series_by_pk.selectionSet.book_series.args.where.book.featured', 'code': 'validation-failed'}}]
+WARNING - ⚠️  Series 997 not found
+
+❌ Test failed: 'NoneType' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/app/tests/test_hardcover_api.py", line 937, in test_series_books_with_toggles
+    books3 = result3.get("books", [])
+             ^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'get'
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Advanced Book Search Test
+======================================================================
+
+🔍 Test 1: Searching for 'The Way of Kings' with advanced fields...
+INFO - ❌ Cache MISS for book_advanced:1a54010c8a7a
+INFO - 🔍 Advanced search for book: 'The Way of Kings' (author: '', limit: 3, dedup: False)
+INFO - HTTP Request: POST https://api.hardcover.app/v1/graphql "HTTP/1.1 200 OK"
+# todo 3-repeat: issue"Advanced search still lacks results and produces empty set" :solution"Follow todo 3; confirm fallback called and assertions updated so test passes when fallback returns books"
+WARNING - ⚠️  No 'results' field in search response for 'The Way of Kings'
+⚠️  No results found for 'The Way of Kings'
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  Deduplication Logic Test
+======================================================================
+
+🔍 Testing _normalize_title method...
+  ✓ 'The Way of Kings' → 'way of kings' (expected: 'way of kings')
+  ✓ 'A Game of Thrones' → 'game of thrones' (expected: 'game of thrones')
+  ✓ 'An Unexpected Journey' → 'unexpected journey' (expected: 'unexpected journey')
+  ✓ 'The Lord of the Rings: The Fellowship' → 'lord of rings fellowship' (expected: 'lord of rings fellowship')
+
+🔍 Testing _deduplicate_books method...
+# todo 1-repeat: issue"Deduplication repeat failure (3 'Way of Kings' kept) persists" :solution"Apply todo 1; ensure dedup logic/test data collapse variants and update expectations before rerun"
+
+  Original: 4 books
+  Deduplicated: 4 books
+  ✗ Should have 1 'Way of Kings', got 3
+  ✓ Kept 'Words of Radiance' unchanged
+
+⚠️  Some deduplication logic tests failed
+
+⏱️  Waiting 1.0s between tests...
+
+======================================================================
+  ABS Fallback Integration Test
+======================================================================
+
+# todo 4: issue"ABS fallback test crashes because abs_client.is_configured is a bool, not callable" :solution"Update test_abs_fallback usage to match AudiobookshelfClient API (property vs method) and guard against missing config before invoking; mirror fix noted in IMPROVEMENTS_SUMMARY.md import section"
+❌ Unexpected error: 'bool' object is not callable
+Traceback (most recent call last):
+  File "/app/tests/test_hardcover_api.py", line 1435, in <module>
+    exit_code = asyncio.run(main())
+                ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/app/tests/test_hardcover_api.py", line 1428, in main
+    success = await run_all_tests()
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/app/tests/test_hardcover_api.py", line 1304, in run_all_tests
+    results.append(("ABS Fallback", await test_abs_fallback()))
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/tests/test_hardcover_api.py", line 1157, in test_abs_fallback
+    if not abs_client.is_configured():
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'bool' object is not callable
