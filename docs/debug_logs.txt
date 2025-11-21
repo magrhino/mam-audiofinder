@@ -1,0 +1,76 @@
+background: we have been working to enrich metadata gathering, we now need to resolve frontend issues. you can find the issues as issue #: "problem" 
+task: the hardcover metadata enrichment the deduplication has caused some legitimate books to be marked as duplicates on the frontend please construct a plan to determine what the caused the ommission based on the backend tests vs the logs when using frontend.
+backend test log: INFO - mam-audiofinder - ✅ Found series: 'The Cosmere' by Brandon Sanderson (33 total books)
+# note the return of 34 unique titles
+INFO - mam-audiofinder - ✅ Retrieved 34 books from GraphQL
+DEBUG - mam-audiofinder - 📚 All 34 books retrieved from series:
+DEBUG - mam-audiofinder -    1. 'Elantris' (ID: 338931, Position: 1)
+DEBUG - mam-audiofinder -       Subtitle: 10th Anniversary Edition
+DEBUG - mam-audiofinder -    2. 'Mistborn: The Final Empire' (ID: 369692, Position: 2)
+DEBUG - mam-audiofinder -       Subtitle: The Final Empire
+DEBUG - mam-audiofinder -    3. 'The Hope of Elantris' (ID: 427815, Position: 3)
+DEBUG - mam-audiofinder -    4. 'The Well of Ascension' (ID: 427383, Position: 4)
+DEBUG - mam-audiofinder -       Subtitle: A Mistborn Novel
+DEBUG - mam-audiofinder -    5. 'The Hero of Ages' (ID: 103241, Position: 5)
+DEBUG - mam-audiofinder -       Subtitle: Book Three of Mistborn
+DEBUG - mam-audiofinder -    6. 'Warbreaker' (ID: 385491, Position: 6)
+DEBUG - mam-audiofinder -    7. 'The Way of Kings' (ID: 386446, Position: 7)
+DEBUG - mam-audiofinder -       Subtitle: Bk. 1
+DEBUG - mam-audiofinder -    8. 'The Alloy of Law' (ID: 330249, Position: 8)
+DEBUG - mam-audiofinder -       Subtitle: Alloy of Law
+DEBUG - mam-audiofinder -    9. 'The Eleventh Metal' (ID: 427844, Position: 9)
+DEBUG - mam-audiofinder -    10. 'The Emperor's Soul' (ID: 427626, Position: 10)
+DEBUG - mam-audiofinder -       Subtitle: 10th Anniversary Edition
+DEBUG - mam-audiofinder -    11. 'Shadows for Silence in the Forests of Hell' (ID: 427840, Position: 11)
+DEBUG - mam-audiofinder -    12. 'Words of Radiance' (ID: 374131, Position: 12)
+DEBUG - mam-audiofinder -       Subtitle: Book Two of the Stormlight Archive
+DEBUG - mam-audiofinder -    13. 'Sixth of the Dusk' (ID: 427846, Position: 13)
+DEBUG - mam-audiofinder -    14. 'Warbreaker' (ID: 2158392, Position: 14)
+DEBUG - mam-audiofinder -    15. 'Allomancer Jak and the Pits of Eltania' (ID: 427892, Position: 14)
+DEBUG - mam-audiofinder -    16. 'Shadows of Self' (ID: 135725, Position: 15)
+DEBUG - mam-audiofinder -       Subtitle: A Mistborn Novel [Paperback] Brandon Sanderson
+DEBUG - mam-audiofinder -    17. 'The Bands of Mourning' (ID: 427966, Position: 16)
+DEBUG - mam-audiofinder -       Subtitle: A Mistborn Novel
+DEBUG - mam-audiofinder -    18. 'Mistborn: Secret History' (ID: 427881, Position: 17)
+DEBUG - mam-audiofinder -       Subtitle: Historia Secreta
+DEBUG - mam-audiofinder -    19. 'Arcanum Unbounded: The Cosmere Collection' (ID: 80765, Position: 18)
+DEBUG - mam-audiofinder -       Subtitle: The Cosmere Collection
+DEBUG - mam-audiofinder -    20. 'Edgedancer' (ID: 427544, Position: 19)
+DEBUG - mam-audiofinder -    21. 'White Sand, Vol. 1' (ID: 676415, Position: 20)
+DEBUG - mam-audiofinder -       Subtitle: Volume One
+DEBUG - mam-audiofinder -    22. 'Oathbringer' (ID: 459452, Position: 21)
+DEBUG - mam-audiofinder -       Subtitle: Book Three of the Stormlight Archive
+DEBUG - mam-audiofinder -    23. 'White Sand, Vol. 2' (ID: 429287, Position: 23)
+DEBUG - mam-audiofinder -       Subtitle: Volume Two
+DEBUG - mam-audiofinder -    24. 'White Sand, Vol. 3' (ID: 429355, Position: 24)
+DEBUG - mam-audiofinder -    25. 'Rhythm of War' (ID: 427522, Position: 25)
+DEBUG - mam-audiofinder -    26. 'Dawnshard' (ID: 427945, Position: 26)
+DEBUG - mam-audiofinder -       Subtitle: Una novela de El Archivo de las Tormentas
+DEBUG - mam-audiofinder -    27. 'The Lost Metal' (ID: 427863, Position: 27)
+DEBUG - mam-audiofinder -    28. 'Brandon Sanderson's White Sand Omnibus' (ID: 1070354, Position: 28)
+DEBUG - mam-audiofinder -    29. 'Tress of the Emerald Sea' (ID: 602482, Position: 29)
+DEBUG - mam-audiofinder -    30. 'Yumi and the Nightmare Painter' (ID: 763207, Position: 31)
+DEBUG - mam-audiofinder -    31. 'The Sunlit Man' (ID: 889484, Position: 32)
+DEBUG - mam-audiofinder -    32. 'Wind and Truth' (ID: 665261, Position: 33)
+DEBUG - mam-audiofinder -    33. 'Isles of the Emberdark' (ID: 1179741, Position: 34)
+DEBUG - mam-audiofinder -       Subtitle: A Cosmere Novel
+DEBUG - mam-audiofinder -    34. 'Nightblood' (ID: 460973, Position: None)
+
+frontend logs:
+✅ Found series: 'The Cosmere' by Brandon Sanderson (33 total books)
+✅ Retrieved 34 books from GraphQL
+✅ Returning 31 books for series 'The Cosmere'
+💾 Cached series:b550380694ff (TTL: 300s)
+# issue 1: legitimate results filtered determine if occured due to frontend filtering since backend testing returned correct data or if it is due to another issue. Identify which 3 books are missing and why
+📋 Raw book titles from Hardcover API (31 total): [{'book_id': 338931, 'title': 'Elantris', 'subtitle': '10th Anniversary Edition', 'position': 1}, {'book_id': 369692, 'title': 'Mistborn: The Final Empire', 'subtitle': 'The Final Empire', 'position': 2}, {'book_id': 427815, 'title': 'The Hope of Elantris', 'subtitle': None, 'position': 3}, {'book_id': 427383, 'title': 'The Well of Ascension', 'subtitle': 'A Mistborn Novel', 'position': 4}, {'book_id': 103241, 'title': 'The Hero of Ages', 'subtitle': 'Book Three of Mistborn', 'position': 5}, {'book_id': 385491, 'title': 'Warbreaker', 'subtitle': None, 'position': 6}, {'book_id': 386446, 'title': 'The Way of Kings', 'subtitle': 'Bk. 1', 'position': 7}, {'book_id': 330249, 'title': 'The Alloy of Law', 'subtitle': 'Alloy of Law', 'position': 8}, {'book_id': 427844, 'title': 'The Eleventh Metal', 'subtitle': None, 'position': 9}, {'book_id': 427626, 'title': "The Emperor's Soul", 'subtitle': '10th Anniversary Edition', 'position': 10}, {'book_id': 427840, 'title': 'Shadows for Silence in the Forests of Hell', 'subtitle': None, 'position': 11}, {'book_id': 374131, 'title': 'Words of Radiance', 'subtitle': 'Book Two of the Stormlight Archive', 'position': 12}, {'book_id': 427846, 'title': 'Sixth of the Dusk', 'subtitle': None, 'position': 13}, {'book_id': 427892, 'title': 'Allomancer Jak and the Pits of Eltania', 'subtitle': None, 'position': 14}, {'book_id': 135725, 'title': 'Shadows of Self', 'subtitle': 'A Mistborn Novel [Paperback] Brandon Sanderson', 'position': 15}, {'book_id': 427966, 'title': 'The Bands of Mourning', 'subtitle': 'A Mistborn Novel', 'position': 16}, {'book_id': 427881, 'title': 'Mistborn: Secret History', 'subtitle': 'Historia Secreta', 'position': 17}, {'book_id': 80765, 'title': 'Arcanum Unbounded: The Cosmere Collection', 'subtitle': 'The Cosmere Collection', 'position': 18}, {'book_id': 427544, 'title': 'Edgedancer', 'subtitle': None, 'position': 19}, {'book_id': 676415, 'title': 'White Sand, Vol. 1', 'subtitle': 'Volume One', 'position': 20}, {'book_id': 459452, 'title': 'Oathbringer', 'subtitle': 'Book Three of the Stormlight Archive', 'position': 21}, {'book_id': 427522, 'title': 'Rhythm of War', 'subtitle': None, 'position': 25}, {'book_id': 427945, 'title': 'Dawnshard', 'subtitle': 'Una novela de El Archivo de las Tormentas', 'position': 26}, {'book_id': 427863, 'title': 'The Lost Metal', 'subtitle': None, 'position': 27}, {'book_id': 1070354, 'title': "Brandon Sanderson's White Sand Omnibus", 'subtitle': None, 'position': 28}, {'book_id': 602482, 'title': 'Tress of the Emerald Sea', 'subtitle': None, 'position': 29}, {'book_id': 763207, 'title': 'Yumi and the Nightmare Painter', 'subtitle': None, 'position': 31}, {'book_id': 889484, 'title': 'The Sunlit Man', 'subtitle': None, 'position': 32}, {'book_id': 665261, 'title': 'Wind and Truth', 'subtitle': None, 'position': 33}, {'book_id': 1179741, 'title': 'Isles of the Emberdark', 'subtitle': 'A Cosmere Novel', 'position': 34}, {'book_id': 460973, 'title': 'Nightblood', 'subtitle': None, 'position': None}]
+# issue 2: All remaining results filtered consider deleting due to backend filtering logic
+🔍 Filtered out 31 combined/omnibus title(s)
+📖 Enriching 0 unique books for series 'The Cosmere'
+✅ Enriched 0 books with detailed info
+# issue 3 ABS should use new abs enpoint with enhanced metadata same as used in app/tests/test_abs_providers.py
+🔍 Applying ABS enrichment to 0 books
+# issue 4: pagination no longer necessary with new logic and can be removed
+📚 Enriching 0 books with ABS data (page 1, per_page 5)
+📄 Processing books 1-0 of 0
+✅ Enriched 0 books with ABS data
+✅ Returned 0 ABS-enriched books (page 1/0)
