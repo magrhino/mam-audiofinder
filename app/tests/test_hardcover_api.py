@@ -932,15 +932,21 @@ async def test_series_books_with_toggles(series_id=997):
         await asyncio.sleep(0.5)
 
         # Test 3: Featured only (featured=True, deduplicate=True)
-        print(f"\n🔍 Test 3: Featured books only (featured=True, deduplicate=True)")
+        # NOTE: include_featured is now deprecated (API doesn't support it)
+        print(f"\n🔍 Test 3: Featured books (deprecated parameter - should return same as Test 1)")
         result3 = await hardcover_client.list_series_books(series_id, include_featured=True)
-        books3 = result3.get("books", [])
-        print(f"✅ Retrieved {len(books3)} featured books")
 
-        if len(books3) <= len(books1):
-            print(f"   ✓ Featured has same or fewer books ({len(books3)} vs {len(books1)})")
+        if not result3:
+            print(f"⚠️  Featured filter returned None (expected - parameter is deprecated)")
+            books3 = []
         else:
-            print(f"   ℹ️  Featured has more books ({len(books3)} vs {len(books1)})")
+            books3 = result3.get("books", [])
+            print(f"✅ Retrieved {len(books3)} books (should match Test 1 since featured filter is ignored)")
+
+            if len(books3) == len(books1):
+                print(f"   ✓ Featured parameter correctly ignored ({len(books3)} == {len(books1)})")
+            else:
+                print(f"   ℹ️  Book count differs ({len(books3)} vs {len(books1)})")
 
         # Show sample books from each test
         print(f"\n📚 Sample books (first 3 from each test):")
@@ -1154,7 +1160,7 @@ async def test_abs_fallback():
     # Initialize ABS client
     abs_client = AudiobookshelfClient()
 
-    if not abs_client.is_configured():
+    if not abs_client.is_configured:
         print("⚠️  ABS not configured - will demonstrate Hardcover-only search")
         abs_available = False
     else:

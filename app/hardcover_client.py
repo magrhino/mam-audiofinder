@@ -491,6 +491,14 @@ class HardcoverClient:
         # Convert to lowercase
         normalized = title.lower()
 
+        # Remove qualifiers in parentheses/brackets (Illustrated, Unabridged, etc.)
+        # Do this BEFORE punctuation removal to catch the parentheses
+        normalized = re.sub(r'\([^)]*\)', '', normalized)
+        normalized = re.sub(r'\[[^\]]*\]', '', normalized)
+
+        # Remove trailing articles: ", the", ", a", ", an"
+        normalized = re.sub(r',\s*(the|a|an)\s*$', '', normalized)
+
         # Remove series markers (Book 1, Bk. 1, Part 1, Vol. 1, #1, etc.)
         normalized = re.sub(r'\b(book|bk|part|pt|vol|volume|edition|ed)\.?\s*\d+\b', '', normalized)
         normalized = re.sub(r'#\d+\b', '', normalized)
@@ -580,11 +588,11 @@ class HardcoverClient:
         List books in a series using GraphQL book_series relationship.
 
         Uses the Hardcover GraphQL API to fetch complete book details with ordering.
-        Filters for non-canonical books (canonical_id is null) and optionally featured books.
+        Filters for non-canonical books (canonical_id is null).
 
         Args:
             series_id: Hardcover series ID
-            include_featured: If True, only return featured books (default: False)
+            include_featured: DEPRECATED - Parameter ignored (Hardcover API does not support featured filter)
             deduplicate: If True, remove duplicate books by normalized title (default: True)
             debug: If True, log detailed book information (default: False)
 
@@ -604,49 +612,50 @@ class HardcoverClient:
         if not self.is_configured:
             return None
 
-        # Generate cache key with parameters
-        cache_key = self._get_cache_key("series", f"{series_id}|feat:{include_featured}|dedup:{deduplicate}")
+        # Log deprecation warning if include_featured is used
+        if include_featured:
+            logger.warning("⚠️  include_featured parameter is deprecated and ignored (Hardcover API does not support featured filter)")
+
+        # Generate cache key with parameters (exclude deprecated featured param)
+        cache_key = self._get_cache_key("series", f"{series_id}|dedup:{deduplicate}")
 
         # Check cache
         cached = await self._get_cached(cache_key)
         if cached:
             return cached
 
-        # Build GraphQL query with conditional featured filter
-        featured_filter = 'featured: {_eq: true}' if include_featured else ''
-
-        query = f"""
-        query GetBooksBySeries($seriesId: Int!) {{
-          series_by_pk(id: $seriesId) {{
+        # Build GraphQL query (removed featured filter - API doesn't support it)
+        query = """
+        query GetBooksBySeries($seriesId: Int!) {
+          series_by_pk(id: $seriesId) {
             id
             name
-            author {{
+            author {
               name
-            }}
+            }
             books_count
             book_series(
-              order_by: {{position: asc}}
-              where: {{
-                book: {{
-                  {featured_filter}
-                  canonical_id: {{_is_null: true}}
-                }}
-              }}
-            ) {{
+              order_by: {position: asc}
+              where: {
+                book: {
+                  canonical_id: {_is_null: true}
+                }
+              }
+            ) {
               position
-              book {{
+              book {
                 id
                 title
                 subtitle
-              }}
-            }}
-          }}
-        }}
+              }
+            }
+          }
+        }
         """
 
         variables = {"seriesId": series_id}
 
-        logger.info(f"📚 Fetching series books for ID {series_id} (featured={include_featured}, dedup={deduplicate})")
+        logger.info(f"📚 Fetching series books for ID {series_id} (dedup={deduplicate})")
 
         data = await self._execute_graphql(query, variables)
 
@@ -1094,9 +1103,23 @@ class HardcoverClient:
         # Execute query
         data = await self._execute_graphql(query, variables)
 
-        # If advanced query failed, fall back to basic search
+        # Check if we need to fall back to basic search
+        need_fallback = False
         if data is None or "search" not in data:
-            logger.warning(f"⚠️  Advanced search failed for '{title}', falling back to basic search")
+            need_fallback = True
+            logger.warning(f"⚠️  Advanced search failed for '{title}' (no data/search field)")
+        else:
+            # Check if results is None (advanced params not working)
+            search_data = data.get("search", {})
+            if isinstance(search_data, dict):
+                results_check = search_data.get("results")
+                if results_check is None:
+                    need_fallback = True
+                    logger.warning(f"⚠️  Advanced search returned None results for '{title}'")
+
+        # Fall back to basic search if needed
+        if need_fallback:
+            logger.info(f"🔄 Falling back to basic search (no advanced params)")
 
             # Use basic search query (no advanced params)
             basic_query = """
@@ -1113,7 +1136,7 @@ class HardcoverClient:
                 "perPage": limit
             }
 
-            logger.debug(f"🔄 Retrying with basic search query")
+            logger.debug(f"🔄 Executing basic search query")
             data = await self._execute_graphql(basic_query, basic_variables)
 
             if data is None:
