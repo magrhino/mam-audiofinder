@@ -834,6 +834,285 @@ class AudiobookshelfClient:
             # Don't fail verification if description fetch fails
             logger.error(f"❌ Failed to update description after verification: {type(e).__name__}: {e}")
 
+    async def fetch_enhanced_metadata_test(
+        self,
+        item_id: str = None,
+        providers: List[str] = None
+    ) -> dict:
+        """
+        ⚠️  LEGACY TEST METHOD - DO NOT USE IN PRODUCTION
+
+        Test method to fetch enhanced metadata from external providers via /api/search/books.
+
+        This method validates whether the new endpoint provides sufficient data to
+        replace the current fetch_item_details() logic.
+
+        Args:
+            item_id: ABS library item ID. If None, selects random item.
+            providers: List of providers to try (default: ["audible", "google", "openlibrary"])
+
+        Returns:
+            Dict with test results:
+            {
+                "old_metadata": {...},       # Current fetch_item_details() result
+                "new_metadata": {...},       # Enhanced provider metadata
+                "comparison": {...},         # Field-by-field comparison
+                "success": bool,             # Series with sequence found?
+                "provider_used": str         # Which provider succeeded
+            }
+        """
+        if not self.is_configured:
+            logger.warning("⚠️  ABS not configured for enhanced metadata test")
+            return {
+                "old_metadata": {},
+                "new_metadata": {},
+                "comparison": {},
+                "success": False,
+                "provider_used": None
+            }
+
+        # If no item_id, select random item
+        if not item_id:
+            import random
+            items = await self._get_cached_library_items()
+            if not items:
+                logger.warning("⚠️  No items in library for test")
+                return {
+                    "old_metadata": {},
+                    "new_metadata": {},
+                    "comparison": {},
+                    "success": False,
+                    "provider_used": None
+                }
+
+            random_item = random.choice(items)
+            item_id = random_item.get("id")
+            logger.info(f"📖 Selected random item for test: {item_id}")
+
+        # Get item metadata for title/author
+        item_details = await self.fetch_item_details(item_id)
+        if not item_details:
+            logger.warning(f"⚠️  Could not fetch item details for {item_id}")
+            return {
+                "old_metadata": {},
+                "new_metadata": {},
+                "comparison": {},
+                "success": False,
+                "provider_used": None
+            }
+
+        old_metadata = item_details.get("metadata", {})
+        title = old_metadata.get("title", "")
+        author = old_metadata.get("authorName", "")
+
+        # Default providers
+        if not providers:
+            providers = ["audible", "google", "openlibrary"]
+
+        logger.info(f"🔍 Testing enhanced metadata for '{title}' by '{author}'")
+        logger.info(f"   Providers to try: {', '.join(providers)}")
+
+        # Try each provider until success (series with sequence)
+        for provider in providers:
+            logger.info(f"   → Trying provider: {provider}")
+
+            try:
+                # Fetch enhanced metadata from provider
+                enhanced_result = await self._fetch_from_provider(
+                    provider=provider,
+                    item_id=item_id,
+                    title=title,
+                    author=author,
+                    fallback_title_only=True
+                )
+
+                if not enhanced_result:
+                    logger.info(f"     ✗ No results from {provider}")
+                    continue
+
+                # Check for series with sequence (success criteria)
+                series = enhanced_result.get("series", [])
+                has_series_sequence = any(
+                    s.get("sequence", "").strip().isdigit() if isinstance(s, dict) else False
+                    for s in series
+                )
+
+                if has_series_sequence:
+                    logger.info(f"     ✅ SUCCESS: {provider} returned series with sequence!")
+
+                    return {
+                        "old_metadata": old_metadata,
+                        "new_metadata": enhanced_result,
+                        "comparison": self._compare_metadata(old_metadata, enhanced_result),
+                        "success": True,
+                        "provider_used": provider
+                    }
+                else:
+                    logger.info(f"     ⚠️  No series sequence from {provider}")
+
+            except Exception as e:
+                logger.warning(f"     ✗ Provider {provider} failed: {type(e).__name__}: {e}")
+                continue
+
+        # No provider succeeded
+        logger.warning(f"⚠️  No provider returned series with sequence")
+
+        return {
+            "old_metadata": old_metadata,
+            "new_metadata": {},
+            "comparison": {},
+            "success": False,
+            "provider_used": None
+        }
+
+    async def _fetch_from_provider(
+        self,
+        provider: str,
+        item_id: str,
+        title: str,
+        author: str = "",
+        fallback_title_only: bool = True
+    ) -> dict:
+        """
+        Fetch enhanced metadata from a specific provider.
+
+        Uses /api/search/books endpoint with provider parameter.
+
+        Args:
+            provider: Provider name (audible, google, openlibrary, etc.)
+            item_id: ABS library item ID
+            title: Book title
+            author: Author name (optional)
+            fallback_title_only: Use title-only search if author search fails
+
+        Returns:
+            Dict with enhanced metadata fields, or empty dict on error
+        """
+        if not self.is_configured:
+            return {}
+
+        try:
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+
+            # Build search parameters
+            params = {
+                "provider": provider,
+                "fallbackTitleOnly": "1" if fallback_title_only else "0",
+                "title": title,
+                "id": item_id  # Item ID allows provider to enrich with library data
+            }
+
+            if author:
+                params["author"] = author
+
+            logger.debug(f"🌐 Calling /api/search/books with provider={provider}")
+
+            # Use semaphore to limit concurrent requests
+            async with self._request_semaphore:
+                r = await self._shared_client.get(
+                    f"{self.base_url}/api/search/books",
+                    headers=headers,
+                    params=params
+                )
+
+                logger.debug(f"📡 Provider {provider} response: HTTP {r.status_code}")
+
+                if r.status_code != 200:
+                    logger.warning(f"⚠️  Provider {provider} returned HTTP {r.status_code}")
+                    return {}
+
+                data = r.json()
+                results = data if isinstance(data, list) else data.get("results", [])
+
+                if not results:
+                    logger.debug(f"ℹ️  No results from provider {provider}")
+                    return {}
+
+                # Take first result (ignoring matchConfidence as per requirements)
+                first_result = results[0]
+
+                logger.debug(f"✅ Got result from {provider}: {first_result.get('title', 'Unknown')}")
+
+                return first_result
+
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch from provider {provider}: {type(e).__name__}: {e}")
+            return {}
+
+    def _compare_metadata(self, old_meta: dict, new_meta: dict) -> dict:
+        """
+        Compare old and new metadata field by field.
+
+        Returns dict with comparison results:
+        {
+            "field_name": {
+                "old": "value",
+                "new": "value",
+                "status": "new|enhanced|same|missing"
+            }
+        }
+        """
+        comparison = {}
+
+        # Fields to compare (new_field, old_field)
+        fields = [
+            ("narrator", "narratorName"),
+            ("publisher", "publisher"),
+            ("series", "series"),
+            ("rating", None),
+            ("region", None),
+            ("language", "language"),
+            ("asin", "asin"),
+            ("isbn", "isbn"),
+            ("description", "description"),
+            ("publishedYear", "publishedYear"),
+        ]
+
+        for new_field, old_field in fields:
+            old_val = old_meta.get(old_field if old_field else new_field, '')
+            new_val = new_meta.get(new_field, '')
+
+            # Determine status
+            if new_field == "series":
+                old_has_seq = any(s.get("sequence", "").strip() for s in (old_val or []))
+                new_has_seq = any(s.get("sequence", "").strip() for s in (new_val or []))
+
+                if new_has_seq and not old_has_seq:
+                    status = "enhanced"
+                elif new_val and not old_val:
+                    status = "new"
+                elif new_val:
+                    status = "same"
+                else:
+                    status = "missing"
+            elif new_field == "description":
+                old_len = len(str(old_val)) if old_val else 0
+                new_len = len(str(new_val)) if new_val else 0
+
+                if new_len > old_len * 1.5:
+                    status = "enhanced"
+                elif new_len > 0 and old_len == 0:
+                    status = "new"
+                elif new_len > 0:
+                    status = "same"
+                else:
+                    status = "missing"
+            else:
+                if new_val and not old_val:
+                    status = "new"
+                elif new_val:
+                    status = "same"
+                else:
+                    status = "missing"
+
+            comparison[new_field] = {
+                "old": old_val,
+                "new": new_val,
+                "status": status
+            }
+
+        return comparison
+
 
 # Global instance
 abs_client = AudiobookshelfClient()

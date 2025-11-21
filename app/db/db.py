@@ -59,8 +59,11 @@ def run_migrations():
         logger.warning(f"⚠️  Migrations directory not found: {MIGRATIONS_DIR}")
         return
 
-    # Get all .sql files sorted numerically
-    migration_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    # Get all .sql files sorted numerically (skip DEPRECATED_* files)
+    migration_files = sorted([
+        f for f in MIGRATIONS_DIR.glob("*.sql")
+        if not f.name.startswith("DEPRECATED_")
+    ])
 
     if not migration_files:
         logger.info("ℹ️  No migration files found")
@@ -193,7 +196,41 @@ def run_migrations():
     else:
         logger.info("✓ Database migrations completed")
 
+def _initialize_covers_db_from_schema():
+    """
+    Initialize covers.db from fresh schema file.
+    Replaces deprecated migrations 005, 008, 009.
+    """
+    schema_file = Path(__file__).parent / "covers_schema.sql"
+
+    if not schema_file.exists():
+        logger.warning(f"⚠️  Covers schema file not found: {schema_file}")
+        return
+
+    logger.info("🔧 Initializing covers.db from fresh schema...")
+
+    try:
+        sql = schema_file.read_text()
+
+        # Use executescript for schema file (handles triggers properly)
+        with covers_engine.connect() as conn:
+            raw_conn = conn.connection.driver_connection
+            raw_conn.executescript(sql)
+            conn.commit()
+
+        logger.info("✓ Covers database schema initialized")
+
+    except Exception as e:
+        logger.error(f"✗ Failed to initialize covers.db from schema: {e}")
+        raise
+
+
 def initialize_databases():
-    """Initialize database schemas by running migrations."""
+    """Initialize database schemas by running migrations and fresh schemas."""
+    # Initialize covers.db from fresh schema (replaces migrations 005, 008, 009)
+    _initialize_covers_db_from_schema()
+
+    # Run migrations for history.db only (skips DEPRECATED_* files)
     run_migrations()
+
     logger.info("✓ Database schemas initialized")
