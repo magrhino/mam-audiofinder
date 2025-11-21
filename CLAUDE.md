@@ -43,10 +43,9 @@ shelfarr/
 │   │   └── logs_route.py         # Application logs endpoint
 │   ├── static/
 │   │   ├── dist/                 # Vue build output (gitignored, generated)
-│   │   ├── js/                   # Legacy shared JS utilities
-│   │   │   ├── core/             # api.js, utils.js (reused by Vue)
-│   │   │   └── services/         # coverLoader.js
-│   │   └── css/                  # Global stylesheets
+│   │   └── js/                   # ⚠️ LEGACY - scheduled for removal
+│   │       ├── core/             # api.js, utils.js (reused by Vue via aliases)
+│   │       └── services/         # coverLoader.js
 │   └── tests/                    # Test suite (23 test files)
 │       ├── conftest.py           # Shared fixtures
 │       ├── test_*.py             # Backend tests (15 files)
@@ -87,7 +86,11 @@ shelfarr/
 │       │   │   ├── useCoverLoader.js
 │       │   │   ├── useHistoryLiveUpdates.js
 │       │   │   └── naive/        # NaiveUI table configs
-│       │   └── theme/            # Theme configuration
+│       │   ├── styles/           # Global styles
+│       │   │   └── global.css    # CSS custom properties, resets
+│       │   ├── theme/            # Theme configuration
+│       │   │   └── naive.js      # NaiveUI theme overrides
+│       │   └── uno.config.js     # UnoCSS configuration
 │       └── static/               # Static assets (if any)
 ├── docs/                         # Documentation
 │   ├── CLAUDE.md                 # AI assistant guide (this file)
@@ -103,7 +106,8 @@ shelfarr/
 **Important Notes:**
 - Frontend source is in `build/frontend/src/`, not at root level
 - Built Vue assets are output to `app/static/dist/` during Docker build
-- Legacy JS utilities in `app/static/js/` are still used by Vue components via Vite aliases
+- ⚠️ **Legacy JS in `app/static/js/` is deprecated** - Do not extend. Migrate to Vue composables before removal.
+- UnoCSS is the primary styling system - no legacy CSS files remain
 
 ## Architecture & Data Flow
 
@@ -216,15 +220,16 @@ NavBar, HealthIndicator, ResultRow, HistoryRow, ShowcaseCard, SeriesTable, Glass
 - `useMAMSearchDataTable()` - NaiveUI table configuration for search results
 - `useBreakpoints()` - (@vueuse/core) Responsive breakpoint detection (mobile: 0, tablet: 768, desktop: 1024)
 
-**Design System:**
-- Dark theme with maroon accents (#500000)
-- Glassmorphism effects (backdrop-filter, semi-transparent panels)
-- NaiveUI components for tables, modals, buttons
-- CSS custom properties for theming
-- System font stack
+**Styling System:**
+- **UnoCSS** - Atomic CSS engine with preset utilities and custom shortcuts (uno.config.js)
+- **Global CSS** - CSS custom properties and resets in `build/frontend/src/styles/global.css`
+- **Component-scoped styles** - `<style scoped>` blocks in Vue components
+- **NaiveUI theme** - Theme overrides in `build/frontend/src/theme/naive.js`
+- **Design tokens** - Dark theme with maroon accents (#500000), glassmorphism effects, system fonts
+- **No legacy CSS** - `app/static/css/` has been removed entirely
 
-**Legacy Integration:**
-Vue components import `app/static/js/core/api.js` for backend communication. Vite configured with aliases (@core, @services) to access legacy modules.
+**Legacy Integration (Temporary):**
+⚠️ Vue components currently import `app/static/js/core/api.js` for backend communication. Vite configured with aliases (@core, @services) to access these legacy modules. **Do not extend** - migrate logic to Vue composables instead.
 
 ## Database Schemas
 
@@ -522,6 +527,56 @@ const scrollX = computed(() => {
 4. Smart routing: history table → history.db, covers/series tables → covers.db
 5. Current: 001-010 (10 migrations total)
 
+### Styling & Design
+
+**UnoCSS Approach:**
+ShelfArr uses UnoCSS as the primary styling system. UnoCSS is an atomic CSS engine that generates utility classes on-demand.
+
+**Configuration:**
+- `build/frontend/uno.config.js` - Defines presets, shortcuts, and custom rules
+- `build/frontend/src/styles/global.css` - CSS custom properties, resets, and base styles
+- `build/frontend/src/theme/naive.js` - NaiveUI component theme overrides
+
+**Styling Priority:**
+1. **UnoCSS utilities** - Use for spacing, layout, colors (e.g., `flex`, `p-4`, `bg-gray-900`)
+2. **UnoCSS shortcuts** - Custom shortcuts defined in uno.config.js (e.g., `glass-panel`)
+3. **Component-scoped styles** - Use `<style scoped>` for component-specific CSS
+4. **Global CSS** - Only for CSS custom properties and truly global styles
+
+**Example Component Styling:**
+```vue
+<template>
+  <div class="glass-panel flex flex-col gap-4 p-6">
+    <h2 class="text-xl font-semibold">Title</h2>
+    <p class="text-gray-400">Description</p>
+  </div>
+</template>
+
+<style scoped>
+/* Only for styles that can't be expressed with UnoCSS utilities */
+.custom-gradient {
+  background: linear-gradient(to bottom, var(--maroon-dark), transparent);
+}
+</style>
+```
+
+**Design Tokens (CSS Custom Properties in global.css):**
+- `--maroon-primary: #500000` - Primary brand color
+- `--maroon-light: #800000` - Lighter maroon variant
+- `--maroon-dark: #300000` - Darker maroon variant
+
+**⚠️ DO NOT:**
+- Reference `app/static/css/main.css` or `app/static/css/legacy.css` (removed)
+- Create new CSS files outside of `build/frontend/src/styles/`
+- Use inline styles when UnoCSS utilities suffice
+- Extend legacy CSS patterns
+
+**Adding New Styles:**
+1. Check if UnoCSS preset utilities cover your need
+2. Add custom shortcut to uno.config.js if pattern repeats
+3. Use scoped styles for component-specific CSS
+4. Add to global.css only for CSS custom properties or true globals
+
 ## Common Tasks
 
 ### Add Backend Endpoint
@@ -619,13 +674,43 @@ Composition API with `<script setup>`, camelCase for variables/functions, Pascal
 **JavaScript:**
 ES6+ modules, async/await, camelCase for functions/variables, UPPER_SNAKE_CASE for constants
 
-**CSS:**
-kebab-case classes, CSS custom properties for theming, minimal utility classes, dark theme with maroon accents
+**CSS/Styling:**
+UnoCSS atomic utilities preferred, kebab-case for custom classes, CSS custom properties in global.css, component-scoped styles, dark theme with maroon accents
 
 **Logging:**
 Emoji prefixes (✅ success, ❌ error, ⚠️ warning, 🔍 debug, 📚 library, 🔄 retry, 📦 cache)
 
 ## AI Assistant Guidelines
+
+### Legacy Asset Policy
+
+**⚠️ CRITICAL: `app/static/js/` is DEPRECATED**
+
+The legacy JavaScript modules in `app/static/js/` are scheduled for removal. They represent the pre-Vue architecture.
+
+**DO NOT:**
+- Add new files to `app/static/js/`
+- Extend existing legacy modules
+- Import legacy modules in new Vue components
+- Reference these modules in documentation
+
+**DO:**
+- Migrate logic from legacy modules to Vue composables in `build/frontend/src/composables/`
+- Use `useApi()` composable for API calls (eventual replacement for api.js)
+- Document migration path when working with legacy code
+- Plan incremental migration to avoid breaking changes
+
+**Current Legacy Dependencies:**
+- `app/static/js/core/api.js` - API wrapper (used via useApi composable)
+- `app/static/js/core/utils.js` - Utilities (migrate to composables)
+- `app/static/js/services/coverLoader.js` - Cover loading (partially migrated to useCoverLoader)
+
+**Migration Strategy:**
+1. Identify legacy import in Vue component
+2. Create equivalent composable in `build/frontend/src/composables/`
+3. Update component to use new composable
+4. Remove legacy import
+5. Mark legacy file for deletion once all references removed
 
 ### Making Changes
 
@@ -634,6 +719,7 @@ Emoji prefixes (✅ success, ❌ error, ⚠️ warning, 🔍 debug, 📚 library
 3. **Test thoroughly** (automated tests + manual verification in Docker)
 4. **Write descriptive commits** ("why" not "what") - see recent commits for style
 5. **Update documentation** if architecture or significant functionality changes
+6. **Respect the legacy policy** - migrate, don't extend
 
 ### Adding Features
 
