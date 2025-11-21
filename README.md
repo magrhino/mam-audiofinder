@@ -43,7 +43,7 @@ Screenshots above reflect the Vue 3 + Naive UI SPA views.
 - **SPA entrypoint:** Vite builds land in `app/static/dist/` with `index.html` served for all non-API routes. FastAPI mounts `/static` and provides the SPA fallback in `app/main.py`.
 - **Backend role:** FastAPI exposes API routes under `app/routes/` (`/search`, `/history`, `/import`, `/qb`, `/logs`, `/series`, `/covers`, `/config`, `/health`) and defers HTML to the SPA index.
 - **Routing:** Vue Router runs in history mode with a catch-all redirect for unknown paths. Deep links and refreshes resolve through the FastAPI fallback.
-- **Styling layers:** Shared base CSS lives in `app/static/css/main.css`; temporary legacy styles are isolated in `app/static/css/legacy.css`; Vue globals are in `build/frontend/src/styles/global.css`; additional styling resides in scoped `<style>` blocks on components plus Naive UI theme overrides in `build/frontend/src/theme/naive.js`.
+- **Styling system:** UnoCSS atomic utilities with custom shortcuts (uno.config.js), global CSS custom properties in `build/frontend/src/styles/global.css`, component-scoped styles in Vue `<style>` blocks, and Naive UI theme overrides in `build/frontend/src/theme/naive.js`.
 
 ## Features
 - **Vue SPA views:** Search, History (imports + verification), Showcase, Logs, and Series all run as Vue Router pages with Naive UI components.

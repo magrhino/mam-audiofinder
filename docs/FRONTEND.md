@@ -36,15 +36,14 @@ ShelfArr’s frontend is a Vue 3 Single-Page Application rendered from `app/stat
 - **Path aliases:** Defined in `build/frontend/vite.config.js` (`@components`, `@views`, `@core`, `@services`, `@composables`) to simplify imports and keep parity with shared JS utilities in `app/static/js/`.
 
 ## Styling Architecture
-- **Shared base CSS:** `app/static/css/main.css` supplies variables, typography, layout primitives, tables, and utilities consumed by both legacy assets and the SPA.
-- **Legacy isolation:** `app/static/css/legacy.css` holds styles retained only for legacy pages; the SPA does not rely on these beyond shared base tokens.
-- **Vue globals:** `build/frontend/src/styles/global.css` adds SPA-only effects (e.g., Naive UI DataTable shimmer) and complements component scopes.
-- **Scoped component styles:** `<style scoped>` blocks live with each component (StatusBadge, ActionButton, HistoryRow, LogsView, ShowcaseCard, etc.) to keep feature-specific styles encapsulated.
-- **Naive UI overrides:** The theme in `build/frontend/src/theme/naive.js` maps ShelfArr’s palette and radii onto Naive UI components; tokens pair with CSS variables in `main.css`.
-- For history of the split and cleanup rationale, see `docs/css_refactoring_summary.md`.
+- **UnoCSS (Primary):** Atomic CSS engine with on-demand utility generation. Configuration in `build/frontend/uno.config.js` defines presets, custom shortcuts (e.g., `glass-panel`), and design tokens.
+- **Global CSS:** `build/frontend/src/styles/global.css` provides CSS custom properties (--maroon-primary, --maroon-light, etc.), resets, and base styles.
+- **Component-scoped styles:** `<style scoped>` blocks in Vue components for styles that can't be expressed with UnoCSS utilities.
+- **Naive UI theme:** `build/frontend/src/theme/naive.js` maps ShelfArr's palette and design tokens onto Naive UI components.
+- **No legacy CSS:** `app/static/css/` has been completely removed - all styling now lives in the Vue workspace.
 
 ## Theme System
-`build/frontend/src/theme/naive.js` exports `customTheme`, defining colors, typography, radii, and component-specific tweaks (DataTable, Pagination, Select, Input, Button, Card, Tag). Theme tokens align with CSS variables defined in `app/static/css/main.css`, ensuring Naive UI components match the base styles without separate template overrides.
+`build/frontend/src/theme/naive.js` exports `customTheme`, defining colors, typography, radii, and component-specific tweaks (DataTable, Pagination, Select, Input, Button, Card, Tag). Theme tokens use CSS custom properties defined in `build/frontend/src/styles/global.css`, ensuring consistent branding across the SPA.
 
 ## Build & Deployment Workflow
 - **Install & develop:** From `build/frontend/`, run `npm install` then `npm run dev` (proxies API requests to FastAPI for local development).

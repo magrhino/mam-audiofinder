@@ -42,5 +42,5 @@ onMounted(() => {
 </script>
 
 <style>
-/* Global app styles are loaded from /static/css/main.css */
+/* Global styles: UnoCSS utilities + src/styles/global.css + Naive UI theme overrides */
 </style>
