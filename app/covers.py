@@ -211,6 +211,122 @@ class CoverService:
             logger.exception("Get cached cover traceback:")
             return {}
 
+    def resolve_cover_url(self, mam_id: str, current_url: str = None) -> dict:
+        """
+        Unified cover URL resolution with healing detection.
+        Consolidates logic from history._resolve_cover_url() and get_cached_cover().
+
+        This method provides a single source of truth for resolving cover URLs across the application.
+        It checks the cache, verifies local file existence, and handles fallback to remote URLs.
+
+        Args:
+            mam_id: MAM torrent ID
+            current_url: Existing cover URL (if any) - used as fallback if cache misses
+
+        Returns:
+            {
+                'cover_url': str | None,     # Final URL to use (local path or remote URL)
+                'is_local': bool,            # True if local file exists
+                'needs_heal': bool,          # True if file missing but expected
+                'item_id': str | None,       # ABS item ID if available
+                'description': str | None,   # Book description if cached
+                'metadata': dict | None,     # Full metadata if cached
+                'source': str                # 'local', 'remote', 'cache_miss', or 'none'
+            }
+        """
+        if not mam_id:
+            logger.warning("⚠️  resolve_cover_url called with empty mam_id")
+            return {
+                'cover_url': current_url,
+                'is_local': False,
+                'needs_heal': False,
+                'item_id': None,
+                'description': None,
+                'metadata': None,
+                'source': 'none'
+            }
+
+        # First check cache (which handles local file existence check)
+        cached = self.get_cached_cover(mam_id)
+
+        if cached and cached.get('cover_url'):
+            # Cache hit - return cached data
+            return {
+                'cover_url': cached.get('cover_url'),
+                'is_local': cached.get('is_local', False),
+                'needs_heal': cached.get('needs_heal', False),
+                'item_id': cached.get('item_id'),
+                'description': cached.get('description'),
+                'metadata': cached.get('metadata'),
+                'source': 'local' if cached.get('is_local') else 'remote'
+            }
+
+        # Cache miss - use current_url if provided
+        if current_url:
+            # Check if it's a local path that might exist
+            if current_url.startswith('/covers/'):
+                filename = current_url.split('/')[-1]
+                local_path = COVERS_DIR / filename
+
+                if local_path.exists():
+                    # Local file exists (not in cache but file is there)
+                    logger.info(f"📦 Local file exists but not in cache for MAM ID {mam_id}: {current_url}")
+                    return {
+                        'cover_url': current_url,
+                        'is_local': True,
+                        'needs_heal': False,
+                        'item_id': None,
+                        'description': None,
+                        'metadata': None,
+                        'source': 'local'
+                    }
+                else:
+                    # Local file expected but missing - try to find original URL in database
+                    logger.warning(f"⚠️  Local file missing for MAM ID {mam_id}: {local_path}")
+                    try:
+                        with covers_engine.begin() as cx:
+                            row = cx.execute(text("""
+                                SELECT cover_url FROM covers
+                                WHERE mam_id = :mam_id LIMIT 1
+                            """), {"mam_id": mam_id}).fetchone()
+
+                            if row and row[0] and not row[0].startswith('/covers/'):
+                                # Found remote URL in database
+                                return {
+                                    'cover_url': row[0],
+                                    'is_local': False,
+                                    'needs_heal': True,
+                                    'item_id': None,
+                                    'description': None,
+                                    'metadata': None,
+                                    'source': 'remote'
+                                }
+                    except Exception as e:
+                        logger.error(f"❌ Failed to query covers database for MAM ID {mam_id}: {e}")
+
+            # It's a remote URL or fallback - return as-is
+            return {
+                'cover_url': current_url,
+                'is_local': False,
+                'needs_heal': False,
+                'item_id': None,
+                'description': None,
+                'metadata': None,
+                'source': 'remote'
+            }
+
+        # No cover available
+        logger.info(f"📦 No cover URL available for MAM ID {mam_id}")
+        return {
+            'cover_url': None,
+            'is_local': False,
+            'needs_heal': False,
+            'item_id': None,
+            'description': None,
+            'metadata': None,
+            'source': 'cache_miss'
+        }
+
     async def save_cover_to_cache(self, mam_id: str, cover_url: str, title: str = "", author: str = "", item_id: str = None, description: str = "", metadata_json: dict = None):
         """
         Save cover URL to covers database and download the image to local storage.

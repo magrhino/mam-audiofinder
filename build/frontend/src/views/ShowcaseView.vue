@@ -78,18 +78,16 @@
       <div class="detail-content">
         <!-- Cover and Info Section -->
         <n-space :size="24" align="start">
-          <!-- Cover Image -->
+          <!-- Cover Image using CoverImage component -->
           <div v-if="detailGroup.mam_id" class="detail-cover-wrapper">
-            <img
-              v-if="detailCoverUrl"
-              :src="detailCoverUrl"
-              :alt="detailGroup.display_title"
-              loading="lazy"
-              class="detail-cover"
+            <CoverImage
+              :mam-id="detailGroup.mam_id"
+              :title="detailGroup.display_title"
+              :author="detailGroup.author || ''"
+              :width="200"
+              :height="300"
+              priority="high"
             />
-            <div v-else class="cover-skeleton">
-              <n-spin size="small" />
-            </div>
           </div>
 
           <!-- Info Section -->
@@ -191,6 +189,7 @@ import {
   NSkeleton
 } from 'naive-ui'
 import ShowcaseCard from '@components/ShowcaseCard.vue'
+import CoverImage from '@components/CoverImage.vue'
 import GlassSearchBar from '@components/GlassSearchBar.vue'
 import GlassSelect from '@components/GlassSelect.vue'
 import GlassTitle from '@components/GlassTitle.vue'
@@ -238,7 +237,6 @@ const loading = ref(false)
 const groups = ref([])
 const detailGroup = ref(null)
 const detailElement = ref(null)
-const detailCoverUrl = ref('')
 const detailDescription = ref('')
 const descriptionLoading = ref(false)
 const descriptionCollapsed = ref(true)
@@ -334,7 +332,6 @@ const clearSearch = () => {
 const showDetail = async (group) => {
   console.log('showDetail called with:', group)
   detailGroup.value = group
-  detailCoverUrl.value = ''
   detailDescription.value = ''
   descriptionCollapsed.value = true
 
@@ -355,9 +352,8 @@ const showDetail = async (group) => {
     detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Load cover and description separately for lazy loading effect
+  // Fetch description separately (CoverImage component handles cover loading)
   if (group.mam_id && group.display_title) {
-    // Start description loading
     descriptionLoading.value = true
 
     try {
@@ -368,17 +364,13 @@ const showDetail = async (group) => {
         max_retries: '3'
       })
 
-      // Set cover URL
-      detailCoverUrl.value = data.cover_url || ''
-
       // Set description if available
       if (data.description) {
         detailDescription.value = data.description
       }
     } catch (err) {
-      console.warn('Failed to load detail cover and description:', err)
+      console.warn('Failed to load description:', err)
     } finally {
-      // Stop loading after fetch completes
       descriptionLoading.value = false
     }
   }
@@ -386,7 +378,6 @@ const showDetail = async (group) => {
 
 const closeDetail = () => {
   detailGroup.value = null
-  detailCoverUrl.value = ''
   detailDescription.value = ''
   descriptionLoading.value = false
   clearVersionsData()
@@ -405,7 +396,6 @@ const searchThisTitle = () => {
 
   // Close detail view
   detailGroup.value = null
-  detailCoverUrl.value = ''
   detailDescription.value = ''
 
   // Set search parameters
@@ -429,7 +419,6 @@ const restoreDetailFromUrl = async () => {
   if (group) {
     // Show detail without updating URL (already in URL)
     detailGroup.value = group
-    detailCoverUrl.value = ''
     detailDescription.value = ''
     descriptionCollapsed.value = true
 
@@ -442,7 +431,7 @@ const restoreDetailFromUrl = async () => {
       detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
 
-    // Load cover and description with loading state
+    // Fetch description separately (CoverImage component handles cover loading)
     if (group.mam_id && group.display_title) {
       descriptionLoading.value = true
 
@@ -452,12 +441,11 @@ const restoreDetailFromUrl = async () => {
         author: group.author || '',
         max_retries: '3'
       }).then(data => {
-        detailCoverUrl.value = data.cover_url || ''
         if (data.description) {
           detailDescription.value = data.description
         }
       }).catch(err => {
-        console.warn('Failed to load detail cover and description:', err)
+        console.warn('Failed to load description:', err)
       }).finally(() => {
         descriptionLoading.value = false
       })
@@ -494,7 +482,6 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   } else if (!newDetail && oldDetail) {
     // Detail parameter removed - close detail view
     detailGroup.value = null
-    detailCoverUrl.value = ''
     detailDescription.value = ''
     descriptionLoading.value = false
     clearVersionsData()

@@ -6,14 +6,18 @@
 
 import { ref, computed, h } from 'vue'
 import { NButton, NTooltip } from 'naive-ui'
+import { useBreakpoints } from '@vueuse/core'
 import { escapeHtml } from '@core/utils.js'
 
 /**
  * Create column definitions for series results table
  * @param {Function} onSelect - Callback for View button click
+ * @param {Object} responsive - { isMobile, isTablet } breakpoint flags
  * @returns {Array} Column configuration for n-data-table
  */
-function createSeriesColumns(onSelect) {
+function createSeriesColumns(onSelect, responsive = {}) {
+  const { isMobile = false, isTablet = false } = responsive
+
   return [
     {
       title: 'Series',
@@ -21,7 +25,10 @@ function createSeriesColumns(onSelect) {
       minWidth: 250,
       sorter: (a, b) => (a.series_name || '').localeCompare(b.series_name || ''),
       render(row) {
-        return h('span', {}, escapeHtml(row.series_name || ''))
+        return h('span', {
+          class: 'responsive-title',
+          title: row.series_name || ''  // Native tooltip for full text on hover
+        }, escapeHtml(row.series_name || ''))
       }
     },
     {
@@ -63,9 +70,11 @@ function createSeriesColumns(onSelect) {
     {
       title: 'Action',
       key: 'action',
-      width: 100,
+      width: isMobile ? 80 : 100,
       align: 'center',
       render(row) {
+        // Responsive button labels: Mobile: 'View', Tablet/Desktop: 'View'
+        // (All sizes use 'View' for series - simple action)
         return h(NButton, {
           size: 'small',
           type: 'primary',
@@ -78,9 +87,12 @@ function createSeriesColumns(onSelect) {
 
 /**
  * Create column definitions for books within a series
+ * @param {Object} responsive - { isMobile, isTablet } breakpoint flags
  * @returns {Array} Column configuration for n-data-table
  */
-function createBooksColumns() {
+function createBooksColumns(responsive = {}) {
+  const { isMobile = false, isTablet = false } = responsive
+
   return [
     {
       title: 'Title',
@@ -130,6 +142,16 @@ export function useSeriesDataTable(config = {}) {
     defaultPageSize = 20
   } = config
 
+  // Responsive breakpoints using @vueuse/core
+  const breakpoints = useBreakpoints({
+    mobile: 0,      // 0-767px
+    tablet: 768,    // 768-1023px
+    desktop: 1024   // 1024px+
+  })
+
+  const isMobile = computed(() => breakpoints.smaller('tablet').value)
+  const isTablet = computed(() => breakpoints.between('tablet', 'desktop').value)
+
   // Table ref for programmatic control
   const tableRef = ref(null)
 
@@ -145,8 +167,31 @@ export function useSeriesDataTable(config = {}) {
     showQuickJumper: true
   })
 
-  // Column definitions
-  const columns = computed(() => createSeriesColumns(onSelect))
+  // Column definitions with responsive filtering
+  const columns = computed(() => {
+    const allColumns = createSeriesColumns(
+      onSelect,
+      { isMobile: isMobile.value, isTablet: isTablet.value }
+    )
+
+    // Filter columns based on screen size
+    // Mobile: Show only series name and action
+    if (isMobile.value) {
+      return allColumns.filter(col =>
+        ['series_name', 'action'].includes(col.key)
+      )
+    }
+
+    // Tablet: Hide book_count and readers_count
+    if (isTablet.value) {
+      return allColumns.filter(col =>
+        !['book_count', 'readers_count'].includes(col.key)
+      )
+    }
+
+    // Desktop: Show all columns
+    return allColumns
+  })
 
   // Set table data
   const setData = (newData) => {
@@ -183,6 +228,16 @@ export function useBooksDataTable(config = {}) {
     defaultPageSize = 10
   } = config
 
+  // Responsive breakpoints using @vueuse/core
+  const breakpoints = useBreakpoints({
+    mobile: 0,      // 0-767px
+    tablet: 768,    // 768-1023px
+    desktop: 1024   // 1024px+
+  })
+
+  const isMobile = computed(() => breakpoints.smaller('tablet').value)
+  const isTablet = computed(() => breakpoints.between('tablet', 'desktop').value)
+
   const tableRef = ref(null)
   const data = ref([])
 
@@ -191,7 +246,27 @@ export function useBooksDataTable(config = {}) {
     showQuickJumper: true
   })
 
-  const columns = computed(() => createBooksColumns())
+  // Column definitions with responsive filtering
+  const columns = computed(() => {
+    const allColumns = createBooksColumns({
+      isMobile: isMobile.value,
+      isTablet: isTablet.value
+    })
+
+    // Filter columns based on screen size
+    // Mobile: Show only title
+    if (isMobile.value) {
+      return allColumns.filter(col => col.key === 'title')
+    }
+
+    // Tablet: Hide release_year
+    if (isTablet.value) {
+      return allColumns.filter(col => col.key !== 'release_year')
+    }
+
+    // Desktop: Show all columns
+    return allColumns
+  })
 
   const setData = (newData) => {
     data.value = newData || []

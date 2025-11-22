@@ -9,6 +9,7 @@ from sqlalchemy import text
 from db import engine
 from db.db import covers_engine
 from config import COVERS_DIR
+from covers import CoverService
 from qb_client import qb_login_sync
 from torrent_helpers import (
     get_torrent_state,
@@ -19,61 +20,6 @@ from torrent_helpers import (
 )
 
 router = APIRouter()
-
-
-def _resolve_cover_url(mam_id: str, abs_cover_url: str, logger) -> str:
-    """
-    Resolve cover URL, falling back to ABS URL if local file doesn't exist.
-
-    Args:
-        mam_id: MAM torrent ID
-        abs_cover_url: Current cover URL from history (might be local or remote)
-        logger: Logger instance
-
-    Returns:
-        Valid cover URL (either local if exists, or original ABS URL)
-    """
-    if not abs_cover_url:
-        return abs_cover_url
-
-    # Check if it's a local cover path
-    if abs_cover_url.startswith("/covers/"):
-        filename = abs_cover_url.split("/")[-1]
-        local_path = COVERS_DIR / filename
-
-        # If local file exists, return it
-        if local_path.exists():
-            logger.debug(f"[HISTORY] Local cover exists for MAM ID {mam_id}: {abs_cover_url}")
-            return abs_cover_url
-
-        # Local file missing - look up original ABS URL from covers database
-        logger.info(f"[HISTORY] Local cover missing for MAM ID {mam_id}, looking up ABS URL")
-        try:
-            with covers_engine.begin() as cx:
-                row = cx.execute(text("""
-                    SELECT cover_url FROM covers
-                    WHERE mam_id = :mam_id
-                    LIMIT 1
-                """), {"mam_id": mam_id}).fetchone()
-
-                if row and row[0]:
-                    original_url = row[0]
-                    # Make sure we're returning the remote ABS URL, not another local path
-                    if not original_url.startswith("/covers/"):
-                        logger.info(f"[HISTORY] Using original ABS URL for MAM ID {mam_id}: {original_url}")
-                        return original_url
-                    else:
-                        logger.warning(f"[HISTORY] Covers DB also has local path for MAM ID {mam_id}, returning None")
-                        return ""
-                else:
-                    logger.warning(f"[HISTORY] No cover found in covers DB for MAM ID {mam_id}")
-                    return ""
-        except Exception as e:
-            logger.error(f"[HISTORY] Error looking up cover for MAM ID {mam_id}: {e}")
-            return ""
-
-    # It's already a remote URL (ABS or other), return as-is
-    return abs_cover_url
 
 
 @router.get("/api/history")
@@ -96,16 +42,20 @@ def history():
 
     logger.info(f"[HISTORY] Found {len(rows)} history items in database")
 
-    # Fix cover URLs - replace missing local files with ABS URLs
+    # Fix cover URLs using unified CoverService
+    cover_service = CoverService()
     rows_fixed = []
     for row in rows:
         row_dict = dict(row)
-        if row_dict.get("mam_id") and row_dict.get("abs_cover_url"):
-            row_dict["abs_cover_url"] = _resolve_cover_url(
-                row_dict["mam_id"],
-                row_dict["abs_cover_url"],
-                logger
+        if row_dict.get("mam_id"):
+            # Use unified cover resolution method
+            cover_data = cover_service.resolve_cover_url(
+                mam_id=row_dict["mam_id"],
+                current_url=row_dict.get("abs_cover_url")
             )
+            row_dict["abs_cover_url"] = cover_data.get('cover_url')
+            # Optional: Add healing flag for frontend (not currently used)
+            # row_dict["cover_needs_heal"] = cover_data.get('needs_heal', False)
         rows_fixed.append(row_dict)
 
     items = []

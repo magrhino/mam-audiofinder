@@ -6,6 +6,7 @@
 
 import { ref, computed, h } from 'vue'
 import { NButton, NTag, NTooltip } from 'naive-ui'
+import { useBreakpoints } from '@vueuse/core'
 import { formatSize, escapeHtml } from '@core/utils.js'
 import CoverImage from '../../components/CoverImage.vue'
 import AudiobookFormatIcon from '../../components/icons/AudiobookFormatIcon.vue'
@@ -14,33 +15,78 @@ import SeedersIcon from '../../components/icons/SeedersIcon.vue'
 import DateUploadedIcon from '../../components/icons/DateUploadedIcon.vue'
 
 /**
+ * Parse size values to bytes for accurate sorting
+ * Handles both numeric bytes and string formats like "1.1 GiB" or ".768 MiB"
+ * @param {number|string} size - Size value (numeric bytes or string with unit)
+ * @returns {number} Size in bytes (0 for invalid input)
+ */
+function parseSizeToBytes(size) {
+  if (size == null || size === '') return 0
+
+  // If already numeric, return as-is
+  const numericSize = Number(size)
+  if (Number.isFinite(numericSize)) return numericSize
+
+  // Parse string format like "1.1 GiB" or "768 MiB"
+  const match = String(size).match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)?$/i)
+  if (!match) return 0
+
+  const value = parseFloat(match[1])
+  const unit = (match[2] || 'B').toUpperCase()
+
+  // Multipliers for decimal (KB, MB, GB) and binary (KiB, MiB, GiB) units
+  const multipliers = {
+    'B': 1,
+    'KB': 1000,
+    'MB': 1000000,
+    'GB': 1000000000,
+    'TB': 1000000000000,
+    'KIB': 1024,
+    'MIB': 1048576,
+    'GIB': 1073741824,
+    'TIB': 1099511627776
+  }
+
+  return value * (multipliers[unit] || 1)
+}
+
+/**
  * Create column definitions based on view type
  * @param {string} viewType - 'search' | 'history' | 'showcase'
  * @param {object} callbacks - { onAdd, onVerify, onDelete, isItemLoading }
+ * @param {object} responsive - { isMobile, isTablet } breakpoint flags
  * @returns {Array} Column configuration for n-data-table
  */
-function createColumns(viewType, callbacks) {
+function createColumns(viewType, callbacks, responsive = {}) {
   const { onAdd, onVerify, onDelete, isItemLoading } = callbacks
+  const { isMobile = false, isTablet = false } = responsive
 
   const columns = {
-    // Cover column with library indicator using NaiveUI n-image with lazy loading
+    // Cover column with library indicator, tooltip, and MAM link functionality
     cover: {
       title: 'Cover',
       key: 'cover',
       width: 80,
       render(row) {
-        return h(CoverImage, {
-          mamId: String(row.id || ''),
-          title: row.title || '',
-          author: row.author_info || row.author || '',
-          width: 60,
-          height: 80,
-          inLibrary: row.in_abs_library || false
+        return h(NTooltip, {}, {
+          trigger: () => h(CoverImage, {
+            mamId: String(row.id || ''),
+            title: row.title || '',
+            author: row.author_info || row.author || '',
+            width: 60,
+            height: 80,
+            inLibrary: row.in_abs_library || false,
+            onClick: row.id ? () => {
+              const url = `https://www.myanonamouse.net/t/${encodeURIComponent(row.id)}`
+              window.open(url, '_blank', 'noopener,noreferrer')
+            } : null
+          }),
+          default: () => 'Link to MAM Page'
         })
       }
     },
 
-    // Title column with escaping
+    // Title column with escaping and responsive truncation
     title: {
       title: 'Title',
       key: 'title',
@@ -50,7 +96,10 @@ function createColumns(viewType, callbacks) {
       },
       filterOptionValues: [],
       render(row) {
-        return h('span', {}, escapeHtml(row.title || ''))
+        return h('span', {
+          class: 'responsive-title',
+          title: row.title || ''  // Native tooltip for full text on hover
+        }, escapeHtml(row.title || ''))
       }
     },
 
@@ -126,7 +175,12 @@ function createColumns(viewType, callbacks) {
       key: 'size',
       minWidth: 100,
       align: 'right',
-      sorter: (row1, row2) => (row1.size || 0) - (row2.size || 0),
+      sorter: (row1, row2) => {
+        // Parse size values (handles both numeric bytes and string formats like "1.1 GiB")
+        const size1 = parseSizeToBytes(row1.size)
+        const size2 = parseSizeToBytes(row2.size)
+        return size1 - size2
+      },
       customNextSortOrder: (order) => {
         // Only toggle between ascend and descend (no unsorted state)
         if (order === 'ascend') return 'descend'
@@ -177,32 +231,20 @@ function createColumns(viewType, callbacks) {
       }
     },
 
-    // MAM link column
-    link: {
-      title: 'Link',
-      key: 'link',
-      align: 'center',
-      width: 60,
-      render(row) {
-        if (!row.id) return null
-        const url = `https://www.myanonamouse.net/t/${encodeURIComponent(row.id)}`
-        return h('a', {
-          href: url,
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          title: 'Open on MAM'
-        }, '🔗')
-      }
-    },
-
     // Add action column (search view)
     addAction: {
       title: 'Add',
       key: 'action',
-      width: 120,
+      width: isMobile ? 60 : (isTablet ? 90 : 120),
       render(row) {
         const isDisabled = !(row.dl || row.id)
         const itemLoading = isItemLoading ? isItemLoading(row.id) : false
+
+        // Responsive button labels: Mobile: '+', Tablet: 'Add', Desktop: 'Add to qBittorrent'
+        const buttonLabel = itemLoading
+          ? (isMobile ? '...' : 'Adding...')
+          : (isMobile ? '+' : (isTablet ? 'Add' : 'Add to qBittorrent'))
+
         return h(NButton, {
           size: 'small',
           type: 'primary',
@@ -211,8 +253,7 @@ function createColumns(viewType, callbacks) {
           loading: itemLoading,
           onClick: () => onAdd && onAdd(row)
         }, {
-          default: () => itemLoading ? 'Adding...' : 'Add',
-          icon: itemLoading ? undefined : () => h('span', '+')
+          default: () => buttonLabel
         })
       }
     },
@@ -320,7 +361,6 @@ function createColumns(viewType, callbacks) {
       columns.size,
       columns.seeders,
       columns.uploaded,
-      columns.link,
       columns.addAction
     ],
     history: [
@@ -366,6 +406,16 @@ export function useMAMSearchDataTable(config = {}) {
     defaultPageSize = 25
   } = config
 
+  // Responsive breakpoints using @vueuse/core
+  const breakpoints = useBreakpoints({
+    mobile: 0,      // 0-767px
+    tablet: 768,    // 768-1023px
+    desktop: 1024   // 1024px+
+  })
+
+  const isMobile = computed(() => breakpoints.smaller('tablet').value)
+  const isTablet = computed(() => breakpoints.between('tablet', 'desktop').value)
+
   // Table ref for programmatic control
   const tableRef = ref(null)
 
@@ -381,12 +431,33 @@ export function useMAMSearchDataTable(config = {}) {
     showQuickJumper: true
   })
 
-  // Column definitions
+  // Column definitions with responsive filtering
   const columns = computed(() => {
-    return createColumns(
+    const allColumns = createColumns(
       viewType,
-      { onAdd, onVerify, onDelete, isItemLoading }
+      { onAdd, onVerify, onDelete, isItemLoading },
+      { isMobile: isMobile.value, isTablet: isTablet.value }
     )
+
+    // Filter columns based on screen size
+    if (viewType === 'search') {
+      // Mobile: Show only essential columns (cover, title, size, actions)
+      if (isMobile.value) {
+        return allColumns.filter(col =>
+          ['cover', 'title', 'size', 'action'].includes(col.key)
+        )
+      }
+
+      // Tablet: Hide less critical columns (format, uploaded)
+      if (isTablet.value) {
+        return allColumns.filter(col =>
+          !['format', 'uploaded'].includes(col.key)
+        )
+      }
+    }
+
+    // Desktop or other views: Show all columns
+    return allColumns
   })
 
   // Programmatic table controls

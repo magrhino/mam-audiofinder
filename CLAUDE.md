@@ -217,7 +217,9 @@ NavBar, HealthIndicator, ResultRow, HistoryRow, ShowcaseCard, SeriesTable, Glass
 - `useApi()` - API wrapper (reuses legacy `app/static/js/core/api.js`)
 - `useCoverLoader()` - Lazy image loading with IntersectionObserver
 - `useHistoryLiveUpdates()` - Real-time history updates (auto-refresh)
-- `useMAMSearchDataTable()` - NaiveUI table configuration for search results
+- `useMAMSearchDataTable()` - NaiveUI table configuration for search results with responsive column filtering, clickable covers with MAM links, and smart size sorting
+- `useSeriesDataTable()` - NaiveUI table configuration for Hardcover series results with responsive column filtering
+- `useCover()` - Cover URL fetching with in-memory caching (5-min TTL, LRU eviction)
 - `useBreakpoints()` - (@vueuse/core) Responsive breakpoint detection (mobile: 0, tablet: 768, desktop: 1024)
 
 **Styling System:**
@@ -518,6 +520,8 @@ const scrollX = computed(() => {
 - Prefer reactive computed properties over direct window.innerWidth checks
 - Component props and table settings should adapt to screen size
 - Mobile-first approach with progressive enhancement
+- Use `responsive-title` shortcut for text truncation with native tooltips showing full text on hover
+- Table columns should filter based on screen size (essential columns on mobile, progressive enhancement for tablet/desktop)
 
 ### Database Migrations
 
@@ -536,6 +540,16 @@ ShelfArr uses UnoCSS as the primary styling system. UnoCSS is an atomic CSS engi
 - `build/frontend/uno.config.js` - Defines presets, shortcuts, and custom rules
 - `build/frontend/src/styles/global.css` - CSS custom properties, resets, and base styles
 - `build/frontend/src/theme/naive.js` - NaiveUI component theme overrides
+
+**Key UnoCSS Shortcuts:**
+- `glass-panel` - Premium glassmorphism panel with backdrop blur and border
+- `glass-panel-hover` - Hover state with maroon border and enhanced shadow
+- `glass-overlay` - Glass overlay with pseudo-element shine effect
+- `responsive-title` - Responsive title with word-aware truncation using clamp() (120px-30vw-400px)
+- `card` - Glass card container with rounded corners and padding
+- `panel` - Simple panel with backdrop blur
+- `muted` - Muted text color (#b8b8b8) at 0.9rem
+- `heading-1`, `heading-3` - Typography presets
 
 **Styling Priority:**
 1. **UnoCSS utilities** - Use for spacing, layout, colors (e.g., `flex`, `p-4`, `bg-gray-900`)

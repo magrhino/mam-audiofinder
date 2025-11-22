@@ -1,5 +1,10 @@
 <template>
-  <div class="cover-container" :style="{ position: 'relative', width: `${width}px`, height: `${height}px` }">
+  <div
+    class="cover-container"
+    :class="{ 'clickable': onClick }"
+    :style="{ position: 'relative', width: `${width}px`, height: `${height}px` }"
+    @click="handleClick"
+  >
     <n-image
       v-if="localCoverUrl"
       :src="localCoverUrl"
@@ -8,9 +13,9 @@
       lazy
       :fallback-src="fallbackSrc"
       object-fit="cover"
-      :intersection-observer-options="{
-        rootMargin: '50px'
-      }"
+      :intersection-observer-options="intersectionOptions"
+      @load="handleLoad"
+      @error="handleError"
     >
       <template #placeholder>
         <div class="cover-skeleton" :style="{ width: `${width}px`, height: `${height}px` }">
@@ -41,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { NImage } from 'naive-ui'
 import { useCover } from '@composables/naive/useCover'
 
@@ -52,8 +57,26 @@ const props = defineProps({
   width: { type: Number, default: 60 },
   height: { type: Number, default: 80 },
   inLibrary: { type: Boolean, default: false },
-  fallbackSrc: { type: String, default: '' }
+  fallbackSrc: { type: String, default: '' },
+  priority: {
+    type: String,
+    default: 'normal',
+    validator: (value) => ['high', 'normal', 'low'].includes(value)
+  },
+  onClick: { type: Function, default: null }
 })
+
+const emit = defineEmits(['loaded', 'error', 'click'])
+
+// Computed intersection observer options based on priority
+const intersectionOptions = computed(() => ({
+  rootMargin: {
+    high: '200px',    // Load early for high priority (e.g., detail views)
+    normal: '50px',   // Standard preload (default)
+    low: '0px'        // Load only when in viewport (e.g., below-fold content)
+  }[props.priority],
+  threshold: 0.01
+}))
 
 const { coverUrl, error, fetchCover } = useCover({
   mamId: props.mamId,
@@ -77,12 +100,37 @@ watch(coverUrl, (newUrl) => {
     localCoverUrl.value = newUrl
   }
 })
+
+// Event handlers
+function handleLoad() {
+  emit('loaded', { mamId: props.mamId, url: localCoverUrl.value })
+}
+
+function handleError(err) {
+  emit('error', { mamId: props.mamId, error: err })
+}
+
+function handleClick() {
+  if (props.onClick) {
+    props.onClick({ mamId: props.mamId, title: props.title, author: props.author })
+  }
+  emit('click', { mamId: props.mamId, title: props.title, author: props.author })
+}
 </script>
 
 <style scoped>
 .cover-container {
   position: relative;
   display: inline-block;
+}
+
+.cover-container.clickable {
+  cursor: pointer;
+}
+
+.cover-container.clickable:hover {
+  opacity: 0.9;
+  transition: opacity 0.2s ease;
 }
 
 .cover-skeleton {

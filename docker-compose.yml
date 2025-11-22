@@ -1,5 +1,5 @@
 services:
-  mam-audiofinder:
+  shelfarr:
     build:
       context: .
       dockerfile: build/Dockerfile
@@ -7,8 +7,8 @@ services:
       args:
         PUID: ${PUID}
         PGID: ${PGID}
-    image: ghcr.io/raygan/mam-audiofinder:latest
-    container_name: mam-audiofinder
+    image: ghcr.io/magrhino/shelfarr:latest
+    container_name: shelfarr
     networks:
       - nginx-network # only had if you want to run on local network
     ports:
@@ -25,21 +25,6 @@ services:
       - ${DATA_DIR}:/data
       - ${MEDIA_ROOT}:/media
     restart: unless-stopped
-
-  selenium:
-    image: selenium/standalone-chrome:latest
-    container_name: mam-audiofinder-selenium
-    ports:
-      - "4444:4444"
-      - "7900:7900"  # VNC server for debugging (optional)
-    shm_size: 2gb
-    environment:
-      - SE_NODE_MAX_SESSIONS=5
-      - SE_NODE_SESSION_TIMEOUT=300
-      - SE_VNC_NO_PASSWORD=1
-    restart: unless-stopped
-    profiles:
-      - testing  # Only start with: docker compose --profile testing up
 
 networks:
    nginx-network:
