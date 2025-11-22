@@ -17,6 +17,61 @@ router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
 
 
+def filter_omnibus_books(books: List[dict], debug: bool = False) -> List[dict]:
+    """
+    FastAPI dependency: Filter out combined/omnibus editions.
+
+    Detects and removes box sets or collections that contain multiple books
+    in one title (e.g., "Book 1 / Book 2 / Book 3").
+
+    Args:
+        books: List of book dictionaries with 'title' field
+        debug: Enable debug logging
+
+    Returns:
+        Filtered list excluding omnibus editions
+    """
+    if not books:
+        return books
+
+    def is_combined_title(title: str) -> bool:
+        """Detect if a title is a combined/omnibus edition."""
+        if not isinstance(title, str):
+            return False
+        # Check for slash separators (common in omnibus titles)
+        # Must have spaces around slash to avoid false positives like "and/or"
+        if " / " in title:
+            # Count how many slashes - 2+ slashes likely means combined title
+            slash_count = title.count(" / ")
+            if slash_count >= 2:
+                return True
+            # Even with 1 slash, if title is very long (>80 chars), likely omnibus
+            if slash_count >= 1 and len(title) > 80:
+                return True
+        return False
+
+    filtered_books = []
+    filtered_count = 0
+
+    for book in books:
+        if not isinstance(book, dict):
+            continue
+
+        title = book.get('title', '')
+
+        if is_combined_title(title):
+            filtered_count += 1
+            if debug:
+                logger.debug(f"🗑️  Filtered out combined/omnibus: '{title}'")
+        else:
+            filtered_books.append(book)
+
+    if filtered_count > 0:
+        logger.info(f"🔍 Filtered out {filtered_count} combined/omnibus edition(s)")
+
+    return filtered_books
+
+
 class SeriesSearchRequest(BaseModel):
     """Request model for series search."""
     title: str
@@ -129,126 +184,48 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
     Returns:
         Dictionary with series info and enriched books array, or None if not found
     """
-    # Step 1: Get series info and book titles
+    # Step 1: Get series info and books from Hardcover
     series_data = await hardcover_client.list_series_books(series_id)
 
     if not series_data:
         return None
 
-    book_titles = series_data.get("books", [])
+    books = series_data.get("books", [])
     series_author = series_data.get("author_name", "")
 
-    logger.info(f"📋 Raw book titles from Hardcover API ({len(book_titles)} total): {book_titles}")
+    logger.info(f"📋 Raw books from Hardcover API ({len(books)} total): {books}")
 
-    # Step 1: Filter out combined/omnibus titles (e.g., "Book 1 / Book 2 / Book 3")
-    # These are box sets or collections that contain multiple books in one title
-    def is_combined_title(title: str) -> bool:
-        """Detect if a title is a combined/omnibus edition."""
-        if not isinstance(title, str):
-            return False
-        # Check for slash separators (common in omnibus titles)
-        # Must have spaces around slash to avoid false positives like "and/or"
-        if " / " in title:
-            # Count how many slashes - 2+ slashes likely means combined title
-            slash_count = title.count(" / ")
-            if slash_count >= 2:
-                return True
-            # Even with 1 slash, if title is very long (>80 chars), likely omnibus
-            if slash_count >= 1 and len(title) > 80:
-                return True
-        return False
+    # Step 2: Filter out omnibus editions using dependency
+    # Note: Deduplication already done by hardcover_client._deduplicate_books()
+    filtered_books = filter_omnibus_books(books, debug=True)
 
-    filtered_titles = []
-    for title in book_titles:
-        if isinstance(title, str):
-            if is_combined_title(title):
-                logger.warning(f"🗑️  Filtered out combined/omnibus title: '{title}'")
-            else:
-                filtered_titles.append(title)
+    logger.info(f"📖 Processing {len(filtered_books)} books for series '{series_data.get('series_name')}'")
 
-    if len(filtered_titles) < len(book_titles):
-        logger.info(f"🔍 Filtered out {len(book_titles) - len(filtered_titles)} combined/omnibus title(s)")
-
-    # Step 2: Deduplicate book titles (Hardcover API sometimes returns duplicates)
-    # Use dict to preserve order while removing case-insensitive duplicates
-    seen_titles = {}
-    unique_titles = []
-    for title in filtered_titles:
-        if isinstance(title, str):
-            # Normalize title for comparison (lowercase, strip whitespace)
-            normalized = title.strip().lower()
-            if normalized and normalized not in seen_titles:
-                seen_titles[normalized] = True
-                unique_titles.append(title)
-            else:
-                # Log each duplicate found
-                logger.warning(f"⚠️  Duplicate book title detected and removed: '{title}'")
-
-    if len(unique_titles) < len(filtered_titles):
-        logger.warning(f"🔍 Deduplication: Removed {len(filtered_titles) - len(unique_titles)} duplicate(s) from series '{series_data.get('series_name')}'")
-        logger.info(f"   Before dedup: {filtered_titles}")
-        logger.info(f"   After dedup: {unique_titles}")
-
-    logger.info(f"📖 Enriching {len(unique_titles)} unique books for series '{series_data.get('series_name')}'")
-
-    # Step 3: Enrich each book title with full details
+    # Step 3: Format books for output
+    # Books already have basic info from list_series_books (title, subtitle, position, book_id)
+    # No need for additional search_book_by_title() calls
     enriched_books = []
-    for book_title in unique_titles:
-        if not book_title or not isinstance(book_title, str):
+    for book in filtered_books:
+        if not isinstance(book, dict):
             continue
 
-        try:
-            # Search for book details by title
-            book_results = await hardcover_client.search_book_by_title(
-                title=book_title,
-                author=series_author,
-                limit=1
-            )
+        book_title = book.get("title", "")
+        if not book_title:
+            continue
 
-            if book_results and len(book_results) > 0:
-                # Use the first match
-                book_info = book_results[0]
+        enriched_books.append({
+            "book_id": book.get("book_id"),
+            "title": book_title,
+            "author": series_author,
+            "author_name": series_author,
+            "release_year": None,  # Not available from list_series_books
+            "description": "",
+            "cover_url": "",
+            "subtitle": book.get("subtitle"),
+            "position": book.get("position")
+        })
 
-                # Format authors as comma-separated string
-                authors_list = book_info.get("authors", [])
-                author_str = ", ".join(authors_list) if authors_list else series_author
-
-                enriched_books.append({
-                    "book_id": book_info.get("book_id"),
-                    "title": book_info.get("title", book_title),
-                    "author": author_str,
-                    "author_name": author_str,  # Support both field names
-                    "release_year": book_info.get("release_year"),
-                    "description": book_info.get("description", ""),
-                    "cover_url": book_info.get("cover_url", "")
-                })
-            else:
-                # Fallback: use title only with series author
-                logger.debug(f"⚠️  No detailed info found for '{book_title}', using title only")
-                enriched_books.append({
-                    "book_id": None,
-                    "title": book_title,
-                    "author": series_author,
-                    "author_name": series_author,
-                    "release_year": None,
-                    "description": "",
-                    "cover_url": ""
-                })
-
-        except Exception as e:
-            logger.warning(f"⚠️  Failed to enrich book '{book_title}': {e}")
-            # Add fallback entry
-            enriched_books.append({
-                "book_id": None,
-                "title": book_title,
-                "author": series_author,
-                "author_name": series_author,
-                "release_year": None,
-                "description": "",
-                "cover_url": ""
-            })
-
-    logger.info(f"✅ Enriched {len(enriched_books)} books with detailed info")
+    logger.info(f"✅ Formatted {len(enriched_books)} books with basic info")
 
     return {
         "series_id": series_data.get("series_id"),
@@ -260,64 +237,71 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
 
 async def enrich_books_with_abs(
     books: List[dict],
-    series_author: str,
-    per_page: int = 5,
-    page: int = 1
-) -> dict:
+    series_author: str
+) -> List[dict]:
     """
     Translation layer: Enrich Hardcover books with ABS data.
 
-    Fetches covers and library status from Audiobookshelf for each book,
-    returning ShowcaseCard-compatible format with pagination.
+    Fetches covers, library status, and enhanced metadata from Audiobookshelf
+    for each book, returning ShowcaseCard-compatible format.
 
     Args:
         books: Hardcover-enriched books from get_book_series_info()
         series_author: Series author for ABS lookups
-        per_page: Number of books per page (default: 5)
-        page: Page number, 1-indexed (default: 1)
 
     Returns:
-        Dictionary with:
-        - books: List of ShowcaseCard-compatible book objects
-        - total: Total number of books
-        - page: Current page number
-        - per_page: Books per page
-        - total_pages: Total number of pages
-        - has_next: Whether there's a next page
-        - has_prev: Whether there's a previous page
+        List of ShowcaseCard-compatible book objects with enhanced metadata
     """
-    logger.info(f"📚 Enriching {len(books)} books with ABS data (page {page}, per_page {per_page})")
-
-    # Calculate pagination indices (page is 1-indexed)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-
-    paginated_books = books[start_idx:end_idx]
-    total_pages = (len(books) + per_page - 1) // per_page  # Ceiling division
-
-    logger.info(f"📄 Processing books {start_idx + 1}-{min(end_idx, len(books))} of {len(books)}")
+    logger.info(f"📚 Enriching {len(books)} books with ABS data")
 
     # Enrich each book with ABS data (5 concurrent requests max)
     semaphore = asyncio.Semaphore(5)
 
     async def enrich_single_book(book: dict) -> dict:
-        """Enrich a single book with ABS cover and library status."""
+        """Enrich a single book with ABS cover, library status, and provider metadata."""
         async with semaphore:
             book_title = book.get('title', '')
             book_author = book.get('author', series_author)
+            book_id = book.get('book_id')
 
-            # Fetch ABS cover (with cache)
-            cover_data = {}
+            # Enhanced metadata enrichment
+            enhanced_metadata = {}
+            cover_url = ''
+            item_id = None
+
             if abs_client.is_configured:
                 try:
-                    cover_data = await abs_client.fetch_cover(
-                        title=book_title,
-                        author=book_author,
-                        mam_id='',  # No MAM ID for Hardcover books
-                        force_refresh=False
-                    )
+                    # Try provider enrichment (Audible → Google → OpenLibrary)
+                    providers = ['audible', 'google', 'openlibrary']
+                    for provider in providers:
+                        logger.debug(f"🌐 Trying provider {provider} for '{book_title}'")
+                        result = await abs_client._fetch_from_provider(
+                            provider=provider,
+                            item_id=str(book_id) if book_id else '',
+                            title=book_title,
+                            author=book_author,
+                            fallback_title_only=True
+                        )
+                        if result:
+                            enhanced_metadata = result
+                            cover_url = result.get('cover', '')
+                            logger.info(f"✅ Enhanced metadata from {provider} for '{book_title}'")
+                            break
+
+                    # Fallback to basic fetch_cover if provider enrichment fails
+                    if not enhanced_metadata:
+                        logger.debug(f"🔄 Falling back to basic fetch_cover for '{book_title}'")
+                        cover_data = await abs_client.fetch_cover(
+                            title=book_title,
+                            author=book_author,
+                            mam_id='',
+                            force_refresh=False
+                        )
+                        cover_url = cover_data.get('cover_url', '')
+                        item_id = cover_data.get('item_id')
+
                 except Exception as e:
-                    logger.warning(f"⚠️  Failed to fetch ABS cover for '{book_title}': {e}")
+                    logger.warning(f"⚠️  Failed to enrich '{book_title}': {e}")
 
             # Check if in ABS library
             in_library = False
@@ -331,59 +315,52 @@ async def enrich_books_with_abs(
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to check library for '{book_title}': {e}")
 
-            # Return ShowcaseCard-compatible format
+            # Return ShowcaseCard-compatible format with enhanced metadata
             return {
                 "display_title": book_title,
                 "author": book_author,
-                "cover_url": cover_data.get('cover_url', ''),
-                "abs_item_id": cover_data.get('item_id'),
+                "cover_url": cover_url,
+                "abs_item_id": item_id or enhanced_metadata.get('id'),
                 "in_abs_library": in_library,
-                "description": book.get('description', ''),
+                "description": enhanced_metadata.get('description', book.get('description', '')),
                 "release_year": book.get('release_year'),
                 "book_id": book.get('book_id'),
-                "formats": [],  # N/A for Hardcover
-                "total_versions": 1,  # Always 1 for Hardcover
+                "formats": [],
+                "total_versions": 1,
                 "normalized_title": book_title.lower().replace(' ', '-'),
-                # Additional metadata for potential future use
-                "mam_id": None,  # No MAM ID for Hardcover books
-                "narrator": None  # Not available from Hardcover
+                "mam_id": None,
+                "narrator": enhanced_metadata.get('narrator'),
+                # Enhanced fields from provider
+                "series": enhanced_metadata.get('series', []),
+                "asin": enhanced_metadata.get('asin'),
+                "isbn": enhanced_metadata.get('isbn'),
+                "publisher": enhanced_metadata.get('publisher'),
+                "rating": enhanced_metadata.get('rating')
             }
 
     # Enrich books concurrently
     enriched = await asyncio.gather(*[
-        enrich_single_book(book) for book in paginated_books
+        enrich_single_book(book) for book in books
     ])
 
     logger.info(f"✅ Enriched {len(enriched)} books with ABS data")
 
-    return {
-        "books": enriched,
-        "total": len(books),
-        "page": page,
-        "per_page": per_page,
-        "total_pages": total_pages,
-        "has_next": page < total_pages,
-        "has_prev": page > 1
-    }
+    return enriched
 
 
 @router.get("/api/series/{series_id}/books")
 async def get_series_books(
     series_id: int,
-    per_page: int = 5,
-    page: int = 1,
     enrich_abs: bool = True
 ):
     """
-    Get books in a series from Hardcover with optional ABS enrichment and pagination.
+    Get books in a series from Hardcover with optional ABS enrichment.
 
     Path parameter:
         series_id: Hardcover series ID
 
     Query parameters:
-        per_page: Number of books per page (default: 5, max: 50)
-        page: Page number, 1-indexed (default: 1)
-        enrich_abs: Enable ABS enrichment (covers, library check) (default: true)
+        enrich_abs: Enable ABS enrichment (covers, library check, provider metadata) (default: true)
 
     Response (with enrich_abs=true):
         {
@@ -398,16 +375,14 @@ async def get_series_books(
                     "in_abs_library": true,
                     "description": "...",
                     "release_year": 2010,
+                    "series": [...],
+                    "asin": "...",
+                    "isbn": "...",
                     ...
                 },
                 ...
             ],
             "total": 10,
-            "page": 1,
-            "per_page": 5,
-            "total_pages": 2,
-            "has_next": true,
-            "has_prev": false,
             "timestamp": "2025-11-19T10:30:00Z"
         }
 
@@ -423,7 +398,7 @@ async def get_series_books(
                     "author": "Brandon Sanderson",
                     "release_year": 2010,
                     "description": "...",
-                    "cover_url": "https://..."  // Hardcover URL
+                    "cover_url": ""
                 },
                 ...
             ],
@@ -437,14 +412,7 @@ async def get_series_books(
             detail="Hardcover API not configured. Set HARDCOVER_API_TOKEN in environment."
         )
 
-    # Validate pagination parameters
-    if page < 1:
-        raise HTTPException(status_code=400, detail="Page must be >= 1")
-
-    if per_page < 1 or per_page > 50:
-        raise HTTPException(status_code=400, detail="per_page must be between 1 and 50")
-
-    logger.info(f"📚 Fetching books for series ID {series_id} (page={page}, per_page={per_page}, enrich_abs={enrich_abs})")
+    logger.info(f"📚 Fetching books for series ID {series_id} (enrich_abs={enrich_abs})")
 
     try:
         # Get Hardcover-enriched books
@@ -459,28 +427,27 @@ async def get_series_books(
         from datetime import datetime
 
         if enrich_abs and abs_client.is_configured:
-            # Apply ABS enrichment + pagination
+            # Apply ABS enrichment with provider metadata
             logger.info(f"🔍 Applying ABS enrichment to {len(result['books'])} books")
 
-            enriched_result = await enrich_books_with_abs(
+            enriched_books = await enrich_books_with_abs(
                 books=result['books'],
-                series_author=result['author_name'],
-                per_page=per_page,
-                page=page
+                series_author=result['author_name']
             )
 
             response = {
                 "series_id": result['series_id'],
                 "series_name": result['series_name'],
                 "author_name": result['author_name'],
-                **enriched_result,  # books, total, page, per_page, total_pages, has_next, has_prev
+                "books": enriched_books,
+                "total": len(enriched_books),
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             }
 
-            logger.info(f"✅ Returned {len(enriched_result['books'])} ABS-enriched books (page {page}/{enriched_result['total_pages']})")
+            logger.info(f"✅ Returned {len(enriched_books)} ABS-enriched books")
             return JSONResponse(response)
         else:
-            # Return original Hardcover data (no ABS enrichment, no pagination)
+            # Return original Hardcover data (no ABS enrichment)
             if not abs_client.is_configured and enrich_abs:
                 logger.warning("⚠️  ABS enrichment requested but ABS is not configured")
 
