@@ -499,9 +499,9 @@ class HardcoverClient:
         # Remove trailing articles: ", the", ", a", ", an"
         normalized = re.sub(r',\s*(the|a|an)\s*$', '', normalized)
 
-        # Remove series markers (Book 1, Bk. 1, Part 1, Vol. 1, #1, etc.)
-        normalized = re.sub(r'\b(book|bk|part|pt|vol|volume|edition|ed)\.?\s*\d+\b', '', normalized)
-        normalized = re.sub(r'#\d+\b', '', normalized)
+        # Remove only edition markers (not volume/book/part numbers which distinguish separate volumes)
+        # Keep volume numbers for graphic novels and multi-volume works (Vol. 1, Vol. 2, etc.)
+        normalized = re.sub(r'\b(edition|ed)\.?\s*\d+\b', '', normalized)
 
         # Remove leading articles (the, a, an)
         normalized = re.sub(r'^(the|a|an)\s+', '', normalized)
