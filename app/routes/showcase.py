@@ -2,7 +2,6 @@
 Showcase routes for MAM Audiobook Finder.
 Displays audiobooks in a grouped grid view similar to Audible.
 """
-import json
 import re
 import logging
 import httpx
@@ -14,6 +13,7 @@ from typing import Dict, List
 from config import MAM_BASE, MAM_COOKIE, ABS_CHECK_LIBRARY
 from abs_client import abs_client
 from mam_cache import get_cached_mam_search, cache_mam_search
+from dependencies.mam import normalize_mam_result
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -42,46 +42,6 @@ def normalize_title(title: str) -> str:
 
     # Convert to lowercase
     return s.lower()
-
-
-def flatten(v):
-    """Normalize MAM API response data (handles dicts, lists, JSON strings)."""
-    if isinstance(v, dict):
-        return ", ".join(str(x) for x in v.values())
-    if isinstance(v, list):
-        return ", ".join(str(x) for x in v)
-    if isinstance(v, str):
-        s = v.strip()
-        if s.startswith("{") or s.startswith("["):
-            try:
-                obj = json.loads(s)
-                if isinstance(obj, dict):
-                    return ", ".join(str(x) for x in obj.values())
-                if isinstance(obj, list):
-                    return ", ".join(str(x) for x in obj)
-            except Exception:
-                pass
-        s = re.sub(r'^\{|\}$', '', s)
-        parts = []
-        for chunk in s.split(","):
-            parts.append(chunk.split(":", 1)[-1])
-        parts = [p.strip().strip('"').strip("'") for p in parts if p.strip()]
-        return ", ".join(parts)
-    return "" if v is None else str(v)
-
-
-def detect_format(item: dict) -> str:
-    """Extract file format from torrent metadata."""
-    for key in ("format", "filetype", "container", "encoding", "format_name"):
-        val = item.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-    name = (item.get("title") or item.get("name") or "")
-    toks = re.findall(r'(?i)\b(mp3|m4b|flac|aac|ogg|opus|wav|alac|ape|epub|pdf|mobi|azw3|cbz|cbr)\b', name)
-    if toks:
-        uniq = list(dict.fromkeys(t.upper() for t in toks))
-        return "/".join(uniq)
-    return ""
 
 
 @router.get("/api/showcase")
@@ -164,27 +124,16 @@ async def showcase(
     groups_dict: Dict[str, List[dict]] = defaultdict(list)
 
     for item in raw.get("data", []):
-        # Convert to string to handle cases where MAM returns integers
-        title = str(item.get("title") or item.get("name") or "Unknown")
+        # Use shared MAM result normalizer
+        parsed_item = normalize_mam_result(item)
+
+        # Convert title to string and normalize for grouping
+        title = str(parsed_item.get("title") or "Unknown")
         normalized = normalize_title(title)
 
         # Skip empty titles
         if not normalized:
             continue
-
-        parsed_item = {
-            "id": str(item.get("id") or item.get("tid") or ""),
-            "title": title,
-            "author_info": flatten(item.get("author_info")),
-            "narrator_info": flatten(item.get("narrator_info")),
-            "format": detect_format(item),
-            "size": item.get("size"),
-            "seeders": item.get("seeders"),
-            "leechers": item.get("leechers"),
-            "catname": item.get("catname"),
-            "added": item.get("added"),
-            "dl": item.get("dl"),
-        }
 
         groups_dict[normalized].append(parsed_item)
 

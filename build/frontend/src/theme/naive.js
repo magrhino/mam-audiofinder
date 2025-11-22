@@ -1,11 +1,13 @@
 /**
  * Naive UI Custom Theme Configuration
- * Matches existing dark theme with maroon accents from main.css
+ * Dark charcoal → maroon atmospheric glassmorphism theme
+ * Features: translucent charcoal glass backgrounds, white text, maroon accents,
+ * subtle glass borders, and alternating table columns
  */
 
 export const customTheme = {
   common: {
-    // Primary maroon colors
+    // Primary maroon colors (oxblood maroon accents)
     primaryColor: '#500000',
     primaryColorHover: '#6a0000',
     primaryColorPressed: '#3a0000',
@@ -31,50 +33,50 @@ export const customTheme = {
     errorColorHover: '#bf4848',
     errorColorPressed: '#8f2727',
 
-    // Base backgrounds
-    baseColor: '#000000',
-    bodyColor: '#000000',
+    // Base backgrounds - charcoal with atmospheric gradient
+    baseColor: '#0a0a0a',              // Matte charcoal (matches gradient start)
+    bodyColor: '#0a0a0a',              // Body base charcoal
 
-    // Card/Panel backgrounds
-    cardColor: '#242424',
-    modalColor: '#242424',
-    popoverColor: '#2a2a2a',
-    tableColor: '#242424',
+    // Card/Panel backgrounds - translucent charcoal glass
+    cardColor: 'rgba(36, 36, 36, 0.7)',      // Glassmorphic card
+    modalColor: 'rgba(26, 26, 26, 0.9)',     // Modal backdrop (more opaque)
+    popoverColor: 'rgba(42, 42, 42, 0.8)',   // Popover glass
+    tableColor: 'rgba(36, 36, 36, 0.6)',     // Table base glass
 
-    // Text colors
-    textColorBase: '#e8e8e8',
-    textColor1: '#e8e8e8',
-    textColor2: '#b8b8b8',
-    textColor3: '#888888',
+    // Text colors - white/near-white for readability against dark gradient
+    textColorBase: '#ffffff',          // Pure white base text
+    textColor1: '#ffffff',             // Primary text (white)
+    textColor2: '#e8e8e8',             // Secondary text (near-white)
+    textColor3: '#b8b8b8',             // Tertiary text (light gray)
 
     // Placeholder text
-    placeholderColor: '#888888',
-    placeholderColorDisabled: '#5a5a5a',
+    placeholderColor: '#b8b8b8',       // Light gray placeholder
+    placeholderColorDisabled: '#888888',
 
     // Icon colors
-    iconColor: '#b8b8b8',
-    iconColorHover: '#e8e8e8',
-    iconColorPressed: '#888888',
-    iconColorDisabled: '#5a5a5a',
+    iconColor: '#e8e8e8',              // Near-white icons
+    iconColorHover: '#ffffff',         // Pure white on hover
+    iconColorPressed: '#b8b8b8',       // Light gray when pressed
+    iconColorDisabled: '#888888',
 
-    // Border colors
-    borderColor: '#3a3a3a',
-    dividerColor: '#2a2a2a',
+    // Border colors - subtle white glass borders
+    borderColor: 'rgba(255, 255, 255, 0.08)',    // Subtle glass border
+    dividerColor: 'rgba(255, 255, 255, 0.05)',   // Divider line
 
-    // Input backgrounds
-    inputColor: '#2a2a2a',
-    inputColorDisabled: '#1f1f1f',
+    // Input backgrounds - translucent glass
+    inputColor: 'rgba(42, 42, 42, 0.6)',         // Input field glass
+    inputColorDisabled: 'rgba(30, 30, 30, 0.4)', // Disabled input
 
-    // Hover states
-    hoverColor: 'rgba(80, 0, 0, 0.1)',
+    // Hover states - maroon tint overlay
+    hoverColor: 'rgba(80, 0, 0, 0.1)',           // Subtle maroon hover
 
-    // Pressed/Active states
-    pressedColor: 'rgba(80, 0, 0, 0.15)',
+    // Pressed/Active states - stronger maroon overlay
+    pressedColor: 'rgba(80, 0, 0, 0.15)',        // Maroon press effect
 
     // Opacity values
     opacityDisabled: '0.4',
 
-    // Border radius
+    // Border radius - premium rounded corners
     borderRadius: '6px',
     borderRadiusSmall: '4px',
 
@@ -93,30 +95,36 @@ export const customTheme = {
   },
 
   DataTable: {
-    // Header styling - Glassmorphic
-    thColor: 'rgba(42, 42, 42, 0.7)',
-    thColorHover: 'rgba(50, 50, 50, 0.8)',
-    thTextColor: '#e8e8e8',
+    // Header styling - glassmorphic with white text
+    thColor: 'rgba(36, 36, 36, 0.7)',              // Translucent charcoal header
+    thColorHover: 'rgba(80, 0, 0, 0.2)',           // Maroon hover overlay
+    thTextColor: '#ffffff',                         // White header text
     thFontWeight: '600',
-    thButtonColorHover: 'rgba(80, 0, 0, 0.2)',
-    thIconColor: '#b8b8b8',
-    thIconColorActive: '#6a0000',
+    thButtonColorHover: 'rgba(80, 0, 0, 0.2)',     // Maroon button hover
+    thIconColor: '#e8e8e8',                        // Near-white icons
+    thIconColorActive: '#6a0000',                  // Maroon active icon
 
-    // Cell styling - Glassmorphic
-    tdColor: 'rgba(36, 36, 36, 0.3)',
-    tdColorHover: 'rgba(80, 0, 0, 0.15)',
-    tdColorStriped: 'rgba(80, 0, 0, 0.08)',
-    tdTextColor: '#e8e8e8',
+    // Cell styling - glassmorphic with alternating column colors
+    tdColor: 'rgba(255, 255, 255, 0.05)',          // Base cell (very subtle)
+    tdColorHover: 'rgba(80, 0, 0, 0.15)',          // Maroon row hover
+    tdColorStriped: 'rgba(106, 0, 0, 0.12)',       // Maroon-tinted alternating rows
+    tdTextColor: '#ffffff',                         // White cell text
 
-    // Borders - Subtle glass borders
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Alternating column backgrounds (custom implementation via CSS)
+    // Note: NaiveUI doesn't natively support alternating columns, but we can use:
+    // - tdColor for base cells
+    // - Custom CSS in components for column-specific styling
+    tdColorModal: 'rgba(36, 36, 36, 0.5)',         // Modal table cells
+
+    // Borders - subtle white glass borders
+    borderColor: 'rgba(255, 255, 255, 0.08)',      // Subtle glass border
     borderRadius: '12px',
 
     // Filter/Sort indicators
-    filterColor: '#6a0000',
+    filterColor: '#6a0000',                         // Maroon filter indicator
 
     // Loading state
-    loadingColor: 'rgba(80, 0, 0, 0.12)',
+    loadingColor: 'rgba(80, 0, 0, 0.12)',          // Maroon loading overlay
 
     // Pagination
     paginationBorderColor: 'rgba(255, 255, 255, 0.08)',
@@ -134,133 +142,157 @@ export const customTheme = {
   },
 
   Pagination: {
-    itemTextColor: '#e8e8e8',
-    itemTextColorHover: '#e8e8e8',
-    itemTextColorPressed: '#e8e8e8',
-    itemTextColorActive: '#e8e8e8',
-    itemTextColorDisabled: '#5a5a5a',
+    // Text colors - white for readability
+    itemTextColor: '#ffffff',
+    itemTextColorHover: '#ffffff',
+    itemTextColorPressed: '#ffffff',
+    itemTextColorActive: '#ffffff',
+    itemTextColorDisabled: '#888888',
 
+    // Item backgrounds - glassmorphic
     itemColor: 'transparent',
-    itemColorHover: 'rgba(80, 0, 0, 0.1)',
-    itemColorPressed: 'rgba(80, 0, 0, 0.15)',
-    itemColorActive: '#500000',
-    itemColorActiveHover: '#6a0000',
+    itemColorHover: 'rgba(80, 0, 0, 0.1)',         // Maroon hover
+    itemColorPressed: 'rgba(80, 0, 0, 0.15)',      // Maroon press
+    itemColorActive: 'rgba(80, 0, 0, 0.6)',        // Maroon active state
+    itemColorActiveHover: 'rgba(106, 0, 0, 0.7)',  // Brighter maroon
     itemColorDisabled: 'transparent',
 
-    itemBorder: '1px solid #3a3a3a',
-    itemBorderHover: '1px solid #500000',
-    itemBorderPressed: '1px solid #3a0000',
-    itemBorderActive: '1px solid #500000',
-    itemBorderDisabled: '1px solid #2a2a2a',
+    // Borders - subtle glass borders with maroon accents
+    itemBorder: '1px solid rgba(255, 255, 255, 0.08)',
+    itemBorderHover: '1px solid rgba(106, 0, 0, 0.5)',
+    itemBorderPressed: '1px solid rgba(80, 0, 0, 0.7)',
+    itemBorderActive: '1px solid rgba(106, 0, 0, 0.6)',
+    itemBorderDisabled: '1px solid rgba(255, 255, 255, 0.03)',
 
     itemBorderRadius: '6px',
     itemSize: '32px',
     itemFontSize: '14px',
     itemPadding: '0 12px',
 
+    // Button colors
     buttonColor: 'transparent',
     buttonColorHover: 'rgba(80, 0, 0, 0.1)',
     buttonColorPressed: 'rgba(80, 0, 0, 0.15)',
-    buttonBorder: '1px solid #3a3a3a',
-    buttonBorderHover: '1px solid #500000',
-    buttonBorderPressed: '1px solid #3a0000',
-    buttonIconColor: '#b8b8b8',
-    buttonIconColorHover: '#e8e8e8',
-    buttonIconColorPressed: '#888888'
+    buttonBorder: '1px solid rgba(255, 255, 255, 0.08)',
+    buttonBorderHover: '1px solid rgba(106, 0, 0, 0.5)',
+    buttonBorderPressed: '1px solid rgba(80, 0, 0, 0.7)',
+    buttonIconColor: '#e8e8e8',
+    buttonIconColorHover: '#ffffff',
+    buttonIconColorPressed: '#b8b8b8'
   },
 
   Select: {
     peers: {
       InternalSelection: {
-        color: '#2a2a2a',
-        colorActive: '#2a2a2a',
-        border: '1px solid #3a3a3a',
-        borderHover: '1px solid #500000',
-        borderActive: '1px solid #500000',
-        borderFocus: '1px solid #500000',
-        textColor: '#e8e8e8',
-        placeholderColor: '#888888',
+        // Selection box - translucent glass
+        color: 'rgba(42, 42, 42, 0.6)',
+        colorActive: 'rgba(42, 42, 42, 0.7)',
 
-        caretColor: '#500000',
-        arrowColor: '#b8b8b8',
-        arrowColorActive: '#500000'
+        // Borders - glass borders with maroon accents
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderHover: '1px solid rgba(106, 0, 0, 0.5)',
+        borderActive: '1px solid rgba(106, 0, 0, 0.6)',
+        borderFocus: '1px solid rgba(106, 0, 0, 0.6)',
+
+        // Text - white for readability
+        textColor: '#ffffff',
+        placeholderColor: '#b8b8b8',
+
+        // Indicators
+        caretColor: '#6a0000',                      // Maroon caret
+        arrowColor: '#e8e8e8',
+        arrowColorActive: '#6a0000'                 // Maroon arrow when active
       },
       InternalSelectMenu: {
-        color: '#2a2a2a',
-        optionTextColor: '#e8e8e8',
-        optionTextColorActive: '#e8e8e8',
-        optionTextColorHover: '#e8e8e8',
-        optionColorHover: 'rgba(80, 0, 0, 0.1)',
-        optionColorActive: '#500000',
-        optionCheckColor: '#e8e8e8',
+        // Dropdown menu - glassmorphic
+        color: 'rgba(42, 42, 42, 0.85)',            // More opaque dropdown
+
+        // Option text - white
+        optionTextColor: '#ffffff',
+        optionTextColorActive: '#ffffff',
+        optionTextColorHover: '#ffffff',
+
+        // Option backgrounds - maroon accents
+        optionColorHover: 'rgba(80, 0, 0, 0.15)',   // Maroon hover
+        optionColorActive: 'rgba(80, 0, 0, 0.6)',   // Maroon selected
+        optionCheckColor: '#ffffff',                 // White checkmark
+
         borderRadius: '6px',
 
-        groupHeaderTextColor: '#b8b8b8'
+        // Group headers
+        groupHeaderTextColor: '#e8e8e8'
       }
     }
   },
 
   Input: {
-    color: '#2a2a2a',
-    colorFocus: '#2a2a2a',
-    colorDisabled: '#1f1f1f',
+    // Input field - translucent glass
+    color: 'rgba(42, 42, 42, 0.6)',
+    colorFocus: 'rgba(42, 42, 42, 0.7)',
+    colorDisabled: 'rgba(30, 30, 30, 0.4)',
 
-    textColor: '#e8e8e8',
-    textColorDisabled: '#5a5a5a',
-    placeholderColor: '#888888',
-    placeholderColorDisabled: '#5a5a5a',
+    // Text - white for readability
+    textColor: '#ffffff',
+    textColorDisabled: '#888888',
+    placeholderColor: '#b8b8b8',
+    placeholderColorDisabled: '#888888',
 
-    border: '1px solid #3a3a3a',
-    borderHover: '1px solid #500000',
-    borderFocus: '1px solid #500000',
-    borderDisabled: '1px solid #2a2a2a',
+    // Borders - glass borders with maroon focus
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderHover: '1px solid rgba(106, 0, 0, 0.5)',
+    borderFocus: '1px solid rgba(106, 0, 0, 0.6)',
+    borderDisabled: '1px solid rgba(255, 255, 255, 0.03)',
 
     borderRadius: '6px',
 
-    caretColor: '#500000',
+    // Caret - maroon accent
+    caretColor: '#6a0000',
 
-    clearColor: '#b8b8b8',
-    clearColorHover: '#e8e8e8',
-    clearColorPressed: '#888888',
+    // Clear/Icon buttons
+    clearColor: '#e8e8e8',
+    clearColorHover: '#ffffff',
+    clearColorPressed: '#b8b8b8',
 
-    iconColor: '#b8b8b8',
-    iconColorHover: '#e8e8e8',
-    iconColorPressed: '#888888',
-    iconColorDisabled: '#5a5a5a'
+    iconColor: '#e8e8e8',
+    iconColorHover: '#ffffff',
+    iconColorPressed: '#b8b8b8',
+    iconColorDisabled: '#888888'
   },
 
   Button: {
-    textColor: '#e8e8e8',
-    textColorHover: '#e8e8e8',
-    textColorPressed: '#e8e8e8',
-    textColorFocus: '#e8e8e8',
-    textColorDisabled: '#5a5a5a',
+    // Text colors - white
+    textColor: '#ffffff',
+    textColorHover: '#ffffff',
+    textColorPressed: '#ffffff',
+    textColorFocus: '#ffffff',
+    textColorDisabled: '#888888',
 
-    // Secondary/Default buttons - Glassmorphic
-    color: 'rgba(42, 42, 42, 0.4)',
-    colorHover: 'rgba(80, 0, 0, 0.2)',
-    colorPressed: 'rgba(80, 0, 0, 0.3)',
+    // Secondary/Default buttons - glassmorphic
+    color: 'rgba(42, 42, 42, 0.5)',                // Translucent charcoal
+    colorHover: 'rgba(80, 0, 0, 0.2)',             // Maroon hover overlay
+    colorPressed: 'rgba(80, 0, 0, 0.3)',           // Maroon press overlay
     colorFocus: 'rgba(80, 0, 0, 0.2)',
-    colorDisabled: 'rgba(36, 36, 36, 0.2)',
+    colorDisabled: 'rgba(36, 36, 36, 0.3)',
 
+    // Borders - subtle glass with maroon accents
     border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderHover: '1px solid rgba(80, 0, 0, 0.5)',
-    borderPressed: '1px solid rgba(80, 0, 0, 0.7)',
-    borderFocus: '1px solid rgba(80, 0, 0, 0.5)',
+    borderHover: '1px solid rgba(106, 0, 0, 0.5)',
+    borderPressed: '1px solid rgba(106, 0, 0, 0.7)',
+    borderFocus: '1px solid rgba(106, 0, 0, 0.5)',
     borderDisabled: '1px solid rgba(255, 255, 255, 0.03)',
 
-    rippleColor: 'rgba(80, 0, 0, 0.3)',
+    rippleColor: 'rgba(106, 0, 0, 0.3)',           // Maroon ripple effect
 
-    // Primary button - Glassmorphic maroon
+    // Primary button - glassmorphic maroon
     textColorPrimary: '#ffffff',
     textColorHoverPrimary: '#ffffff',
     textColorPressedPrimary: '#ffffff',
     textColorFocusPrimary: '#ffffff',
-    textColorDisabledPrimary: '#5a5a5a',
+    textColorDisabledPrimary: '#888888',
 
-    colorPrimary: 'rgba(80, 0, 0, 0.7)',
-    colorHoverPrimary: 'rgba(106, 0, 0, 0.8)',
-    colorPressedPrimary: 'rgba(58, 0, 0, 0.9)',
+    colorPrimary: 'rgba(80, 0, 0, 0.7)',           // Maroon glass
+    colorHoverPrimary: 'rgba(106, 0, 0, 0.8)',     // Brighter maroon
+    colorPressedPrimary: 'rgba(58, 0, 0, 0.9)',    // Darker maroon
     colorFocusPrimary: 'rgba(80, 0, 0, 0.7)',
     colorDisabledPrimary: 'rgba(42, 42, 42, 0.3)',
 
@@ -272,19 +304,19 @@ export const customTheme = {
   },
 
   Card: {
-    // Glassmorphic card backgrounds
-    color: 'rgba(36, 36, 36, 0.7)',
-    colorModal: 'rgba(26, 26, 26, 0.9)',
-    colorEmbedded: 'rgba(42, 42, 42, 0.5)',
-    colorTarget: 'rgba(80, 0, 0, 0.05)',
+    // Glassmorphic card backgrounds with backdrop blur
+    color: 'rgba(36, 36, 36, 0.7)',                // Standard card glass
+    colorModal: 'rgba(26, 26, 26, 0.9)',           // Modal card (more opaque)
+    colorEmbedded: 'rgba(42, 42, 42, 0.5)',        // Embedded card (lighter)
+    colorTarget: 'rgba(80, 0, 0, 0.05)',           // Target/hover overlay
 
-    // Text colors
-    textColor: '#e8e8e8',
-    titleTextColor: '#e8e8e8',
+    // Text colors - white
+    textColor: '#ffffff',
+    titleTextColor: '#ffffff',
 
-    // Borders
+    // Borders - subtle glass borders
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: '12px',
+    borderRadius: '12px',                          // Premium rounded corners
 
     // Padding
     paddingSmall: '12px 16px',
@@ -298,23 +330,23 @@ export const customTheme = {
     titleFontSizeLarge: '20px',
     titleFontSizeHuge: '22px',
 
-    // Close button
+    // Close button - maroon hover
     closeColorHover: 'rgba(80, 0, 0, 0.2)',
     closeColorPressed: 'rgba(80, 0, 0, 0.3)',
-    closeIconColor: '#b8b8b8',
-    closeIconColorHover: '#e8e8e8',
-    closeIconColorPressed: '#888888'
+    closeIconColor: '#e8e8e8',
+    closeIconColorHover: '#ffffff',
+    closeIconColorPressed: '#b8b8b8'
   },
 
   Tag: {
     // Glassmorphic tags
-    color: 'rgba(42, 42, 42, 0.5)',
-    textColor: '#e8e8e8',
+    color: 'rgba(42, 42, 42, 0.5)',                // Translucent tag
+    textColor: '#ffffff',                          // White text
     border: '1px solid rgba(255, 255, 255, 0.08)',
     borderRadius: '12px',
 
-    // Primary tag (maroon)
-    colorPrimary: 'rgba(80, 0, 0, 0.6)',
+    // Primary tag (maroon accent)
+    colorPrimary: 'rgba(80, 0, 0, 0.6)',           // Maroon glass tag
     textColorPrimary: '#ffffff',
     borderPrimary: '1px solid rgba(106, 0, 0, 0.5)',
 
@@ -339,9 +371,9 @@ export const customTheme = {
     borderError: '1px solid rgba(168, 50, 50, 0.4)',
 
     // Close button
-    closeIconColor: '#b8b8b8',
-    closeIconColorHover: '#e8e8e8',
-    closeIconColorPressed: '#888888',
+    closeIconColor: '#e8e8e8',
+    closeIconColorHover: '#ffffff',
+    closeIconColorPressed: '#b8b8b8',
     closeColorHover: 'rgba(255, 255, 255, 0.08)',
     closeColorPressed: 'rgba(255, 255, 255, 0.12)'
   }

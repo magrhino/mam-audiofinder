@@ -1,8 +1,6 @@
 """
 Search routes for MAM Audiobook Finder.
 """
-import json
-import re
 import asyncio
 import logging
 import random
@@ -13,49 +11,10 @@ from fastapi.responses import JSONResponse
 from config import MAM_BASE, MAM_COOKIE, ABS_BASE_URL, ABS_API_KEY, ABS_CHECK_LIBRARY
 from abs_client import abs_client
 from mam_cache import get_cached_mam_search, cache_mam_search
+from dependencies.mam import normalize_mam_result
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
-
-
-def flatten(v):
-    """Normalize MAM API response data (handles dicts, lists, JSON strings)."""
-    if isinstance(v, dict):
-        return ", ".join(str(x) for x in v.values())
-    if isinstance(v, list):
-        return ", ".join(str(x) for x in v)
-    if isinstance(v, str):
-        s = v.strip()
-        if s.startswith("{") or s.startswith("["):
-            try:
-                obj = json.loads(s)
-                if isinstance(obj, dict):
-                    return ", ".join(str(x) for x in obj.values())
-                if isinstance(obj, list):
-                    return ", ".join(str(x) for x in obj)
-            except Exception:
-                pass
-        s = re.sub(r'^\{|\}$', '', s)
-        parts = []
-        for chunk in s.split(","):
-            parts.append(chunk.split(":", 1)[-1])
-        parts = [p.strip().strip('"').strip("'") for p in parts if p.strip()]
-        return ", ".join(parts)
-    return "" if v is None else str(v)
-
-
-def detect_format(item: dict) -> str:
-    """Extract file format from torrent metadata."""
-    for key in ("format", "filetype", "container", "encoding", "format_name"):
-        val = item.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-    name = (item.get("title") or item.get("name") or "")
-    toks = re.findall(r'(?i)\b(mp3|m4b|flac|aac|ogg|opus|wav|alac|ape|epub|pdf|mobi|azw3|cbz|cbr)\b', name)
-    if toks:
-        uniq = list(dict.fromkeys(t.upper() for t in toks))
-        return "/".join(uniq)
-    return ""
 
 
 @router.post("/search")
@@ -117,22 +76,8 @@ async def search(payload: dict):
     except ValueError:
         raise HTTPException(status_code=502, detail=f"MAM returned non-JSON. Body: {r.text[:300]}")
 
-    out = []
-    for item in raw.get("data", []):
-        out.append({
-            "id": str(item.get("id") or item.get("tid") or ""),
-            "title": item.get("title") or item.get("name"),
-            "author_info": flatten(item.get("author_info")),
-            "narrator_info": flatten(item.get("narrator_info")),
-            "format": detect_format(item),
-            "size": item.get("size"),
-            "seeders": item.get("seeders"),
-            "leechers": item.get("leechers"),
-            "catname": item.get("catname"),
-            "added": item.get("added"),
-            "dl": item.get("dl"),
-            "in_abs_library": False,  # Default to False, will be updated below
-        })
+    # Normalize all results using shared MAM result normalizer
+    out = [normalize_mam_result(item) for item in raw.get("data", [])]
 
     # Check which items exist in ABS library (if feature enabled)
     if ABS_CHECK_LIBRARY and out:

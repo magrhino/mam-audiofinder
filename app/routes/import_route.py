@@ -19,6 +19,7 @@ from db import engine
 from qb_client import qb_login_sync
 from utils import sanitize, next_available, extract_disc_track, try_hardlink
 from abs_client import abs_client
+from dependencies.qb import map_qb_content_path
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -244,18 +245,8 @@ async def do_import(body: ImportBody):
                 )
             )
 
-    # map qB's internal paths to this container's paths
-    def map_qb_path(p: str) -> str:
-        prefix = QB_INNER_DL_PREFIX.rstrip("/")
-        if p == prefix or p.startswith(prefix + "/"):
-            return p.replace(QB_INNER_DL_PREFIX, DL_DIR, 1)
-        if p.startswith("/media/"):
-            return p
-        p = p.replace("/mnt/user/media", "/media", 1)
-        p = p.replace("/mnt/media", "/media", 1)
-        return p
-
-    src_root = Path(map_qb_path(content_path))
+    # Map qB's internal paths to this container's paths using shared dependency
+    src_root = map_qb_content_path(content_path, validate_exists=False)
 
     # Validate source path exists
     if not src_root.exists():
@@ -574,18 +565,8 @@ async def do_multi_book_import(body: MultiBookImportBody):
                 )
             )
 
-    # Map qB's internal paths to this container's paths
-    def map_qb_path(p: str) -> str:
-        prefix = QB_INNER_DL_PREFIX.rstrip("/")
-        if p == prefix or p.startswith(prefix + "/"):
-            return p.replace(QB_INNER_DL_PREFIX, DL_DIR, 1)
-        if p.startswith("/media/"):
-            return p
-        p = p.replace("/mnt/user/media", "/media", 1)
-        p = p.replace("/mnt/media", "/media", 1)
-        return p
-
-    torrent_root = Path(map_qb_path(content_path))
+    # Map qB's internal paths to this container's paths using shared dependency
+    torrent_root = map_qb_content_path(content_path, validate_exists=False)
 
     # Validate torrent root exists
     if not torrent_root.exists():
