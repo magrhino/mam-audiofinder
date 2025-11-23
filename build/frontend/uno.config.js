@@ -172,7 +172,8 @@ export default defineConfig({
     'muted': 'text-[#b8b8b8] text-[0.9rem]',
     'text-subtle': 'text-[#b8b8b8]',
     'code-inline': 'bg-[rgba(36,36,36,0.6)] px-[6px] py-[2px] rounded-sm font-mono text-[#6a0000]',
-    'responsive-title': 'whitespace-nowrap overflow-hidden text-ellipsis max-w-[clamp(120px,30vw,400px)]',
+    'responsive-title': 'overflow-hidden text-ellipsis max-w-[clamp(120px,30vw,400px)]',
+    'responsive-title-wrap': 'break-words overflow-hidden line-clamp-2 max-w-[clamp(150px,35vw,450px)]',
     'word-wrap-title': 'break-words hyphens-auto max-w-full',
 
     // Typography
@@ -189,7 +190,8 @@ export default defineConfig({
     'focus-ring': 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#500000] focus-visible:outline-offset-2',
 
     // Body base with atmospheric gradient (charcoal → maroon)
-    'body-base': 'font-sans bg-gradient-to-b from-[#0a0a0a] to-[#6a0000] text-white leading-relaxed p-8 max-md:p-4 min-h-screen m-0',
+    // Note: Horizontal padding controlled via --page-padding-x in global.css
+    'body-base': 'font-sans bg-gradient-to-b from-[#0a0a0a] to-[#6a0000] text-white leading-relaxed min-h-screen m-0',
   },
 
   rules: [

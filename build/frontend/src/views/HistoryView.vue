@@ -1,5 +1,5 @@
 <template>
-  <div class="history-view card">
+  <div class="history-view card w-full max-w-full overflow-x-hidden">
     <GlassTitle>Download History & Imports</GlassTitle>
     <div class="glass-table-wrapper">
       <n-data-table
@@ -9,7 +9,7 @@
         :pagination="pagination"
         :bordered="false"
         :row-key="(row) => row.id"
-        :scroll-x="scrollX"
+        :single-line="false"
         striped
       />
       <div v-if="!history.length" class="center muted" style="padding: 2rem;">
@@ -21,7 +21,6 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useBreakpoints } from '@vueuse/core'
 import { NDataTable } from 'naive-ui'
 import GlassTitle from '@components/GlassTitle.vue'
 import { useHistoryLiveUpdates } from '@composables/useHistoryLiveUpdates'
@@ -29,24 +28,6 @@ import { useHistoryDataTable } from '@composables/naive/useHistoryDataTable'
 import { useApi } from '@composables/useApi'
 
 const api = useApi()
-
-// Responsive breakpoints for dynamic scroll-x
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024
-})
-
-// Dynamic scroll-x based on screen size
-const scrollX = computed(() => {
-  if (breakpoints.greater('desktop').value) {
-    return 1400
-  } else if (breakpoints.greater('tablet').value) {
-    return 1200
-  } else {
-    return 900
-  }
-})
 
 // Use the live updates composable for auto-refresh and event handling
 const { history, loadHistory } = useHistoryLiveUpdates({ interval: 5000 })

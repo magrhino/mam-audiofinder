@@ -1,5 +1,5 @@
 <template>
-  <div class="showcase-view">
+  <div class="showcase-view" :class="{ 'detail-active': detailGroup }">
     <!-- Hero Panel - Audible/Jellyseerr Style -->
     <n-card class="hero-panel" :bordered="false">
       <n-space vertical :size="24">
@@ -126,9 +126,11 @@
 
                 <n-skeleton v-if="descriptionLoading" text :repeat="4" />
                 <template v-else-if="detailDescription">
-                  <div :class="{ 'description-collapsed': descriptionCollapsed }">
-                    <n-text :depth="2">{{ detailDescription }}</n-text>
-                  </div>
+                  <div
+                    :class="{ 'description-collapsed': descriptionCollapsed }"
+                    class="description-text"
+                    v-html="sanitizedDescription"
+                  ></div>
                   <n-button
                     v-if="detailDescription.length > 200"
                     text
@@ -140,11 +142,11 @@
                     {{ descriptionCollapsed ? 'Show more' : 'Show less' }}
                   </n-button>
                   <n-text :depth="3" style="font-size: 11px; font-style: italic; display: block; margin-top: 8px">
-                    via Audiobookshelf
+                    {{ descriptionSourceLabel }}
                   </n-text>
                 </template>
                 <n-text v-else :depth="3" style="font-style: italic">
-                  No description available
+                  {{ descriptionSourceLabel }}
                 </n-text>
               </n-card>
             </div>
@@ -164,7 +166,7 @@
           :data="versionsData"
           :pagination="versionsPagination"
           :bordered="false"
-          :scroll-x="versionsScrollX"
+          :single-line="false"
           striped
           class="versions-data-table"
         />
@@ -197,6 +199,7 @@ import GlassSubtitle from '@components/GlassSubtitle.vue'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 import { useAddTorrentFlow } from '@composables/useAddTorrentFlow'
+import { sanitizeDescription } from '@/utils/sanitize'
 
 const api = useApi()
 const route = useRoute()
@@ -223,6 +226,25 @@ const inputWidth = computed(() => {
   }
 })
 
+// Description source label
+const descriptionSourceLabel = computed(() => {
+  const sourceMap = {
+    'audible': 'via Audible',
+    'google': 'via Google Books',
+    'openlibrary': 'via Open Library',
+    'abs': 'via Audiobookshelf',
+    'hardcover': 'via Hardcover',
+    'none': 'No metadata available',
+    'error': 'Failed to load metadata'
+  }
+  return sourceMap[descriptionSource.value] || 'Unknown source'
+})
+
+// Sanitized description for safe HTML rendering
+const sanitizedDescription = computed(() => {
+  return sanitizeDescription(detailDescription.value)
+})
+
 const formRef = ref(null)
 const form = reactive({ q: '', limit: '100' })
 const limitOptions = [
@@ -238,6 +260,7 @@ const groups = ref([])
 const detailGroup = ref(null)
 const detailElement = ref(null)
 const detailDescription = ref('')
+const descriptionSource = ref('none')
 const descriptionLoading = ref(false)
 const descriptionCollapsed = ref(true)
 
@@ -247,13 +270,12 @@ const handleAddTorrent = async (rowState) => {
   status.value = result.message
 }
 
-// Initialize versions data table with search configuration (includes responsive scroll-x)
+// Initialize versions data table with search configuration
 const {
   tableRef: versionsTableRef,
   data: versionsData,
   columns: versionsColumns,
   pagination: versionsPagination,
-  scrollX: versionsScrollX,
   setData: setVersionsData,
   clearData: clearVersionsData
 } = useMAMSearchDataTable({
@@ -364,12 +386,13 @@ const showDetail = async (group) => {
         mam_id: group.mam_id || ''
       })
 
-      // Set description if available
-      if (data.description) {
-        detailDescription.value = data.description
-      }
+      // Always set description and source (even if empty)
+      detailDescription.value = data.description || ''
+      descriptionSource.value = data.source || 'none'
     } catch (err) {
       console.warn('Failed to load enriched metadata:', err)
+      detailDescription.value = ''
+      descriptionSource.value = 'error'
     } finally {
       descriptionLoading.value = false
     }
@@ -379,6 +402,7 @@ const showDetail = async (group) => {
 const closeDetail = () => {
   detailGroup.value = null
   detailDescription.value = ''
+  descriptionSource.value = 'none'
   descriptionLoading.value = false
   clearVersionsData()
 
@@ -440,11 +464,13 @@ const restoreDetailFromUrl = async () => {
         author: group.author || '',
         mam_id: group.mam_id || ''
       }).then(data => {
-        if (data.description) {
-          detailDescription.value = data.description
-        }
+        // Always set description and source (even if empty)
+        detailDescription.value = data.description || ''
+        descriptionSource.value = data.source || 'none'
       }).catch(err => {
         console.warn('Failed to load enriched metadata:', err)
+        detailDescription.value = ''
+        descriptionSource.value = 'error'
       }).finally(() => {
         descriptionLoading.value = false
       })
@@ -482,6 +508,7 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
     // Detail parameter removed - close detail view
     detailGroup.value = null
     detailDescription.value = ''
+    descriptionSource.value = 'none'
     descriptionLoading.value = false
     clearVersionsData()
   }
@@ -490,9 +517,25 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
 
 <style scoped>
 .showcase-view {
+  width: 100%;
   max-width: 1400px;
+  overflow-x: hidden;
   margin: 0 auto;
   padding: var(--spacing-md, 1rem);
+  transition: max-width 0.3s ease;
+}
+
+/* Full-width detail view */
+.showcase-view.detail-active {
+  max-width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Keep padding on hero panel when detail is active */
+.showcase-view.detail-active .hero-panel {
+  margin-left: var(--spacing-md, 1rem);
+  margin-right: var(--spacing-md, 1rem);
 }
 
 /* Hero Panel - Audible/Jellyseerr Inspired */
@@ -617,6 +660,17 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Description text styling for v-html content */
+.description-text {
+  color: var(--text-secondary, #e8e8e8);
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.description-text br {
+  margin-bottom: 0.5em;
 }
 
 /* Versions Data Table */

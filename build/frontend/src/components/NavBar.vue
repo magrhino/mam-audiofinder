@@ -138,11 +138,11 @@ const healthText = computed(() => {
   z-index: 100;
   padding: 0.5rem 1rem;
 
-  /* Edge-to-edge full width */
-  margin-left: calc(-1 * var(--spacing-xl));
-  margin-right: calc(-1 * var(--spacing-xl));
+  /* Edge-to-edge full width (responsive via --page-padding-x) */
+  margin-left: calc(-1 * var(--page-padding-x));
+  margin-right: calc(-1 * var(--page-padding-x));
   margin-bottom: var(--spacing-lg);
-  width: calc(100% + 2 * var(--spacing-xl));
+  width: calc(100% + 2 * var(--page-padding-x));
 
   /* Glass effect */
   background: rgba(0, 0, 0, 0.4) !important;

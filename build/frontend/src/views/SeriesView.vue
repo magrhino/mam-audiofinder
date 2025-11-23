@@ -67,7 +67,7 @@
         :data="results"
         :pagination="seriesPagination"
         :bordered="false"
-        :scroll-x="scrollX"
+        :single-line="false"
         striped
       />
     </div>
@@ -187,17 +187,6 @@ const inputWidth = computed(() => {
     return '300px'
   } else {
     return '100%'
-  }
-})
-
-// Dynamic scroll-x for responsive tables
-const scrollX = computed(() => {
-  if (breakpoints.greater('desktop').value) {
-    return 1000
-  } else if (breakpoints.greater('tablet').value) {
-    return 900
-  } else {
-    return 700
   }
 })
 
@@ -517,7 +506,9 @@ watch(() => route.query.detail, async (newDetail, oldDetail) => {
 
 <style scoped>
 .series-view {
-  max-width: 1400px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   margin: 0 auto;
   padding: var(--spacing-md, 1rem);
 }

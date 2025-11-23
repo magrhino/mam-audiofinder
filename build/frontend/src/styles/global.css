@@ -60,6 +60,39 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
+
+  /* Responsive page padding (single source of truth) */
+  --page-padding-x: var(--spacing-xl); /* Default: 2rem (desktop) */
+}
+
+/* Responsive page padding for mobile */
+@media (max-width: 768px) {
+  :root {
+    --page-padding-x: var(--spacing-md); /* Mobile: 1rem */
+  }
+}
+
+/* ========================================
+   Body Layout
+   ========================================
+   Apply responsive padding using --page-padding-x variable
+   Single source of truth for page margins
+   Prevent horizontal overflow on all devices
+   ======================================== */
+
+/* Full-width container rules - prevent horizontal scrollbar */
+html, body, #app {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* Apply responsive horizontal padding to body */
+body {
+  padding-left: var(--page-padding-x);
+  padding-right: var(--page-padding-x);
 }
 
 /* ========================================

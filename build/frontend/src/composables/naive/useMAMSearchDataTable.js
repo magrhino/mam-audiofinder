@@ -6,7 +6,7 @@
 
 import { ref, computed, h } from 'vue'
 import { NButton, NTag, NTooltip, NText, NSpace } from 'naive-ui'
-import { useBreakpoints } from '@vueuse/core'
+import { useBreakpoints } from '../useBreakpoints.js'
 import { formatSize, escapeHtml } from '@core/utils.js'
 import CoverImage from '../../components/CoverImage.vue'
 import AudiobookFormatIcon from '../../components/icons/AudiobookFormatIcon.vue'
@@ -133,7 +133,7 @@ function createColumns(viewType, callbacks, responsive = {}) {
       }
     },
 
-    // Title column with escaping and responsive truncation
+    // Title column with wrapping and responsive font sizing
     title: {
       title: 'Title',
       key: 'title',
@@ -143,9 +143,8 @@ function createColumns(viewType, callbacks, responsive = {}) {
       },
       filterOptionValues: [],
       render(row) {
-        return h('span', {
-          class: 'responsive-title',
-          title: row.title || ''  // Native tooltip for full text on hover
+        return h('div', {
+          style: 'white-space: normal; word-break: break-word; font-size: clamp(0.85rem, 1.5vw, 1rem); line-height: 1.4;'
         }, escapeHtml(row.title || ''))
       }
     },
@@ -154,7 +153,6 @@ function createColumns(viewType, callbacks, responsive = {}) {
     author: {
       title: 'Author',
       key: 'author',
-      minWidth: 150,
       sorter: (a, b) => {
         const authorA = a.author_info || a.author || ''
         const authorB = b.author_info || b.author || ''
@@ -170,11 +168,10 @@ function createColumns(viewType, callbacks, responsive = {}) {
       }
     },
 
-    // Narrator column with filtering (responsive width for tablet compression)
+    // Narrator column with filtering
     narrator: {
       title: 'Narrator',
       key: 'narrator',
-      minWidth: isTablet ? 120 : 150,  // Compressed width on tablet for 10-12" displays
       sorter: (a, b) => {
         const narratorA = a.narrator_info || a.narrator || ''
         const narratorB = b.narrator_info || b.narrator || ''
@@ -197,7 +194,6 @@ function createColumns(viewType, callbacks, responsive = {}) {
         default: () => 'Filetype - Filter Only'
       }),
       key: 'format',
-      minWidth: 90,
       filterOptions: [
         { label: 'MP3', value: 'MP3' },
         { label: 'M4B', value: 'M4B' },
@@ -220,7 +216,6 @@ function createColumns(viewType, callbacks, responsive = {}) {
         default: () => 'Size - Click to Sort'
       }),
       key: 'size',
-      minWidth: 100,
       align: 'right',
       sorter: (row1, row2) => {
         // Parse size values (handles both numeric bytes and string formats like "1.1 GiB")
@@ -245,7 +240,6 @@ function createColumns(viewType, callbacks, responsive = {}) {
         default: () => 'Seeders - Click to Sort'
       }),
       key: 'seeders',
-      minWidth: 110,
       align: 'right',
       defaultSortOrder: 'descend',
       sorter: (rowA, rowB) => {
@@ -267,7 +261,6 @@ function createColumns(viewType, callbacks, responsive = {}) {
         default: () => 'Date Uploaded - Click to Sort'
       }),
       key: 'added',
-      minWidth: 140,
       sorter: (rowA, rowB) => {
         const dateA = new Date(rowA.added || 0)
         const dateB = new Date(rowB.added || 0)
@@ -400,6 +393,7 @@ function createColumns(viewType, callbacks, responsive = {}) {
   // Define column sets for each view type
   const viewColumns = {
     search: [
+      columns.expand,      // Expand column for mobile (hidden on desktop)
       columns.cover,
       columns.title,
       columns.author,
@@ -453,26 +447,8 @@ export function useMAMSearchDataTable(config = {}) {
     defaultPageSize = 25
   } = config
 
-  // Responsive breakpoints using @vueuse/core
-  const breakpoints = useBreakpoints({
-    mobile: 0,      // 0-767px
-    tablet: 768,    // 768-1023px
-    desktop: 1024   // 1024px+
-  })
-
-  const isMobile = computed(() => breakpoints.smaller('tablet').value)
-  const isTablet = computed(() => breakpoints.between('tablet', 'desktop').value)
-
-  // Responsive scroll-x for table horizontal scrolling
-  const scrollX = computed(() => {
-    if (breakpoints.greater('desktop').value) {
-      return 1400 // Desktop: More space for expanded columns
-    } else if (breakpoints.greater('tablet').value) {
-      return 1200 // Tablet: Standard layout
-    } else {
-      return 900 // Mobile: Compact layout
-    }
-  })
+  // Responsive breakpoints from centralized composable (single source of truth)
+  const { isMobile, isTablet, isDesktop } = useBreakpoints()
 
   // Table ref for programmatic control
   const tableRef = ref(null)
@@ -489,7 +465,7 @@ export function useMAMSearchDataTable(config = {}) {
     showQuickJumper: true
   })
 
-  // Column definitions with responsive filtering
+  // Column definitions with responsive filtering (3-breakpoint column strategy)
   const columns = computed(() => {
     const allColumns = createColumns(
       viewType,
@@ -497,27 +473,30 @@ export function useMAMSearchDataTable(config = {}) {
       { isMobile: isMobile.value, isTablet: isTablet.value }
     )
 
-    // Filter columns based on screen size
+    // Apply responsive column filtering for search view
     if (viewType === 'search') {
-      // Mobile: Show expand column + essential columns (expand, cover, title, size, actions)
+      // Mobile (0-767px): Ultra-minimal - expand + cover + title + add
+      // Users tap expand to see author, narrator, format, seeders, uploaded
       if (isMobile.value) {
-        const essentialColumns = allColumns.filter(col =>
-          ['cover', 'title', 'size', 'action'].includes(col.key)
+        return allColumns.filter(col =>
+          col.type === 'expand' || ['cover', 'title', 'action'].includes(col.key)
         )
-        // Add expand column at the beginning
-        const expandColumn = allColumns.find(col => col.type === 'expand')
-        return expandColumn ? [expandColumn, ...essentialColumns] : essentialColumns
       }
 
-      // Tablet: Hide less critical columns (format, uploaded) and no expand column
+      // Tablet (768-1023px): Moderate - hide expand, format, seeders, uploaded
+      // Shows: cover, title, author, narrator, size, add
       if (isTablet.value) {
         return allColumns.filter(col =>
-          col.type !== 'expand' && !['format', 'uploaded'].includes(col.key)
+          col.type !== 'expand' && !['format', 'seeders', 'uploaded'].includes(col.key)
         )
       }
+
+      // Desktop (1024px+): All columns except expand
+      // Shows: cover, title, author, narrator, format, size, seeders, uploaded, add
+      return allColumns.filter(col => col.type !== 'expand')
     }
 
-    // Desktop or other views: Show all columns except expand (expand is mobile-only)
+    // Other views (history, showcase): No expand column
     return allColumns.filter(col => col.type !== 'expand')
   })
 
@@ -563,11 +542,11 @@ export function useMAMSearchDataTable(config = {}) {
     loading,
     pagination,
     columns,
-    scrollX,
 
     // Responsive breakpoint helpers
     isMobile,
     isTablet,
+    isDesktop,
 
     // Methods
     setData,

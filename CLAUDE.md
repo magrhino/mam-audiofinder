@@ -217,10 +217,13 @@ NavBar, HealthIndicator, ResultRow, HistoryRow, ShowcaseCard, SeriesTable, Glass
 - `useApi()` - API wrapper (reuses legacy `app/static/js/core/api.js`)
 - `useCoverLoader()` - Lazy image loading with IntersectionObserver
 - `useHistoryLiveUpdates()` - Real-time history updates (auto-refresh)
-- `useMAMSearchDataTable()` - NaiveUI table configuration for search results with responsive column filtering, clickable covers with MAM links, and smart size sorting
+- `useMAMSearchDataTable()` - NaiveUI table configuration with responsive 3-column-set strategy, native expansion for mobile, no scroll-x
 - `useSeriesDataTable()` - NaiveUI table configuration for Hardcover series results with responsive column filtering
 - `useCover()` - Cover URL fetching with in-memory caching (5-min TTL, LRU eviction)
-- `useBreakpoints()` - (@vueuse/core) Responsive breakpoint detection (mobile: 0, tablet: 768, desktop: 1024)
+- `useBreakpoints()` - **Centralized responsive breakpoints** (mobile: 0-767px, tablet: 768-1023px, desktop: 1024px+) - Single source of truth for all breakpoint logic
+
+**Utilities:**
+- `sanitizeDescription()` - DOMPurify-based HTML sanitization for descriptions (strips `<p>` tags, allows safe inline formatting)
 
 **Styling System:**
 - **UnoCSS** - Atomic CSS engine with preset utilities and custom shortcuts (uno.config.js)
@@ -488,40 +491,40 @@ except Exception:
 
 ### Responsive Design
 
-**Use @vueuse/core for breakpoint detection:**
+**Centralized Breakpoint System (Single Source of Truth):**
+
+All components must use the centralized `useBreakpoints` composable from `build/frontend/src/composables/useBreakpoints.js`:
 
 ```javascript
-import { useBreakpoints } from '@vueuse/core'
-import { computed } from 'vue'
+import { useBreakpoints } from '@/composables/useBreakpoints'
 
-// Define breakpoints
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024
-})
+// Get reactive breakpoint state
+const { isMobile, isTablet, isDesktop } = useBreakpoints()
 
-// Create responsive computed properties
-const scrollX = computed(() => {
-  if (breakpoints.greater('desktop').value) {
-    return 1400  // Desktop
-  } else if (breakpoints.greater('tablet').value) {
-    return 1200  // Tablet
-  } else {
-    return 900   // Mobile
-  }
-})
+// Use in computed properties or directly in templates
+const showFullDetails = computed(() => isDesktop.value)
 ```
 
-**Best Practices:**
-- Use `useBreakpoints` for JavaScript-based responsive behavior
-- Use CSS media queries for styling
-- Define consistent breakpoints: mobile (0), tablet (768), desktop (1024)
-- Prefer reactive computed properties over direct window.innerWidth checks
-- Component props and table settings should adapt to screen size
-- Mobile-first approach with progressive enhancement
-- Use `responsive-title` shortcut for text truncation with native tooltips showing full text on hover
-- Table columns should filter based on screen size (essential columns on mobile, progressive enhancement for tablet/desktop)
+**Standard Breakpoints (3-tier system):**
+- **Mobile:** 0-767px (phones, small tablets)
+- **Tablet:** 768-1023px (tablets, small laptops)
+- **Desktop:** 1024px+ (laptops, desktops)
+
+**Table Responsive Strategy:**
+Tables use a 3-column-set approach with native Naive UI expansion for mobile:
+- **Mobile:** Minimal columns (expand + cover + title + action) - users tap expand for details
+- **Tablet:** Moderate columns (+ author + narrator + size)
+- **Desktop:** Full columns (all fields visible, expand column hidden)
+
+**Key Principles:**
+- ❌ **NEVER** use fixed `minWidth` on table columns - let Naive UI auto-size
+- ❌ **NEVER** use `scroll-x` prop - tables adapt to container width naturally
+- ❌ **NEVER** create local breakpoint definitions - use centralized composable
+- ✅ **ALWAYS** use `single-line="false"` on `n-data-table` to allow multi-line cells
+- ✅ **ALWAYS** add `w-full max-w-full overflow-x-hidden` to view wrapper divs
+- ✅ **ALWAYS** use CSS `clamp()` for responsive font sizing (e.g., `clamp(0.85rem, 1.5vw, 1rem)`)
+- Mobile-first approach with progressive column enhancement
+- Use CSS media queries for styling, centralized breakpoints for behavior
 
 ### Database Migrations
 

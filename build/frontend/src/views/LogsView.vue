@@ -1,5 +1,5 @@
 <template>
-  <div class="logs-view card">
+  <div class="logs-view card w-full max-w-full overflow-x-hidden">
     <div class="logs-header">
       <h3>Application Logs</h3>
       <div class="logs-controls">

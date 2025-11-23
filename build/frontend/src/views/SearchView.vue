@@ -1,5 +1,5 @@
 <template>
-  <div class="search-view">
+  <div class="search-view w-full max-w-full overflow-x-hidden">
     <n-space :size="12" :wrap="true" align="end" class="search-form">
       <div class="search-input-wrapper">
         <GlassSearchBar
@@ -45,7 +45,7 @@
         :pagination="pagination"
         :bordered="false"
         :loading="loading"
-        :scroll-x="scrollX"
+        :single-line="false"
         striped
       />
     </div>
@@ -69,13 +69,12 @@ const router = useRouter()
 // Unified add torrent flow
 const { addTorrent, isItemLoading } = useAddTorrentFlow()
 
-// Initialize data table with search configuration (includes responsive scroll-x)
+// Initialize data table with search configuration
 const {
   tableRef,
   data,
   columns,
   pagination,
-  scrollX,
   loading: tableLoading,
   setData,
   clearData,

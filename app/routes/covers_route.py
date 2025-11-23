@@ -100,17 +100,15 @@ async def enrich_metadata(request: EnrichRequest):
             "narrator": "...",
             "series": [...],
             "rating": 4.5,
-            "source": "audible|google|openlibrary|none"
+            "source": "audible|google|openlibrary|abs|none"
         }
     """
-    if not abs_client.is_configured:
-        raise HTTPException(
-            status_code=503,
-            detail="Audiobookshelf not configured. Set ABS_BASE_URL and ABS_API_KEY."
-        )
-
     if not request.title:
         raise HTTPException(status_code=400, detail="Title is required")
+
+    # Log warning if ABS not configured, but continue with external providers
+    if not abs_client.is_configured:
+        logger.info(f"⚠️  ABS not configured, using external providers only for '{request.title}'")
 
     logger.info(f"🔍 On-demand enrichment for: '{request.title}' by '{request.author}'")
 
