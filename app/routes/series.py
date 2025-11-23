@@ -301,6 +301,25 @@ async def enrich_books_with_abs(
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to check library for '{book_title}': {e}")
 
+            # Fetch audiobook metadata from Hardcover
+            has_audiobook = None  # null = unknown
+            audio_seconds = None
+            if hardcover_client.is_configured:
+                try:
+                    logger.debug(f"🎧 Fetching audiobook metadata for '{book_title}'")
+                    hardcover_results = await hardcover_client.search_book_advanced(
+                        title=book_title,
+                        author=book_author,
+                        limit=1
+                    )
+                    if hardcover_results and len(hardcover_results) > 0:
+                        first_result = hardcover_results[0]
+                        has_audiobook = first_result.get('has_audiobook')
+                        audio_seconds = first_result.get('audio_seconds')
+                        logger.debug(f"🎧 Audiobook metadata: has_audiobook={has_audiobook}, duration={audio_seconds}s")
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to fetch audiobook metadata for '{book_title}': {e}")
+
             # Return ShowcaseCard-compatible format
             return {
                 "display_title": book_title,
@@ -316,6 +335,9 @@ async def enrich_books_with_abs(
                 "normalized_title": book_title.lower().replace(' ', '-'),
                 "mam_id": None,
                 "narrator": None,
+                # Audiobook metadata from Hardcover
+                "has_audiobook": has_audiobook,
+                "audio_seconds": audio_seconds,
                 # Provider fields not populated (use on-demand enrichment endpoint for these)
                 "series": [],
                 "asin": None,

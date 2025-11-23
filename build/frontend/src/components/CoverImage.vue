@@ -54,9 +54,12 @@ const props = defineProps({
   mamId: { type: String, required: true },
   title: { type: String, required: true },
   author: { type: String, default: '' },
+  initialUrl: { type: String, default: '' },  // Backend-provided cover URL (skips fetch)
   width: { type: Number, default: 60 },
   height: { type: Number, default: 80 },
   inLibrary: { type: Boolean, default: false },
+  hasAudiobook: { type: Boolean, default: null },  // null = unknown, true/false = known
+  seriesNumber: { type: [String, Number], default: null },
   fallbackSrc: { type: String, default: '' },
   priority: {
     type: String,
@@ -78,17 +81,25 @@ const intersectionOptions = computed(() => ({
   threshold: 0.01
 }))
 
-const { coverUrl, error, fetchCover } = useCover({
+const { coverUrl, error, fetchCover, badges } = useCover({
   mamId: props.mamId,
   title: props.title,
-  author: props.author
+  author: props.author,
+  initialUrl: props.initialUrl,  // Passthrough backend URL
+  priority: props.priority,
+  inLibrary: props.inLibrary,
+  hasAudiobook: props.hasAudiobook,
+  seriesNumber: props.seriesNumber
 })
 
 const localCoverUrl = ref('')
 
-// Fetch cover on mount
+// Fetch cover on mount (unless initialUrl provided)
 onMounted(async () => {
-  await fetchCover()
+  // If initialUrl provided, useCover already set coverUrl - no fetch needed
+  if (!props.initialUrl) {
+    await fetchCover()
+  }
   if (coverUrl.value) {
     localCoverUrl.value = coverUrl.value
   }

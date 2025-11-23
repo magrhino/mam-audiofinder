@@ -16,12 +16,13 @@ import HistoryImportForm from '../../components/HistoryImportForm.vue'
  * @param {object} config - Configuration object
  * @param {function} config.onVerify - Callback for verify button
  * @param {function} config.onRemove - Callback for remove button
+ * @param {function} config.isVerifying - Callback to check if item is verifying
  * @param {boolean} config.isMobile - Mobile breakpoint flag
  * @param {string} config.absBaseUrl - ABS base URL for library links
  * @returns {Array} Column configuration for n-data-table
  */
 function createColumns(config) {
-  const { onVerify, onRemove, isMobile, absBaseUrl } = config
+  const { onVerify, onRemove, isVerifying, isMobile, absBaseUrl } = config
 
   const columns = [
     // Expand column - built-in n-data-table expansion
@@ -44,30 +45,79 @@ function createColumns(config) {
       }
     },
 
-    // Cover column
+    // Cover column (clickable MAM link with library status)
     {
       title: 'Cover',
       key: 'cover',
       width: 80,
       render(row) {
-        return h(CoverImage, {
-          mamId: String(row.mam_id || ''),
-          title: row.title || '',
-          author: row.author || '',
-          width: 60,
-          height: 90,
-          inLibrary: false
+        if (!row.mam_id) {
+          return h(CoverImage, {
+            mamId: String(row.mam_id || ''),
+            title: row.title || '',
+            author: row.author || '',
+            width: 60,
+            height: 90,
+            inLibrary: row.abs_verify_status === 'verified'
+          })
+        }
+
+        const url = `https://www.myanonamouse.net/t/${encodeURIComponent(row.mam_id)}`
+        return h(NTooltip, {}, {
+          trigger: () => h(CoverImage, {
+            mamId: String(row.mam_id || ''),
+            title: row.title || '',
+            author: row.author || '',
+            width: 60,
+            height: 90,
+            inLibrary: row.abs_verify_status === 'verified',
+            onClick: () => {
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }
+          }),
+          default: () => 'Link to MAM Page'
         })
       }
     },
 
-    // Title column
+    // Title column (clickable MAM link with responsive truncation)
     {
       title: 'Title',
       key: 'title',
       minWidth: 150,
       render(row) {
-        return h('span', {}, row.title || '')
+        if (!row.mam_id) {
+          return h('span', {}, row.title || '')
+        }
+        const url = `https://www.myanonamouse.net/t/${encodeURIComponent(row.mam_id)}`
+        return h(NTooltip, {}, {
+          trigger: () => h('a', {
+            href: url,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            class: 'responsive-title',
+            style: {
+              color: 'inherit',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              display: 'inline-block',
+              maxWidth: 'clamp(120px, 30vw, 400px)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              wordBreak: 'keep-all'
+            },
+            onMouseenter: (e) => {
+              e.target.style.textDecoration = 'underline'
+              e.target.style.color = '#b8b8b8'
+            },
+            onMouseleave: (e) => {
+              e.target.style.textDecoration = 'none'
+              e.target.style.color = 'inherit'
+            }
+          }, row.title || ''),
+          default: () => 'Link to MAM Page'
+        })
       }
     },
 
@@ -91,25 +141,7 @@ function createColumns(config) {
       }
     },
 
-    // Link column
-    {
-      title: 'Link',
-      key: 'link',
-      width: 60,
-      align: 'center',
-      render(row) {
-        if (!row.mam_id) return null
-        const url = `https://www.myanonamouse.net/t/${encodeURIComponent(row.mam_id)}`
-        return h('a', {
-          href: url,
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          title: 'Open on MAM'
-        }, '🔗')
-      }
-    },
-
-    // When column
+    // When column (hidden on mobile)
     {
       title: 'When',
       key: 'added_at',
@@ -196,17 +228,24 @@ function createColumns(config) {
           ? `${absBaseUrl}/item/${row.abs_item_id}`
           : null
 
+        const isCurrentlyVerifying = isVerifying && isVerifying(row.id)
         const buttons = [
-          // Verify button
+          // Verify button with loading state
           h(NButton, {
             type: 'info',
             ghost: true,
             round: true,
             size: 'small',
-            disabled: !row.imported_at,
+            disabled: !row.imported_at || isCurrentlyVerifying,
+            loading: isCurrentlyVerifying,
             onClick: () => onVerify && onVerify(row)
           }, {
-            default: () => isMobile ? '🔄' : '🔄 Verify'
+            default: () => {
+              if (isCurrentlyVerifying) {
+                return isMobile ? '⏳' : 'Verifying...'
+              }
+              return isMobile ? '🔄' : '🔄 Verify'
+            }
           }),
 
           // Remove button with confirmation
@@ -256,10 +295,11 @@ function createColumns(config) {
  * Main composable for history data table
  * @param {object} config - Configuration object
  * @param {function} config.onUpdated - Callback when data needs refresh
+ * @param {function} config.isVerifying - Callback to check if item is verifying (optional)
  * @returns {object} Table state and methods
  */
 export function useHistoryDataTable(config = {}) {
-  const { onUpdated } = config
+  const { onUpdated, isVerifying } = config
 
   // Responsive breakpoints
   const breakpoints = useBreakpoints({
@@ -315,13 +355,14 @@ export function useHistoryDataTable(config = {}) {
     const cols = createColumns({
       onVerify: handleVerify,
       onRemove: handleRemove,
+      isVerifying: isVerifying,
       isMobile: isMobile.value,
       absBaseUrl: absBaseUrl.value
     })
 
-    // Filter out Author and Narrator columns on mobile
+    // Filter out Author, Narrator, and When columns on mobile
     if (isMobile.value) {
-      return cols.filter(col => !['author', 'narrator'].includes(col.key))
+      return cols.filter(col => !['author', 'narrator', 'added_at'].includes(col.key))
     }
 
     return cols

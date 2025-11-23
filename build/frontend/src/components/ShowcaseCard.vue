@@ -3,11 +3,15 @@
     <div class="showcase-versions-badge">{{ versionsLabel }}</div>
     <div class="showcase-cover-skeleton" v-if="loadingCover">
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
+      <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
+      <span v-if="group.has_audiobook === false" class="audiobook-unavailable-badge" title="No Audiobook Available">🚫 Audio</span>
     </div>
     <div class="showcase-cover-wrapper" v-else>
       <img v-if="coverUrl" class="showcase-cover" :src="coverUrl" :alt="group.display_title" loading="lazy" />
       <div v-else class="showcase-cover-placeholder">📚</div>
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
+      <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
+      <span v-if="group.has_audiobook === false" class="audiobook-unavailable-badge" title="No Audiobook Available">🚫 Audio</span>
     </div>
     <div class="showcase-title">{{ group.display_title }}</div>
     <div class="showcase-author">{{ group.author }}</div>
@@ -18,80 +22,43 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useApi } from '@composables/useApi'
+import { computed, onMounted, ref } from 'vue'
+import { useCover } from '@composables/naive/useCover'
 
 const props = defineProps({
   group: {
     type: Object,
     required: true
+  },
+  seriesNumber: {
+    type: [String, Number],
+    default: null
   }
 })
 
 const emit = defineEmits(['select'])
 
-const api = useApi()
-const coverUrl = ref('')
-const loadingCover = ref(true)
 const cardElement = ref(null)
-const observer = ref(null)
 
-const loadCover = async () => {
-  loadingCover.value = true
-  try {
-    if (props.group.cover_url) {
-      coverUrl.value = props.group.cover_url
-      loadingCover.value = false
-    } else if (props.group.mam_id && props.group.display_title) {
-      const data = await api.fetchCover({
-        mam_id: props.group.mam_id,
-        title: props.group.display_title,
-        author: props.group.author || '',
-        max_retries: '2'
-      })
-      coverUrl.value = data.cover_url || ''
-      loadingCover.value = false
-    } else {
-      loadingCover.value = false
-    }
-  } catch (err) {
-    console.warn('Cover load failed', err)
-    loadingCover.value = false
-  }
-}
+// Use enhanced useCover composable with lazy loading and passthrough support
+const { coverUrl, loading: loadingCover, setupLazyLoad } = useCover({
+  mamId: props.group.mam_id || '',
+  title: props.group.display_title || '',
+  author: props.group.author || '',
+  initialUrl: props.group.cover_url || '',  // Backend passthrough (skips fetch)
+  lazy: true,  // Enable lazy loading
+  priority: 'normal',  // Standard 50px preload
+  inLibrary: props.group.in_abs_library || false
+})
 
-// Use IntersectionObserver for true lazy loading
+// Setup lazy loading when card mounts
 onMounted(() => {
-  observer.value = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting && loadingCover.value) {
-          // Card is visible, load the cover
-          loadCover()
-          // Stop observing once loaded
-          if (observer.value && cardElement.value) {
-            observer.value.unobserve(cardElement.value)
-          }
-        }
-      })
-    },
-    {
-      rootMargin: '50px', // Start loading 50px before card enters viewport
-      threshold: 0.1 // Trigger when 10% of card is visible
-    }
-  )
-
-  // Get the card element (parent div)
+  // Get the card element
   const element = document.querySelector(`.showcase-card[data-mam-id="${props.group.mam_id}"]`)
   if (element) {
     cardElement.value = element
-    observer.value.observe(element)
-  }
-})
-
-onUnmounted(() => {
-  if (observer.value && cardElement.value) {
-    observer.value.unobserve(cardElement.value)
+    // Setup IntersectionObserver for lazy loading (unless cover already loaded from cache/passthrough)
+    setupLazyLoad(element)
   }
 })
 
@@ -334,6 +301,68 @@ const handleClick = () => {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Series number badge (top-left) */
+.series-number-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(80, 0, 0, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  cursor: help;
+  animation: fadeIn 0.3s ease-in;
+  border: 2px solid rgba(106, 0, 0, 0.6);
+}
+
+.series-number-badge:hover {
+  background: rgba(106, 0, 0, 1);
+  transform: scale(1.1);
+  transition: all 0.2s ease;
+}
+
+/* Audiobook unavailable badge (top-right of cover, red warning) */
+.audiobook-unavailable-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(180, 0, 0, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  cursor: help;
+  animation: fadeIn 0.3s ease-in;
+  border: 1px solid rgba(220, 0, 0, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.audiobook-unavailable-badge:hover {
+  background: rgba(200, 0, 0, 1);
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
 }
 
 /* Responsive */

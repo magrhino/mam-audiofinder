@@ -415,13 +415,15 @@ async function loadBooksPage(page) {
   }
 }
 
-// Handle book card click - navigate to ShowcaseView for MAM search
+// Handle book card click - navigate to ShowcaseView with detail view open
 function handleBookClick(book) {
+  const normalizedTitle = book.display_title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '')
   router.push({
     name: 'showcase',
     query: {
       q: book.display_title,
-      limit: '25'
+      limit: '25',
+      detail: normalizedTitle  // Open detail view immediately
     }
   })
 }
