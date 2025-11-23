@@ -61,7 +61,7 @@
     <n-card v-if="detailGroup" class="detail-card" :bordered="false" ref="detailElement">
       <template #header>
         <n-space justify="space-between" align="center">
-          <GlassTitle tag="h2">{{ detailGroup.display_title }}</GlassTitle>
+          <GlassTitle tag="h2" class="word-wrap-title">{{ detailGroup.display_title }}</GlassTitle>
           <n-space :size="8">
             <n-button secondary @click="searchThisTitle" title="Search MAM for this title (25 results)">
               🔍 Search MAM
@@ -164,7 +164,7 @@
           :data="versionsData"
           :pagination="versionsPagination"
           :bordered="false"
-          :scroll-x="1400"
+          :scroll-x="versionsScrollX"
           striped
           class="versions-data-table"
         />
@@ -247,12 +247,13 @@ const handleAddTorrent = async (rowState) => {
   status.value = result.message
 }
 
-// Initialize versions data table with search configuration
+// Initialize versions data table with search configuration (includes responsive scroll-x)
 const {
   tableRef: versionsTableRef,
   data: versionsData,
   columns: versionsColumns,
   pagination: versionsPagination,
+  scrollX: versionsScrollX,
   setData: setVersionsData,
   clearData: clearVersionsData
 } = useMAMSearchDataTable({
@@ -352,16 +353,15 @@ const showDetail = async (group) => {
     detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Fetch description separately (CoverImage component handles cover loading)
-  if (group.mam_id && group.display_title) {
+  // Fetch description using on-demand enrichment (CoverImage component handles cover loading)
+  if (group.display_title) {
     descriptionLoading.value = true
 
     try {
-      const data = await api.fetchCover({
-        mam_id: group.mam_id,
+      const data = await api.enrichMetadata({
         title: group.display_title,
         author: group.author || '',
-        max_retries: '3'
+        mam_id: group.mam_id || ''
       })
 
       // Set description if available
@@ -369,7 +369,7 @@ const showDetail = async (group) => {
         detailDescription.value = data.description
       }
     } catch (err) {
-      console.warn('Failed to load description:', err)
+      console.warn('Failed to load enriched metadata:', err)
     } finally {
       descriptionLoading.value = false
     }
@@ -431,21 +431,20 @@ const restoreDetailFromUrl = async () => {
       detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
 
-    // Fetch description separately (CoverImage component handles cover loading)
-    if (group.mam_id && group.display_title) {
+    // Fetch description using on-demand enrichment (CoverImage component handles cover loading)
+    if (group.display_title) {
       descriptionLoading.value = true
 
-      api.fetchCover({
-        mam_id: group.mam_id,
+      api.enrichMetadata({
         title: group.display_title,
         author: group.author || '',
-        max_retries: '3'
+        mam_id: group.mam_id || ''
       }).then(data => {
         if (data.description) {
           detailDescription.value = data.description
         }
       }).catch(err => {
-        console.warn('Failed to load description:', err)
+        console.warn('Failed to load enriched metadata:', err)
       }).finally(() => {
         descriptionLoading.value = false
       })
@@ -636,6 +635,21 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
     width: 100%;
     max-width: 300px;
     align-self: center;
+  }
+
+  /* Detail Mode: Remove card max-width on mobile, keep page padding */
+  .detail-card {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* Tablet responsive */
+@media (min-width: 769px) and (max-width: 1023px) {
+  /* Detail Mode: Remove card max-width on tablet, keep page padding */
+  .detail-card {
+    width: 100%;
+    max-width: none;
   }
 }
 </style>

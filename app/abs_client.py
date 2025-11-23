@@ -37,10 +37,10 @@ class AudiobookshelfClient:
         # Initialize shared client and semaphore if not already done
         if AudiobookshelfClient._shared_client is None:
             AudiobookshelfClient._shared_client = httpx.AsyncClient(
-                timeout=30.0,  # Increased from 10s to handle load
+                timeout=8.0,  # Reduced from 30s to fail fast and free semaphore slots
                 limits=httpx.Limits(max_keepalive_connections=20, max_connections=50)
             )
-            logger.info("🔧 Initialized shared HTTP client for ABS requests")
+            logger.info("🔧 Initialized shared HTTP client for ABS requests (8s timeout)")
 
         if AudiobookshelfClient._request_semaphore is None:
             AudiobookshelfClient._request_semaphore = asyncio.Semaphore(10)
@@ -274,7 +274,8 @@ class AudiobookshelfClient:
                 r = await self._shared_client.get(
                     f"{self.base_url}/api/search/covers",
                     headers=headers,
-                    params=params
+                    params=params,
+                    timeout=8.0  # Per-request timeout for cover fetching
                 )
 
                 logger.info(f"📡 ABS /api/search/covers response: HTTP {r.status_code}")
@@ -318,7 +319,8 @@ class AudiobookshelfClient:
                     r = await self._shared_client.get(
                         f"{self.base_url}/api/libraries/{self.library_id}/items",
                         headers=headers,
-                        params={"limit": 5, "minified": "1"}
+                        params={"limit": 5, "minified": "1"},
+                        timeout=8.0  # Per-request timeout for library search
                     )
 
                     logger.info(f"📡 ABS library items response: HTTP {r.status_code}")
@@ -645,6 +647,10 @@ class AudiobookshelfClient:
 
     async def fetch_item_details(self, item_id: str) -> dict:
         """
+        DEPRECATED: This method only works for items already in the ABS library.
+        Use _fetch_from_provider() instead for enriched metadata that works with
+        non-library items (search results, showcase view).
+
         Fetch full item metadata from Audiobookshelf.
 
         Args:
@@ -658,6 +664,8 @@ class AudiobookshelfClient:
             Empty dict {} if fetch fails or item not found.
 
         Uses in-memory caching with TTL to reduce API calls.
+
+        TODO: Remove after verifying _fetch_from_provider() works correctly in production.
         """
         if not self.is_configured:
             logger.debug("📚 ABS not configured, skipping item details fetch")
@@ -1012,7 +1020,8 @@ class AudiobookshelfClient:
                 r = await self._shared_client.get(
                     f"{self.base_url}/api/search/books",
                     headers=headers,
-                    params=params
+                    params=params,
+                    timeout=6.0  # Per-request timeout: fail fast for slow providers
                 )
 
                 logger.debug(f"📡 Provider {provider} response: HTTP {r.status_code}")

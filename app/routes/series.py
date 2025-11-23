@@ -240,68 +240,54 @@ async def enrich_books_with_abs(
     series_author: str
 ) -> List[dict]:
     """
-    Translation layer: Enrich Hardcover books with ABS data.
+    Translation layer: Enrich Hardcover books with ABS cover data.
 
-    Fetches covers, library status, and enhanced metadata from Audiobookshelf
-    for each book, returning ShowcaseCard-compatible format.
+    Fetches covers and library status from Audiobookshelf for each book,
+    returning ShowcaseCard-compatible format. Uses lightweight fetch_cover
+    method (not provider enrichment) for fast series loading.
 
     Args:
         books: Hardcover-enriched books from get_book_series_info()
         series_author: Series author for ABS lookups
 
     Returns:
-        List of ShowcaseCard-compatible book objects with enhanced metadata
+        List of ShowcaseCard-compatible book objects with covers and library status
     """
     logger.info(f"📚 Enriching {len(books)} books with ABS data")
 
-    # Enrich each book with ABS data (5 concurrent requests max)
-    semaphore = asyncio.Semaphore(5)
+    # Enrich each book with ABS data (10 concurrent requests max)
+    semaphore = asyncio.Semaphore(10)
 
     async def enrich_single_book(book: dict) -> dict:
-        """Enrich a single book with ABS cover, library status, and provider metadata."""
+        """Enrich a single book with ABS cover and library status (lightweight, no provider enrichment)."""
         async with semaphore:
             book_title = book.get('title', '')
             book_author = book.get('author', series_author)
             book_id = book.get('book_id')
 
-            # Enhanced metadata enrichment
-            enhanced_metadata = {}
+            # Lightweight cover fetching (no provider enrichment for series listing)
             cover_url = ''
             item_id = None
+            description = book.get('description', '')
 
             if abs_client.is_configured:
                 try:
-                    # Try provider enrichment (Audible → Google → OpenLibrary)
-                    providers = ['audible', 'google', 'openlibrary']
-                    for provider in providers:
-                        logger.debug(f"🌐 Trying provider {provider} for '{book_title}'")
-                        result = await abs_client._fetch_from_provider(
-                            provider=provider,
-                            item_id=str(book_id) if book_id else '',
-                            title=book_title,
-                            author=book_author,
-                            fallback_title_only=True
-                        )
-                        if result:
-                            enhanced_metadata = result
-                            cover_url = result.get('cover', '')
-                            logger.info(f"✅ Enhanced metadata from {provider} for '{book_title}'")
-                            break
-
-                    # Fallback to basic fetch_cover if provider enrichment fails
-                    if not enhanced_metadata:
-                        logger.debug(f"🔄 Falling back to basic fetch_cover for '{book_title}'")
-                        cover_data = await abs_client.fetch_cover(
-                            title=book_title,
-                            author=book_author,
-                            mam_id='',
-                            force_refresh=False
-                        )
-                        cover_url = cover_data.get('cover_url', '')
-                        item_id = cover_data.get('item_id')
+                    # Use fetch_cover for fast, lightweight cover retrieval
+                    logger.debug(f"📸 Fetching cover for '{book_title}'")
+                    cover_data = await abs_client.fetch_cover(
+                        title=book_title,
+                        author=book_author,
+                        mam_id='',
+                        force_refresh=False
+                    )
+                    cover_url = cover_data.get('cover_url', '')
+                    item_id = cover_data.get('item_id')
+                    # If fetch_cover found item in library, use its description
+                    if cover_data.get('description'):
+                        description = cover_data.get('description')
 
                 except Exception as e:
-                    logger.warning(f"⚠️  Failed to enrich '{book_title}': {e}")
+                    logger.warning(f"⚠️  Failed to fetch cover for '{book_title}': {e}")
 
             # Check if in ABS library
             in_library = False
@@ -315,27 +301,27 @@ async def enrich_books_with_abs(
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to check library for '{book_title}': {e}")
 
-            # Return ShowcaseCard-compatible format with enhanced metadata
+            # Return ShowcaseCard-compatible format
             return {
                 "display_title": book_title,
                 "author": book_author,
                 "cover_url": cover_url,
-                "abs_item_id": item_id or enhanced_metadata.get('id'),
+                "abs_item_id": item_id,
                 "in_abs_library": in_library,
-                "description": enhanced_metadata.get('description', book.get('description', '')),
+                "description": description,
                 "release_year": book.get('release_year'),
                 "book_id": book.get('book_id'),
                 "formats": [],
                 "total_versions": 1,
                 "normalized_title": book_title.lower().replace(' ', '-'),
                 "mam_id": None,
-                "narrator": enhanced_metadata.get('narrator'),
-                # Enhanced fields from provider
-                "series": enhanced_metadata.get('series', []),
-                "asin": enhanced_metadata.get('asin'),
-                "isbn": enhanced_metadata.get('isbn'),
-                "publisher": enhanced_metadata.get('publisher'),
-                "rating": enhanced_metadata.get('rating')
+                "narrator": None,
+                # Provider fields not populated (use on-demand enrichment endpoint for these)
+                "series": [],
+                "asin": None,
+                "isbn": None,
+                "publisher": None,
+                "rating": None
             }
 
     # Enrich books concurrently

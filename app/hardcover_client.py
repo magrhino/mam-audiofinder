@@ -809,35 +809,6 @@ class HardcoverClient:
         )
 
         return books
-# todo # 2: evaluate and test new query which provides more detailed book info and allows for better duplcate handling
-# example query:
-# query LordOfTheRingsBooks {
-#     search(
-#         query: "lord of the rings",
-#         query_type: "Book",
-#         per_page: 1,
-#         page: 1,
-#         fields: "title,alternative_titles,author_names,isbns,audio_seconds,has_audiobook,rating",
-#         sort: "users_count:desc,ratings_count:desc",
-#         weights: "5,3,2,1,1,1,1"
-#     ) {
-#         results
-#     }
-# }
-# Key changes:
-
-# per_page: 1 - Returns only the single most popular result
-# sort: "users_count:desc,ratings_count:desc" - Sorts by number of users (most popular metric) first, then by number of ratings
-# fields - Includes alternative_titles to get the alternate titles you need
-# weights: "5,3,2,1" - Prioritizes exact title matches (5), then alternative titles (3), author names (2), and ISBNs (1)
-# Added fields:
-
-# audio_seconds - Number of seconds for the default audiobook edition
-# has_audiobook - Boolean indicating if an audiobook is available
-# rating - Hardcover average rating
-# This will return the most popular "Lord of the Rings" book based on user count, along with all its alternative titles that you can then filter out from subsequent searches.
-# all response fields should be extracted and stored in the local database for more advanced searching and filtering later on.
-
 
     async def search_book_by_title(
         self,

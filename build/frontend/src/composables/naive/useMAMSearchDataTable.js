@@ -5,7 +5,7 @@
  */
 
 import { ref, computed, h } from 'vue'
-import { NButton, NTag, NTooltip } from 'naive-ui'
+import { NButton, NTag, NTooltip, NText, NSpace } from 'naive-ui'
 import { useBreakpoints } from '@vueuse/core'
 import { formatSize, escapeHtml } from '@core/utils.js'
 import CoverImage from '../../components/CoverImage.vue'
@@ -16,7 +16,7 @@ import DateUploadedIcon from '../../components/icons/DateUploadedIcon.vue'
 
 /**
  * Parse size values to bytes for accurate sorting
- * Handles both numeric bytes and string formats like "1.1 GiB" or ".768 MiB"
+ * Handles both numeric bytes and string formats like "1.1 GiB", "768 MiB", or "1,132 MiB"
  * @param {number|string} size - Size value (numeric bytes or string with unit)
  * @returns {number} Size in bytes (0 for invalid input)
  */
@@ -27,8 +27,11 @@ function parseSizeToBytes(size) {
   const numericSize = Number(size)
   if (Number.isFinite(numericSize)) return numericSize
 
-  // Parse string format like "1.1 GiB" or "768 MiB"
-  const match = String(size).match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)?$/i)
+  // Strip commas from string format (e.g., "1,132 MiB" → "1132 MiB")
+  const cleanedSize = String(size).replace(/,/g, '')
+
+  // Parse string format like "1.1 GiB", "768 MiB", or "1132 MiB" (after comma removal)
+  const match = cleanedSize.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)?$/i)
   if (!match) return 0
 
   const value = parseFloat(match[1])
@@ -62,6 +65,50 @@ function createColumns(viewType, callbacks, responsive = {}) {
   const { isMobile = false, isTablet = false } = responsive
 
   const columns = {
+    // Expandable row column (mobile only) - shows hidden fields
+    expand: {
+      type: 'expand',
+      expandable: () => true,
+      renderExpand(row) {
+        // Render hidden fields in expanded section
+        return h('div', {
+          style: 'padding: 1rem; background: rgba(42, 42, 42, 0.3); border-radius: 8px;'
+        }, [
+          h(NSpace, { vertical: true, size: 12 }, {
+            default: () => [
+              // Author
+              h('div', {}, [
+                h(NText, { depth: 3, strong: true }, { default: () => 'Author: ' }),
+                h(NText, { depth: 2 }, { default: () => escapeHtml(row.author_info || row.author || 'N/A') })
+              ]),
+              // Narrator
+              h('div', {}, [
+                h(NText, { depth: 3, strong: true }, { default: () => 'Narrator: ' }),
+                h(NText, { depth: 2 }, { default: () => escapeHtml(row.narrator_info || row.narrator || 'N/A') })
+              ]),
+              // Format
+              h('div', {}, [
+                h(NText, { depth: 3, strong: true }, { default: () => 'Format: ' }),
+                h(NText, { depth: 2 }, { default: () => escapeHtml(row.format || 'N/A') })
+              ]),
+              // Seeders/Leechers
+              h('div', {}, [
+                h(NText, { depth: 3, strong: true }, { default: () => 'Seeders/Leechers: ' }),
+                h(NText, { depth: 2 }, {
+                  default: () => `${row.seeders ?? '-'} / ${row.leechers ?? '-'}`
+                })
+              ]),
+              // Uploaded date
+              h('div', {}, [
+                h(NText, { depth: 3, strong: true }, { default: () => 'Uploaded: ' }),
+                h(NText, { depth: 2 }, { default: () => escapeHtml(row.added || 'N/A') })
+              ])
+            ]
+          })
+        ])
+      }
+    },
+
     // Cover column with library indicator, tooltip, and MAM link functionality
     cover: {
       title: 'Cover',
@@ -123,11 +170,11 @@ function createColumns(viewType, callbacks, responsive = {}) {
       }
     },
 
-    // Narrator column with filtering
+    // Narrator column with filtering (responsive width for tablet compression)
     narrator: {
       title: 'Narrator',
       key: 'narrator',
-      minWidth: 150,
+      minWidth: isTablet ? 120 : 150,  // Compressed width on tablet for 10-12" displays
       sorter: (a, b) => {
         const narratorA = a.narrator_info || a.narrator || ''
         const narratorB = b.narrator_info || b.narrator || ''
@@ -416,6 +463,17 @@ export function useMAMSearchDataTable(config = {}) {
   const isMobile = computed(() => breakpoints.smaller('tablet').value)
   const isTablet = computed(() => breakpoints.between('tablet', 'desktop').value)
 
+  // Responsive scroll-x for table horizontal scrolling
+  const scrollX = computed(() => {
+    if (breakpoints.greater('desktop').value) {
+      return 1400 // Desktop: More space for expanded columns
+    } else if (breakpoints.greater('tablet').value) {
+      return 1200 // Tablet: Standard layout
+    } else {
+      return 900 // Mobile: Compact layout
+    }
+  })
+
   // Table ref for programmatic control
   const tableRef = ref(null)
 
@@ -441,23 +499,26 @@ export function useMAMSearchDataTable(config = {}) {
 
     // Filter columns based on screen size
     if (viewType === 'search') {
-      // Mobile: Show only essential columns (cover, title, size, actions)
+      // Mobile: Show expand column + essential columns (expand, cover, title, size, actions)
       if (isMobile.value) {
-        return allColumns.filter(col =>
+        const essentialColumns = allColumns.filter(col =>
           ['cover', 'title', 'size', 'action'].includes(col.key)
         )
+        // Add expand column at the beginning
+        const expandColumn = allColumns.find(col => col.type === 'expand')
+        return expandColumn ? [expandColumn, ...essentialColumns] : essentialColumns
       }
 
-      // Tablet: Hide less critical columns (format, uploaded)
+      // Tablet: Hide less critical columns (format, uploaded) and no expand column
       if (isTablet.value) {
         return allColumns.filter(col =>
-          !['format', 'uploaded'].includes(col.key)
+          col.type !== 'expand' && !['format', 'uploaded'].includes(col.key)
         )
       }
     }
 
-    // Desktop or other views: Show all columns
-    return allColumns
+    // Desktop or other views: Show all columns except expand (expand is mobile-only)
+    return allColumns.filter(col => col.type !== 'expand')
   })
 
   // Programmatic table controls
@@ -502,6 +563,11 @@ export function useMAMSearchDataTable(config = {}) {
     loading,
     pagination,
     columns,
+    scrollX,
+
+    // Responsive breakpoint helpers
+    isMobile,
+    isTablet,
 
     // Methods
     setData,

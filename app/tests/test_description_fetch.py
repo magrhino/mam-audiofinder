@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: This test file is non-functional.
+
+The logic tested here uses the old fetch_item_details() method which only works
+for items already in the ABS library. The correct provider-based enrichment logic
+is tested in test_abs_providers.py, which uses _fetch_from_provider() and works
+for non-library items.
+
+TODO: Remove this file after verifying test_abs_providers.py covers all cases.
+
 Test script to verify description fetching after import verification.
 This simulates the verification process and checks if descriptions are saved.
 """

@@ -1,5 +1,5 @@
 <template>
-  <div class="showcase-card" @click="handleClick">
+  <div class="showcase-card" @click="handleClick" :data-mam-id="group.mam_id">
     <div class="showcase-versions-badge">{{ versionsLabel }}</div>
     <div class="showcase-cover-skeleton" v-if="loadingCover">
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useApi } from '@composables/useApi'
 
 const props = defineProps({
@@ -33,12 +33,15 @@ const emit = defineEmits(['select'])
 const api = useApi()
 const coverUrl = ref('')
 const loadingCover = ref(true)
+const cardElement = ref(null)
+const observer = ref(null)
 
 const loadCover = async () => {
   loadingCover.value = true
   try {
     if (props.group.cover_url) {
       coverUrl.value = props.group.cover_url
+      loadingCover.value = false
     } else if (props.group.mam_id && props.group.display_title) {
       const data = await api.fetchCover({
         mam_id: props.group.mam_id,
@@ -47,15 +50,50 @@ const loadCover = async () => {
         max_retries: '2'
       })
       coverUrl.value = data.cover_url || ''
+      loadingCover.value = false
+    } else {
+      loadingCover.value = false
     }
   } catch (err) {
     console.warn('Cover load failed', err)
-  } finally {
     loadingCover.value = false
   }
 }
 
-onMounted(loadCover)
+// Use IntersectionObserver for true lazy loading
+onMounted(() => {
+  observer.value = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && loadingCover.value) {
+          // Card is visible, load the cover
+          loadCover()
+          // Stop observing once loaded
+          if (observer.value && cardElement.value) {
+            observer.value.unobserve(cardElement.value)
+          }
+        }
+      })
+    },
+    {
+      rootMargin: '50px', // Start loading 50px before card enters viewport
+      threshold: 0.1 // Trigger when 10% of card is visible
+    }
+  )
+
+  // Get the card element (parent div)
+  const element = document.querySelector(`.showcase-card[data-mam-id="${props.group.mam_id}"]`)
+  if (element) {
+    cardElement.value = element
+    observer.value.observe(element)
+  }
+})
+
+onUnmounted(() => {
+  if (observer.value && cardElement.value) {
+    observer.value.unobserve(cardElement.value)
+  }
+})
 
 const versionsLabel = computed(() => {
   const total = props.group.total_versions || 0

@@ -289,5 +289,37 @@ export const api = {
       throw new Error(msg);
     }
     return resp.json();
+  },
+
+  /**
+   * On-demand metadata enrichment for detail views.
+   * Calls provider APIs in parallel to fetch enhanced metadata including descriptions.
+   * Only used when user explicitly opens a detail view.
+   *
+   * @param {Object} params - Enrichment parameters
+   * @param {string} params.title - Book title (required)
+   * @param {string} params.author - Author name (optional)
+   * @param {string} params.mam_id - MAM torrent ID (optional)
+   * @returns {Promise<{description: string, cover: string, asin?: string, isbn?: string, publisher?: string, narrator?: string, series: Array, rating?: number, source: string}>}
+   */
+  async enrichMetadata(params) {
+    const resp = await fetch('/api/covers/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: params.title,
+        author: params.author || '',
+        mam_id: params.mam_id || ''
+      })
+    });
+    if (!resp.ok) {
+      let msg = `HTTP ${resp.status}`;
+      try {
+        const j = await resp.json();
+        if (j?.detail) msg += ` — ${j.detail}`;
+      } catch {}
+      throw new Error(msg);
+    }
+    return resp.json();
   }
 };

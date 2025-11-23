@@ -173,6 +173,7 @@ export default defineConfig({
     'text-subtle': 'text-[#b8b8b8]',
     'code-inline': 'bg-[rgba(36,36,36,0.6)] px-[6px] py-[2px] rounded-sm font-mono text-[#6a0000]',
     'responsive-title': 'whitespace-nowrap overflow-hidden text-ellipsis max-w-[clamp(120px,30vw,400px)]',
+    'word-wrap-title': 'break-words hyphens-auto max-w-full',
 
     // Typography
     'heading-1': 'text-[1.4rem] font-semibold text-white m-0',

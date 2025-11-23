@@ -53,9 +53,8 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch, onMounted } from 'vue'
+import { reactive, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useBreakpoints } from '@vueuse/core'
 import { NDataTable, NSpace, NButton } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
@@ -70,30 +69,13 @@ const router = useRouter()
 // Unified add torrent flow
 const { addTorrent, isItemLoading } = useAddTorrentFlow()
 
-// Responsive breakpoints for dynamic scroll-x
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024
-})
-
-// Dynamic scroll-x based on screen size
-const scrollX = computed(() => {
-  if (breakpoints.greater('desktop').value) {
-    return 1400 // Desktop: More space for expanded columns
-  } else if (breakpoints.greater('tablet').value) {
-    return 1200 // Tablet: Standard layout
-  } else {
-    return 900 // Mobile: Compact layout
-  }
-})
-
-// Initialize data table with search configuration
+// Initialize data table with search configuration (includes responsive scroll-x)
 const {
   tableRef,
   data,
   columns,
   pagination,
+  scrollX,
   loading: tableLoading,
   setData,
   clearData,
