@@ -262,24 +262,52 @@ export const api = {
   },
 
   /**
-   * Get books in a series from Hardcover with optional ABS enrichment and pagination.
+   * Get books in a series from Hardcover with progressive enrichment support.
    * @param {number} seriesId - Hardcover series ID
    * @param {Object} options - Query options
-   * @param {number} options.per_page - Books per page (default: 5)
-   * @param {number} options.page - Page number, 1-indexed (default: 1)
-   * @param {boolean} options.enrich_abs - Enable ABS enrichment (default: true)
-   * @returns {Promise<{series_id: number, series_name: string, author_name: string, books: Array, total: number, page: number, per_page: number, total_pages: number, has_next: boolean, has_prev: boolean, timestamp: string}>}
+   * @param {string} options.enrich_mode - Enrichment mode: "immediate" (return basic data, enrich in background),
+   *                                       "wait" (wait for full enrichment), or "status" (check enrichment progress)
+   *                                       Default: "immediate" for fast initial load
+   * @param {number} options.per_page - Books per page (default: 5) [deprecated, pagination not implemented]
+   * @param {number} options.page - Page number, 1-indexed (default: 1) [deprecated, pagination not implemented]
+   * @returns {Promise<{series_id: number, series_name: string, author_name: string, books: Array, enrichment_status: string, enrichment_progress: Object, total: number, timestamp: string}>}
    */
   async getSeriesBooks(seriesId, options = {}) {
-    const { per_page = 5, page = 1, enrich_abs = true } = options;
+    const { per_page = 5, page = 1, enrich_mode = 'immediate' } = options;
 
     const params = new URLSearchParams({
-      per_page: String(per_page),
-      page: String(page),
-      enrich_abs: String(enrich_abs)
+      enrich_mode: enrich_mode
     });
 
+    // Keep per_page and page for backward compatibility (though backend ignores them currently)
+    if (per_page) params.append('per_page', String(per_page));
+    if (page) params.append('page', String(page));
+
     const resp = await fetch(`/api/series/${seriesId}/books?${params}`);
+    if (!resp.ok) {
+      let msg = `HTTP ${resp.status}`;
+      try {
+        const j = await resp.json();
+        if (j?.detail) msg += ` — ${j.detail}`;
+      } catch {}
+      throw new Error(msg);
+    }
+    return resp.json();
+  },
+
+  /**
+   * Fetch audiobook metadata for specific books in a series (or all books).
+   * This allows on-demand fetching of audiobook metadata from Hardcover without blocking the initial series load.
+   * @param {number} seriesId - Hardcover series ID
+   * @param {Array<number>|null} bookIndices - List of book positions to enrich, or null/[] for all books
+   * @returns {Promise<{series_id: number, enriched_count: number, books: Array, errors: Array}>}
+   */
+  async fetchSeriesAudioMetadata(seriesId, bookIndices = null) {
+    const resp = await fetch(`/api/series/${seriesId}/books/fetch-audio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ book_indices: bookIndices })
+    });
     if (!resp.ok) {
       let msg = `HTTP ${resp.status}`;
       try {

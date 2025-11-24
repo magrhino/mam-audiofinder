@@ -386,11 +386,21 @@ class CoverService:
             import json
             metadata_json_str = json.dumps(metadata_json) if metadata_json else None
 
+            # Extract audiobook metadata from metadata_json if present
+            has_audiobook = 0  # Default to 0 (no/unknown)
+            duration_minutes = None
+            if metadata_json and isinstance(metadata_json, dict):
+                has_audiobook = 1 if metadata_json.get("has_audiobook") is True else 0
+                # Convert audio_seconds to minutes for duration column
+                audio_seconds = metadata_json.get("audio_seconds")
+                if audio_seconds and isinstance(audio_seconds, (int, float)):
+                    duration_minutes = int(audio_seconds // 60)
+
             # Insert or replace the cover entry (separate connection block)
             with covers_engine.begin() as cx:
                 cx.execute(text("""
-                    INSERT INTO covers (mam_id, title, author, cover_url, abs_item_id, local_file, file_size, fetched_at, abs_description, abs_metadata, abs_metadata_fetched_at)
-                    VALUES (:mam_id, :title, :author, :cover_url, :item_id, :local_file, :file_size, :fetched_at, :description, :metadata, :metadata_fetched_at)
+                    INSERT INTO covers (mam_id, title, author, cover_url, abs_item_id, local_file, file_size, fetched_at, abs_description, abs_metadata, abs_metadata_fetched_at, has_audiobook, duration)
+                    VALUES (:mam_id, :title, :author, :cover_url, :item_id, :local_file, :file_size, :fetched_at, :description, :metadata, :metadata_fetched_at, :has_audiobook, :duration)
                     ON CONFLICT(mam_id) DO UPDATE SET
                         cover_url = :cover_url,
                         abs_item_id = :item_id,
@@ -401,7 +411,9 @@ class CoverService:
                         fetched_at = :fetched_at,
                         abs_description = :description,
                         abs_metadata = :metadata,
-                        abs_metadata_fetched_at = :metadata_fetched_at
+                        abs_metadata_fetched_at = :metadata_fetched_at,
+                        has_audiobook = :has_audiobook,
+                        duration = :duration
                 """), {
                     "mam_id": mam_id,
                     "title": title,
@@ -413,7 +425,9 @@ class CoverService:
                     "fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                     "description": description if description else None,
                     "metadata": metadata_json_str,
-                    "metadata_fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if metadata_json else None
+                    "metadata_fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if metadata_json else None,
+                    "has_audiobook": has_audiobook,
+                    "duration": duration_minutes
                 })
 
                 logger.info(f"✅ Cached cover for MAM ID {mam_id}: {final_cover_url}")

@@ -87,7 +87,7 @@
 
       <div class="detail-content">
         <!-- Series Metadata -->
-        <n-space :size="12" style="margin-bottom: 1.5rem">
+        <n-space :size="12" style="margin-bottom: 1.5rem" align="center">
           <n-tag v-if="detailItem.author_name" type="info" :bordered="false" size="medium">
             📝 {{ detailItem.author_name }}
           </n-tag>
@@ -97,9 +97,41 @@
           <n-tag v-if="detailItem.readers_count" type="success" :bordered="false" size="medium">
             📖 {{ detailItem.readers_count.toLocaleString() }} readers
           </n-tag>
+
+          <!-- Bulk Audiobook Metadata Fetch Button -->
+          <n-button
+            v-if="hasUnfetchedAudioMeta && !booksLoading"
+            type="primary"
+            size="small"
+            @click="fetchAudioMetadataForAll"
+            :loading="isFetchingAudioMeta"
+          >
+            <template #icon>
+              <span>🎧</span>
+            </template>
+            Fetch Audiobook Info
+          </n-button>
         </n-space>
 
         <n-divider />
+
+        <!-- Enrichment Progress Indicator -->
+        <n-card v-if="enrichmentProgress" class="glass-panel" size="small" style="margin-bottom: 1.5rem">
+          <n-space align="center" :size="12">
+            <n-spin size="small" />
+            <n-text style="flex: 1">
+              Loading covers and metadata...
+              <strong>{{ enrichmentProgress.completed }}/{{ enrichmentProgress.total }}</strong>
+            </n-text>
+            <n-progress
+              type="line"
+              :percentage="enrichmentProgress.percentage"
+              :show-indicator="false"
+              :height="6"
+              style="width: 200px"
+            />
+          </n-space>
+        </n-card>
 
         <!-- Books Grid -->
         <n-space justify="space-between" align="center" style="margin-bottom: 16px">
@@ -112,9 +144,11 @@
         <!-- Responsive Card Grid -->
         <div class="books-grid" :style="gridStyle">
           <ShowcaseCard
-            v-for="book in enrichedBooks"
+            v-for="book in paginatedBooks"
             :key="book.normalized_title"
             :group="book"
+            :seriesNumber="book.position"
+            :hideVersionBadge="true"
             @select="handleBookClick"
           />
         </div>
@@ -147,7 +181,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch, computed, nextTick } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBreakpoints } from '@vueuse/core'
 import {
@@ -157,10 +191,13 @@ import {
   NButton,
   NTag,
   NDivider,
-  NDataTable
+  NDataTable,
+  NSpin,
+  NProgress
 } from 'naive-ui'
 import { useApi } from '@composables/useApi'
 import { useSeriesDataTable } from '@composables/naive/useSeriesDataTable'
+import { useSeriesCache } from '@composables/useSeriesCache'
 import GlassSearchBar from '@components/GlassSearchBar.vue'
 import GlassSelect from '@components/GlassSelect.vue'
 import GlassTitle from '@components/GlassTitle.vue'
@@ -170,6 +207,7 @@ import ShowcaseCard from '@components/ShowcaseCard.vue'
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
+const seriesCache = useSeriesCache()
 
 // Responsive breakpoints for dynamic input width
 const breakpoints = useBreakpoints({
@@ -231,11 +269,34 @@ const {
 const enrichedBooks = ref([])
 const booksTotal = ref(0)
 const booksPage = ref(1)
-const booksPerPage = ref(5)
+const booksPerPage = ref(20)  // Show 20 books per page (was 5)
 const booksTotalPages = ref(0)
 const hasNextPage = ref(false)
 const hasPrevPage = ref(false)
 const booksLoading = ref(false)
+
+// Paginated books - slice enrichedBooks based on current page
+const paginatedBooks = computed(() => {
+  const start = (booksPage.value - 1) * booksPerPage.value
+  const end = start + booksPerPage.value
+  return enrichedBooks.value.slice(start, end)
+})
+
+// Progressive enrichment state
+const enrichmentProgress = ref(null)  // { total, completed, percentage }
+const enrichmentStatus = ref(null)    // 'pending', 'in_progress', 'complete', 'failed'
+let pollIntervals = []  // Track all polling intervals (safety net for multiple calls)
+
+// Audiobook metadata fetching state
+const isFetchingAudioMeta = ref(false)
+
+// Check if any books don't have audiobook metadata yet
+const hasUnfetchedAudioMeta = computed(() => {
+  return enrichedBooks.value.some(book => book.has_audiobook === undefined)
+})
+
+// Guard to prevent duplicate loadDetail() calls from watch cascade
+const currentDetailSeriesId = ref(null)
 
 // Responsive grid configuration
 const gridColumns = computed(() => {
@@ -334,16 +395,30 @@ const clearSearch = () => {
   status.value = 'Search for a title to see matching series.'
 }
 
-// Load series detail
+// Load series detail with progressive enrichment
 async function loadDetail(series, options = {}) {
   const { suppressNavigation = false } = options
+
+  // GUARD: Skip if already displaying this exact series (prevents watch cascade)
+  if (currentDetailSeriesId.value === String(series.series_id)) {
+    console.log(`[SeriesView] Series ${series.series_id} already loaded, skipping duplicate call`)
+    return
+  }
+
+  currentDetailSeriesId.value = String(series.series_id)
   status.value = 'Loading series books…'
   detailItem.value = series
+
+  // Stop ALL existing polling intervals
+  pollIntervals.forEach(id => clearInterval(id))
+  pollIntervals = []
 
   // Reset books state
   enrichedBooks.value = []
   booksPage.value = 1
   booksLoading.value = true
+  enrichmentProgress.value = null
+  enrichmentStatus.value = null
 
   await scrollToDetailCard()
 
@@ -358,60 +433,273 @@ async function loadDetail(series, options = {}) {
   }
 
   try {
+    // Check cache first
+    const cached = seriesCache.get(series.series_id)
+
+    // Use cached data if enrichment was complete OR still in progress (don't re-fetch)
+    if (cached && (
+      cached.enrichment_status === 'complete' ||
+      cached.enrichment_status === 'in_progress'
+    )) {
+      console.log(`[SeriesView] Cache HIT for series ${series.series_id} (status: ${cached.enrichment_status}) - using cached data`)
+      enrichedBooks.value = cached.books || []
+      booksTotal.value = cached.total || 0
+      enrichmentStatus.value = cached.enrichment_status
+      enrichmentProgress.value = cached.enrichment_progress
+      status.value = `${booksTotal.value} books in this series (from cache)`
+      booksLoading.value = false
+
+      // Calculate pagination
+      booksTotalPages.value = Math.ceil(booksTotal.value / booksPerPage.value)
+      hasNextPage.value = booksPage.value < booksTotalPages.value
+      hasPrevPage.value = booksPage.value > 1
+
+      // If still in progress, RESUME polling (don't restart enrichment)
+      if (cached.enrichment_status === 'in_progress') {
+        enrichmentProgress.value = cached.enrichment_progress
+        startEnrichmentPolling(series.series_id)
+      } else {
+        enrichmentProgress.value = null  // Hide progress bar for completed
+      }
+
+      return  // Skip API call
+    }
+
+    console.log(`[SeriesView] Cache MISS for series ${series.series_id} - fetching from API`)
+
+    // Step 1: Fetch basic book data immediately (with positions)
     const data = await api.getSeriesBooks(series.series_id, {
-      per_page: booksPerPage.value,
-      page: 1,
-      enrich_abs: true
+      enrich_mode: 'immediate'  // Progressive loading mode
     })
 
-    enrichedBooks.value = data.books || []
+    // Step 2: Display books immediately with basic data
+    enrichedBooks.value = (data.books || []).map(book => ({
+      ...book,
+      // Add placeholder fields if missing
+      display_title: book.display_title || book.title,
+      cover_url: book.cover_url || '',
+      enrichment_pending: !book.cover_url  // Mark as pending if no cover
+    }))
+
     booksTotal.value = data.total || 0
-    booksTotalPages.value = data.total_pages || 0
-    hasNextPage.value = data.has_next || false
-    hasPrevPage.value = data.has_prev || false
+    enrichmentStatus.value = data.enrichment_status
+    enrichmentProgress.value = data.enrichment_progress
+
+    // Cache the result
+    seriesCache.set(series.series_id, {
+      books: enrichedBooks.value,
+      total: booksTotal.value,
+      enrichment_status: enrichmentStatus.value,
+      enrichment_progress: enrichmentProgress.value
+    })
+
+    // Calculate pagination
+    booksTotalPages.value = Math.ceil(booksTotal.value / booksPerPage.value)
+    hasNextPage.value = booksPage.value < booksTotalPages.value
+    hasPrevPage.value = booksPage.value > 1
 
     status.value = `${booksTotal.value} books in this series`
+    booksLoading.value = false  // Books visible now
+
+    // Step 3: Start polling for enriched data if enrichment is in progress
+    if (enrichmentStatus.value === 'pending' || enrichmentStatus.value === 'in_progress') {
+      startEnrichmentPolling(series.series_id)
+    }
+
   } catch (err) {
     status.value = `Failed to load series: ${err.message}`
-  } finally {
     booksLoading.value = false
   }
 }
 
+// Start polling for enrichment status
+function startEnrichmentPolling(seriesId) {
+  const maxAttempts = 30  // 30 attempts × 2s = 60s max polling
+  let attempts = 0
+
+  const intervalId = setInterval(async () => {
+    attempts++
+
+    try {
+      const statusData = await api.getSeriesBooks(seriesId, {
+        enrich_mode: 'status'  // Check enrichment status
+      })
+
+      // Update progress
+      enrichmentProgress.value = statusData.enrichment_progress
+      enrichmentStatus.value = statusData.enrichment_status
+
+      // Merge enriched books (update covers, metadata in place)
+      if (statusData.books && statusData.books.length > 0) {
+        mergeBooksData(statusData.books)
+      }
+
+      // Stop polling when complete, failed, or max attempts reached
+      if (
+        statusData.enrichment_status === 'complete' ||
+        statusData.enrichment_status === 'failed' ||
+        statusData.enrichment_status === 'not_found' ||
+        attempts >= maxAttempts
+      ) {
+        clearInterval(intervalId)
+        // Remove from tracking array
+        pollIntervals = pollIntervals.filter(id => id !== intervalId)
+        enrichmentProgress.value = null  // Hide progress bar
+
+        // Update cache with final status
+        if (detailItem.value && detailItem.value.series_id) {
+          seriesCache.set(detailItem.value.series_id, {
+            books: enrichedBooks.value,
+            total: booksTotal.value,
+            enrichment_status: statusData.enrichment_status,
+            enrichment_progress: null
+          })
+        }
+
+        if (statusData.enrichment_status === 'failed') {
+          status.value = `Enrichment failed. Showing basic data only.`
+        } else if (statusData.enrichment_status === 'complete') {
+          status.value = `${booksTotal.value} books in this series (fully loaded)`
+        }
+      }
+
+    } catch (err) {
+      console.error('[SeriesView] Enrichment polling error:', err)
+      // Continue polling despite errors (API might be temporarily unavailable)
+    }
+
+  }, 2000)  // Poll every 2 seconds
+
+  // Track this interval
+  pollIntervals.push(intervalId)
+}
+
+// Merge enriched book data into existing books array
+function mergeBooksData(newBooks) {
+  // Use cache merge if we have detailItem (series_id available)
+  if (detailItem.value && detailItem.value.series_id) {
+    // Try to merge via cache
+    const merged = seriesCache.mergeBooksData(detailItem.value.series_id, newBooks)
+
+    if (merged) {
+      // Cache merge succeeded, retrieve updated data
+      const cached = seriesCache.get(detailItem.value.series_id)
+      if (cached && cached.books) {
+        enrichedBooks.value = cached.books
+        return
+      }
+    }
+  }
+
+  // Fallback to local merge if cache merge failed
+  enrichedBooks.value = enrichedBooks.value.map(existingBook => {
+    // Find matching enriched book by title + author
+    const enriched = newBooks.find(b =>
+      (b.display_title === existingBook.display_title || b.title === existingBook.title) &&
+      b.author === existingBook.author
+    )
+
+    if (enriched) {
+      // Merge enriched data (covers, metadata, etc.)
+      return {
+        ...existingBook,
+        ...enriched,
+        enrichment_pending: false  // Mark as enriched
+      }
+    }
+
+    return existingBook  // Keep existing data if no match
+  })
+}
+
+// Fetch audiobook metadata for all books in the series
+async function fetchAudioMetadataForAll() {
+  if (!detailItem.value || isFetchingAudioMeta.value) return
+
+  isFetchingAudioMeta.value = true
+  const seriesId = detailItem.value.series_id
+
+  try {
+    console.log(`[SeriesView] Fetching audiobook metadata for all books in series ${seriesId}`)
+
+    const result = await api.fetchSeriesAudioMetadata(seriesId, null)
+
+    console.log(`[SeriesView] Enriched ${result.enriched_count} books with audiobook metadata`)
+
+    // Merge enriched audiobook data into existing books
+    if (result.books && result.books.length > 0) {
+      enrichedBooks.value = enrichedBooks.value.map(existingBook => {
+        const enriched = result.books.find(b =>
+          b.position === existingBook.position ||
+          (b.display_title === existingBook.display_title && b.author === existingBook.author)
+        )
+
+        if (enriched) {
+          // Merge audiobook metadata
+          return {
+            ...existingBook,
+            has_audiobook: enriched.has_audiobook,
+            audio_seconds: enriched.audio_seconds
+          }
+        }
+
+        return existingBook
+      })
+
+      // Update cache with new audiobook metadata
+      if (detailItem.value && detailItem.value.series_id) {
+        seriesCache.set(detailItem.value.series_id, {
+          books: enrichedBooks.value,
+          total: booksTotal.value,
+          enrichment_status: enrichmentStatus.value,
+          enrichment_progress: enrichmentProgress.value
+        })
+      }
+    }
+
+    if (result.errors && result.errors.length > 0) {
+      console.warn(`[SeriesView] ${result.errors.length} books failed to fetch audiobook metadata:`, result.errors)
+    }
+
+  } catch (err) {
+    console.error('[SeriesView] Failed to fetch audiobook metadata:', err)
+    status.value = `Failed to fetch audiobook metadata: ${err.message}`
+  } finally {
+    isFetchingAudioMeta.value = false
+  }
+}
+
+// Cleanup polling on component unmount
+onUnmounted(() => {
+  pollIntervals.forEach(id => clearInterval(id))
+  pollIntervals = []
+})
+
 // Load next page of books
-async function loadNextPage() {
-  if (!hasNextPage.value || booksLoading.value || !detailItem.value) return
+function loadNextPage() {
+  if (!hasNextPage.value || !detailItem.value) return
 
   booksPage.value++
-  await loadBooksPage(booksPage.value)
+  hasNextPage.value = booksPage.value < booksTotalPages.value
+  hasPrevPage.value = booksPage.value > 1
+
+  // Scroll to top of books grid
+  if (detailElement.value?.$el) {
+    detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 // Load previous page of books
-async function loadPrevPage() {
-  if (!hasPrevPage.value || booksLoading.value || !detailItem.value) return
+function loadPrevPage() {
+  if (!hasPrevPage.value || !detailItem.value) return
 
   booksPage.value--
-  await loadBooksPage(booksPage.value)
-}
+  hasNextPage.value = booksPage.value < booksTotalPages.value
+  hasPrevPage.value = booksPage.value > 1
 
-// Helper to load a specific page
-async function loadBooksPage(page) {
-  booksLoading.value = true
-
-  try {
-    const data = await api.getSeriesBooks(detailItem.value.series_id, {
-      per_page: booksPerPage.value,
-      page: page,
-      enrich_abs: true
-    })
-
-    enrichedBooks.value = data.books || []
-    hasNextPage.value = data.has_next || false
-    hasPrevPage.value = data.has_prev || false
-  } catch (err) {
-    status.value = `Failed to load page ${page}: ${err.message}`
-  } finally {
-    booksLoading.value = false
+  // Scroll to top of books grid
+  if (detailElement.value?.$el) {
+    detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
@@ -431,6 +719,7 @@ function handleBookClick(book) {
 // Close detail view
 const closeDetail = (options = {}) => {
   const { suppressNavigation = false } = options
+  currentDetailSeriesId.value = null  // Reset guard
   detailItem.value = null
   enrichedBooks.value = []
   status.value = results.value.length

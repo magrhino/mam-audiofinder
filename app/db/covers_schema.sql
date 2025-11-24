@@ -35,6 +35,7 @@ CREATE TABLE covers (
     rating TEXT,                        -- NEW: Rating score (e.g., "4.8")
     duration INTEGER,                   -- NEW: Duration in minutes
     abridged INTEGER DEFAULT 0,         -- NEW: 0=unabridged, 1=abridged
+    has_audiobook INTEGER DEFAULT 0,    -- NEW: 0=no/unknown, 1=confirmed audiobook available
 
     -- Identifiers
     asin TEXT,                          -- NEW: Amazon ASIN

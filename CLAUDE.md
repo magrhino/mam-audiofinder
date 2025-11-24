@@ -138,6 +138,12 @@ Check covers.db → If miss: ABS API → Download image → Save to /data/covers
 **Series Discovery:**
 POST /api/series/search → Hardcover GraphQL API → Cache results (5-min) → Display with metadata
 
+**Series Books Load (Fast Path):**
+GET /api/series/{id}/books (enrich_mode=immediate) → Fetch basic book list → Return immediately → Background: Fetch covers + library check (no audiobook metadata)
+
+**Series Audiobook Metadata (On-Demand):**
+User clicks "🎧 Fetch Audiobook Info" → POST /api/series/{id}/books/fetch-audio → Hardcover advanced search (all books) → Extract has_audiobook/audio_seconds → Save to covers.db → Update UI with badges
+
 For detailed backend architecture, see [BACKEND.md](BACKEND.md).
 
 ## Key Modules
@@ -189,7 +195,7 @@ All routes are `async def` endpoints:
 - `qbittorrent.py` - GET /qb/torrents, GET /qb/torrent/{hash}/tree, POST /add
 - `import_route.py` - POST /import (with verification workflow)
 - `showcase.py` - GET /api/showcase (grouped search results by normalized title)
-- `series.py` - POST /api/series/search, GET /api/series/{id}/books (Hardcover integration)
+- `series.py` - POST /api/series/search, GET /api/series/{id}/books (Hardcover integration, default `enrich_mode=immediate`, optional `include_audio_meta`), POST /api/series/{id}/books/fetch-audio (on-demand audiobook metadata)
 - `covers_route.py` - GET /covers/{filename} (serve cached covers)
 - `logs_route.py` - GET /api/logs (application logs)
 
@@ -362,6 +368,11 @@ CREATE TABLE series_cache (
 - GraphQL API with rate limiting (60 req/min) and caching (5-min TTL)
 - Limit parameter controls result count (configurable via HARDCOVER_SERIES_LIMIT, default: 20)
 - **Note:** Pagination removed (non-functional in Hardcover API)
+- **Audiobook Metadata:** Fetching audiobook metadata (has_audiobook, audio_seconds) is opt-in via explicit user action
+  - Default series load is fast (covers + library check only, no advanced Hardcover lookups)
+  - Users can fetch audiobook metadata on-demand via "🎧 Fetch Audiobook Info" button in SeriesView
+  - Metadata persists to covers.db once fetched (duration stored in minutes, audio_seconds in JSON)
+  - Green badge (🎧 duration) shown for available audiobooks, red badge (🚫 Audio) for unavailable
 
 ## Environment Configuration
 

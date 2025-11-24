@@ -1,18 +1,34 @@
 <template>
   <div class="showcase-card" @click="handleClick" :data-mam-id="group.mam_id">
-    <div class="showcase-versions-badge">{{ versionsLabel }}</div>
-    <div class="showcase-cover-skeleton" v-if="loadingCover">
+    <!-- Version badge (hidden if hideVersionBadge prop is true OR only 1 version) -->
+    <div v-if="!hideVersionBadge && (group.total_versions || 0) > 1" class="showcase-versions-badge">
+      {{ versionsLabel }}
+    </div>
+
+    <!-- Skeleton/loading state (shown during enrichment or initial cover load) -->
+    <div class="showcase-cover-skeleton" v-if="loadingCover || group.enrichment_pending">
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
       <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
+      <!-- Audiobook badges (only shown if metadata was fetched) -->
+      <span v-if="group.has_audiobook === true" class="audiobook-available-badge" :title="`Audiobook available${audioDurationText}`">
+        🎧{{ audioDurationText ? ' ' + audioDurationText : '' }}
+      </span>
       <span v-if="group.has_audiobook === false" class="audiobook-unavailable-badge" title="No Audiobook Available">🚫 Audio</span>
     </div>
+
+    <!-- Cover image (shown when loaded) -->
     <div class="showcase-cover-wrapper" v-else>
       <img v-if="coverUrl" class="showcase-cover" :src="coverUrl" :alt="group.display_title" loading="lazy" />
       <div v-else class="showcase-cover-placeholder">📚</div>
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
       <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
+      <!-- Audiobook badges (only shown if metadata was fetched) -->
+      <span v-if="group.has_audiobook === true" class="audiobook-available-badge" :title="`Audiobook available${audioDurationText}`">
+        🎧{{ audioDurationText ? ' ' + audioDurationText : '' }}
+      </span>
       <span v-if="group.has_audiobook === false" class="audiobook-unavailable-badge" title="No Audiobook Available">🚫 Audio</span>
     </div>
+
     <div class="showcase-title">{{ group.display_title }}</div>
     <div class="showcase-author">{{ group.author }}</div>
     <div class="showcase-formats">
@@ -33,6 +49,10 @@ const props = defineProps({
   seriesNumber: {
     type: [String, Number],
     default: null
+  },
+  hideVersionBadge: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -65,6 +85,22 @@ onMounted(() => {
 const versionsLabel = computed(() => {
   const total = props.group.total_versions || 0
   return `${total} version${total === 1 ? '' : 's'}`
+})
+
+// Format audio duration from seconds to "Xh Ym" format
+const audioDurationText = computed(() => {
+  const seconds = props.group.audio_seconds
+  if (!seconds || typeof seconds !== 'number') return ''
+
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  } else if (minutes > 0) {
+    return `${minutes}m`
+  }
+  return ''
 })
 
 const handleClick = () => {
@@ -303,10 +339,10 @@ const handleClick = () => {
   }
 }
 
-/* Series number badge (top-left) */
+/* Series number badge (bottom-left) */
 .series-number-badge {
   position: absolute;
-  top: 4px;
+  bottom: 4px;
   left: 4px;
   background: rgba(80, 0, 0, 0.95);
   backdrop-filter: blur(8px);
@@ -331,6 +367,35 @@ const handleClick = () => {
 .series-number-badge:hover {
   background: rgba(106, 0, 0, 1);
   transform: scale(1.1);
+  transition: all 0.2s ease;
+}
+
+/* Audiobook available badge (top-right of cover, green success) */
+.audiobook-available-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 120, 0, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  cursor: help;
+  animation: fadeIn 0.3s ease-in;
+  border: 1px solid rgba(0, 180, 0, 0.8);
+}
+
+.audiobook-available-badge:hover {
+  background: rgba(0, 150, 0, 1);
+  transform: translateY(-2px);
   transition: all 0.2s ease;
 }
 
