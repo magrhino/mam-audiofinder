@@ -14,6 +14,7 @@ from abs_client import abs_client
 from utils import normalize_title, normalize_author
 from enrichment_tracker import get_tracker
 from covers import CoverService
+from edition_resolver import resolve_english_primary_edition
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -614,6 +615,64 @@ async def get_series_books(
                 status_code=404,
                 detail=f"Series {series_id} not found"
             )
+
+        # ==================================================================
+        # ENGLISH PRIMARY EDITION RESOLUTION
+        # ==================================================================
+        # Resolve to English primary editions before enrichment
+        # This ensures we only enrich the correct English edition per position
+        logger.info(f"🔍 Resolving English primary editions for series {series_id}")
+
+        # Prepare series metadata for resolver (canonical_titles built after resolution)
+        series_metadata = {
+            'series_id': series_id,
+            'title': result['series_name'],
+            'author': result['author_name'],
+            'canonical_titles': {}  # Will be populated after resolution
+        }
+
+        # Resolve editions
+        resolved_editions = await resolve_english_primary_edition(
+            raw_books=result['books'],
+            series_metadata=series_metadata,
+            hardcover_client=hardcover_client
+        )
+
+        # Build canonical titles from resolved edition positions
+        # This ensures we have canonical titles for ALL resolved positions,
+        # even if some were filtered out by omnibus detection
+        canonical_titles = {}
+        for position in resolved_editions.keys():
+            canonical_titles[position] = f"{result['series_name']} {position}"
+
+        logger.info(f"✅ Built {len(canonical_titles)} canonical title(s) from resolved positions")
+
+        # Update series metadata with canonical titles (for caching)
+        series_metadata['canonical_titles'] = canonical_titles
+
+        # Flatten resolved editions back to books list
+        # Handle both single books and ambiguous multi-book positions
+        resolved_books = []
+        for position in sorted(resolved_editions.keys()):
+            book_or_books = resolved_editions[position]
+
+            if isinstance(book_or_books, list):
+                # Ambiguous - include all tied candidates
+                resolved_books.extend(book_or_books)
+                logger.debug(f"   Position {position}: Added {len(book_or_books)} ambiguous books")
+            else:
+                # Single resolved book
+                resolved_books.append(book_or_books)
+                logger.debug(f"   Position {position}: Added 1 resolved book")
+
+        logger.info(f"✅ Resolved to {len(resolved_books)} book(s) from {len(result['books'])} original(s)")
+
+        # Replace books in result with resolved books
+        result['books'] = resolved_books
+
+        # ==================================================================
+        # END RESOLUTION
+        # ==================================================================
 
         # MODE: "immediate" - Return basic data, start background enrichment
         if enrich_mode == "immediate":

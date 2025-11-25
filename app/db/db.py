@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from sqlalchemy import create_engine, text
-from config import HISTORY_DB_PATH, COVERS_DB_PATH
+from config import HISTORY_DB_PATH, COVERS_DB_PATH, SERIES_DB_PATH
 
 logger = logging.getLogger("mam-audiofinder")
 
@@ -25,6 +25,17 @@ covers_engine = create_engine(
     pool_recycle=3600  # Recycle connections after 1 hour
 )
 
+# Series database - permanent cache for series metadata and resolved editions
+# Separated from covers.db to provide dedicated storage for series operations
+series_engine = create_engine(
+    f"sqlite:///{SERIES_DB_PATH}",
+    future=True,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    pool_recycle=3600
+)
+
 def get_db_engine():
     """
     Get the database engine for covers and series cache operations.
@@ -33,6 +44,15 @@ def get_db_engine():
         Engine: SQLAlchemy engine for covers.db (contains covers and series_cache tables)
     """
     return covers_engine
+
+def get_series_engine():
+    """
+    Get the database engine for series metadata and resolved editions.
+
+    Returns:
+        Engine: SQLAlchemy engine for series.db (contains series_metadata, resolved_editions, book_metadata tables)
+    """
+    return series_engine
 
 # ---------------------------- Migration System ----------------------------
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
@@ -72,10 +92,11 @@ def run_migrations():
     logger.info(f"🔧 Checking {len(migration_files)} migration(s)...")
 
     # Track which database each migration applies to
-    # Migrations 001-004 are for history.db, 005+ are for covers.db
+    # Migrations 001-004 are for history.db, 005+ are for covers.db, 011+ may be for series.db
     # Ensure tracking tables exist
     _ensure_migrations_table(engine)
     _ensure_migrations_table(covers_engine)
+    _ensure_migrations_table(series_engine)
 
     pending = 0
     for migration_file in migration_files:
@@ -101,8 +122,23 @@ def run_migrations():
             "series_cache"  # Series cache table belongs in covers.db
         ])
 
+        targets_series = any(pattern in sql_content for pattern in [
+            "series_metadata",
+            "resolved_editions",
+            "book_metadata",
+            "alter table series_metadata",
+            "alter table resolved_editions",
+            "alter table book_metadata",
+            "create table series_metadata",
+            "create table resolved_editions",
+            "create table book_metadata"
+        ])
+
         # Determine target engine
-        if targets_history and not targets_covers:
+        if targets_series:
+            target_engine = series_engine
+            db_name = "series.db"
+        elif targets_history and not targets_covers:
             target_engine = engine
             db_name = "history.db"
         elif targets_covers and not targets_history:
@@ -224,13 +260,44 @@ def _initialize_covers_db_from_schema():
         logger.error(f"✗ Failed to initialize covers.db from schema: {e}")
         raise
 
+def _initialize_series_db_from_schema():
+    """
+    Initialize series.db from fresh schema file.
+    Handles series metadata, resolved editions, and book metadata.
+    """
+    schema_file = Path(__file__).parent / "series_schema.sql"
+
+    if not schema_file.exists():
+        logger.warning(f"⚠️  Series schema file not found: {schema_file}")
+        return
+
+    logger.info("🔧 Initializing series.db from fresh schema...")
+
+    try:
+        sql = schema_file.read_text()
+
+        # Use executescript for schema file (handles triggers properly)
+        with series_engine.connect() as conn:
+            raw_conn = conn.connection.driver_connection
+            raw_conn.executescript(sql)
+            conn.commit()
+
+        logger.info("✓ Series database schema initialized")
+
+    except Exception as e:
+        logger.error(f"✗ Failed to initialize series.db from schema: {e}")
+        raise
+
 
 def initialize_databases():
     """Initialize database schemas by running migrations and fresh schemas."""
     # Initialize covers.db from fresh schema (replaces migrations 005, 008, 009)
     _initialize_covers_db_from_schema()
 
-    # Run migrations for history.db only (skips DEPRECATED_* files)
+    # Initialize series.db from fresh schema
+    _initialize_series_db_from_schema()
+
+    # Run migrations for history.db and series.db (skips DEPRECATED_* files)
     run_migrations()
 
     logger.info("✓ Database schemas initialized")

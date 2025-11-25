@@ -1286,6 +1286,176 @@ class HardcoverClient:
 
         return deduplicated
 
+    async def get_books_by_ids(
+        self,
+        book_ids: List[int],
+        fields: Optional[List[str]] = None,
+        use_cache: bool = True
+    ) -> Dict[int, Dict[str, Any]]:
+        """
+        Fetch book metadata by IDs using books(where: {id: {_eq: ...}}) GraphQL query.
+
+        NOTE: The Hardcover API no longer supports book_by_pk, so this method queries
+        books individually using the books(where:...) endpoint. To minimize API calls:
+        - Results are cached in series.db book_metadata table
+        - Requests are batched in chunks of 10 with 1s delays to respect rate limits
+
+        ⚠️ IMPORTANT: This endpoint only provides basic book fields (id, title, users_count, rating).
+        The has_audiobook and audio_seconds fields are NOT available in books(where:...) queries.
+        Use search_book_advanced() instead if you need audiobook metadata.
+
+        Args:
+            book_ids: List of Hardcover book IDs to fetch
+            fields: List of fields to fetch (default: ['id', 'title', 'users_count', 'rating'])
+                   Note: 'id' is always included automatically
+                   Available fields: id, title, users_count, rating
+                   NOT available: has_audiobook, audio_seconds (use search_book_advanced())
+            use_cache: If True, check series.db cache first (default: True)
+
+        Returns:
+            Dictionary mapping book_id to book metadata:
+            {
+                123: {"book_id": 123, "title": "...", "users_count": 5000, "rating": 4.5},
+                456: {"book_id": 456, "title": "...", "users_count": 3000, "rating": 4.2}
+            }
+            Books not found in API will be omitted from result dict.
+        """
+        if not self.is_configured:
+            logger.warning("⚠️  Hardcover API not configured, skipping book metadata fetch")
+            return {}
+
+        if not book_ids:
+            return {}
+
+        # Set default fields if not provided
+        # NOTE: has_audiobook and audio_seconds are NOT available in this endpoint
+        if fields is None:
+            fields = ['id', 'title', 'users_count', 'rating']
+
+        # Ensure 'id' is always included
+        if 'id' not in fields:
+            fields.insert(0, 'id')
+
+        result = {}
+        uncached_ids = []
+
+        # Check cache first (if enabled)
+        if use_cache:
+            from db.db import get_series_engine
+            engine = get_series_engine()
+
+            with engine.begin() as conn:
+                for book_id in book_ids:
+                    cached_row = conn.execute(
+                        text("SELECT * FROM book_metadata WHERE book_id = :book_id"),
+                        {"book_id": book_id}
+                    ).fetchone()
+
+                    if cached_row:
+                        # Reconstruct dict from cached row
+                        # NOTE: Cache may contain has_audiobook/audio_seconds from advanced search queries
+                        # but get_books_by_ids() only returns basic fields
+                        result[book_id] = {
+                            "book_id": cached_row.book_id,
+                            "title": cached_row.title,
+                            "users_count": cached_row.users_count,
+                            "rating": cached_row.rating,
+                        }
+                        # Include audiobook fields if present in cache (for backward compatibility)
+                        if hasattr(cached_row, 'has_audiobook') and cached_row.has_audiobook is not None:
+                            result[book_id]["has_audiobook"] = bool(cached_row.has_audiobook)
+                        if hasattr(cached_row, 'audio_seconds') and cached_row.audio_seconds is not None:
+                            result[book_id]["audio_seconds"] = cached_row.audio_seconds
+                        logger.debug(f"📦 Cache hit for book_id={book_id} (users_count={cached_row.users_count})")
+                        HardcoverClient._cache_hit_count += 1
+                    else:
+                        uncached_ids.append(book_id)
+        else:
+            uncached_ids = book_ids
+
+        # Fetch uncached books from API
+        if uncached_ids:
+            logger.info(f"🔍 Fetching metadata for {len(uncached_ids)} book(s) via books(where:...) query (cached: {len(result)})")
+
+            # Process books individually with rate limiting (batching in chunks of 10)
+            from db.db import get_series_engine
+            engine = get_series_engine()
+
+            # Chunk processing to respect rate limits
+            chunk_size = 10
+            for chunk_start in range(0, len(uncached_ids), chunk_size):
+                chunk = uncached_ids[chunk_start:chunk_start + chunk_size]
+
+                for book_id in chunk:
+                    # Query books by ID using where clause (book_by_pk is broken in Hardcover API)
+                    # NOTE: has_audiobook and audio_seconds are NOT available in books(where:...) endpoint
+                    # These fields are only available via search_book_advanced() query
+                    query = """
+                    query GetBookById($bookId: Int!) {
+                        books(where: {id: {_eq: $bookId}}) {
+                            id
+                            title
+                            users_count
+                            rating
+                        }
+                    }
+                    """
+                    variables = {"bookId": book_id}
+
+                    data = await self._execute_graphql(query, variables)
+
+                    if data and "books" in data:
+                        books_list = data["books"]
+
+                        if books_list:
+                            # Take first result (should be only one for exact ID match)
+                            book_data = books_list[0]
+
+                            # Extract fields (only basic fields available in this endpoint)
+                            book_dict = {
+                                "book_id": book_data.get("id", book_id),
+                                "title": book_data.get("title", ""),
+                                "users_count": book_data.get("users_count", 0),
+                                "rating": book_data.get("rating"),
+                            }
+
+                            result[book_id] = book_dict
+
+                            # Cache in series.db
+                            # NOTE: We only cache basic fields from this endpoint
+                            # has_audiobook/audio_seconds are only available via search_book_advanced()
+                            try:
+                                with engine.begin() as conn:
+                                    conn.execute(
+                                        text("""
+                                            INSERT OR REPLACE INTO book_metadata
+                                            (book_id, title, users_count, rating, fetched_at)
+                                            VALUES (:book_id, :title, :users_count, :rating, datetime('now'))
+                                        """),
+                                        {
+                                            "book_id": book_id,
+                                            "title": book_dict["title"],
+                                            "users_count": book_dict["users_count"],
+                                            "rating": book_dict["rating"],
+                                        }
+                                    )
+                                logger.debug(f"💾 Cached book_id={book_id} to series.db (users_count={book_dict['users_count']})")
+                            except Exception as e:
+                                logger.warning(f"⚠️  Failed to cache book_id={book_id}: {e}")
+                        else:
+                            logger.warning(f"⚠️  Book ID {book_id} not found in Hardcover API")
+                    else:
+                        logger.warning(f"⚠️  Failed to fetch book_id={book_id} from API")
+
+                # Rate limiting: pause between chunks
+                if chunk_start + chunk_size < len(uncached_ids):
+                    await asyncio.sleep(1)
+
+            fetched_count = len([b for b in result.values() if b['book_id'] in uncached_ids])
+            logger.info(f"✅ Fetched {fetched_count}/{len(uncached_ids)} book(s) from API")
+
+        return result
+
     async def get_series_by_author(
         self,
         author_name: str,

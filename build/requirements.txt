@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 httpx
 sqlalchemy
+rapidfuzz
+lingua-language-detector

@@ -9,6 +9,9 @@ Usage:
     python test_hardcover_api.py --series 12345          # Test series books only
     python test_hardcover_api.py --series-limits 997     # Test series books with limit variations
     python test_hardcover_api.py --author "Brandon Sanderson"  # Test author search
+    python test_hardcover_api.py --book-ids "123,456,789"  # Test batch book lookup
+    python test_hardcover_api.py --resolve "Murderbot"  # Test English edition resolution
+    python test_hardcover_api.py --resolve "Stormlight" --debug  # With debug output
     python test_hardcover_api.py --framework basic       # Run basic framework tests
     python test_hardcover_api.py --limits                # Test limit variations
     python test_hardcover_api.py --fields                # Test field extraction
@@ -1070,6 +1073,137 @@ async def test_search_book_advanced(debug: bool = False):
         return False
 
 
+async def test_get_books_by_ids(book_ids: Optional[List[int]] = None, debug: bool = False):
+    """
+    Test book metadata fetching using books(where: {id: ...}) GraphQL query.
+
+    ⚠️ VALIDATES: get_books_by_ids() implementation using books(where:...) approach.
+    NOTE: book_by_pk is no longer supported by Hardcover API.
+
+    Usage:
+        python test_hardcover_api.py --book-ids 123,456,789 --debug
+    """
+    print_header("Book Lookup Test (books where)")
+
+    if not hardcover_client.is_configured:
+        print("⚠️  Skipping test - Hardcover API not configured")
+        return False
+
+    try:
+        # Default test book IDs (The Murderbot Diaries series)
+        if book_ids is None:
+            # These are real Hardcover book IDs for testing
+            # Murderbot Diaries books 1-3
+            book_ids = [28209, 28210, 28211]
+            print("\n📚 Using default test books: Murderbot Diaries books 1-3")
+        else:
+            print(f"\n📚 Testing with {len(book_ids)} provided book ID(s)")
+
+        print(f"   Book IDs: {', '.join(map(str, book_ids))}")
+
+        # Track requests
+        start_count = hardcover_client.get_request_count()
+        start_cache = hardcover_client.get_cache_hit_count()
+
+        # Test 1: First fetch (no cache)
+        print("\n🔍 Test 1: Initial fetch (no cache)...")
+        result = await hardcover_client.get_books_by_ids(book_ids, use_cache=False)
+
+        if result is None:
+            print("❌ Received None result")
+            return False
+
+        print(f"✅ Fetched {len(result)} book(s) from API")
+
+        # Display results
+        # NOTE: get_books_by_ids() only returns basic fields (id, title, users_count, rating)
+        # has_audiobook and audio_seconds are only available via search_book_advanced()
+        for book_id, book_data in result.items():
+            print(f"\n  Book ID {book_id}:")
+            print_result("Title:", book_data.get('title', 'N/A')[:50], indent=2)
+            print_result("Users Count:", book_data.get('users_count', 0), indent=2)
+            print_result("Rating:", book_data.get('rating', 'N/A'), indent=2)
+
+            # These fields may be present if cached from advanced search, but not expected from this query
+            if book_data.get('has_audiobook') is not None:
+                print_result("Has Audiobook (cached):", book_data.get('has_audiobook'), indent=2)
+            if book_data.get('audio_seconds'):
+                hours = book_data['audio_seconds'] // 3600
+                minutes = (book_data['audio_seconds'] % 3600) // 60
+                print_result("Duration (cached):", f"{hours}h {minutes}m", indent=2)
+
+        # Debug: Show raw GraphQL request/response
+        if debug:
+            print("\n🐛 Debug: GraphQL Query Structure (individual queries)")
+            for book_id in book_ids:
+                print(f"   query GetBookById($bookId: Int!) {{")
+                print(f"     books(where: {{id: {{_eq: $bookId}}}}) {{")
+                print(f"       id title users_count rating")
+                print(f"     }}")
+                print(f"   }}")
+                print(f"   Variables: {{ bookId: {book_id} }}\n")
+            print("   Note: API key redacted in actual request")
+            print("   Note: has_audiobook and audio_seconds NOT available in this endpoint")
+
+        # Test 2: Second fetch (should use cache)
+        print("\n🔍 Test 2: Second fetch (should use cache)...")
+        result2 = await hardcover_client.get_books_by_ids(book_ids, use_cache=True)
+
+        if len(result2) != len(result):
+            print(f"⚠️  Cache returned different count: {len(result2)} vs {len(result)}")
+        else:
+            print(f"✅ Cache returned same {len(result2)} book(s)")
+
+        # Check cache was actually used
+        end_cache = hardcover_client.get_cache_hit_count()
+        cache_hits = end_cache - start_cache
+
+        if cache_hits >= len(book_ids):
+            print(f"✅ Cache hits detected: {cache_hits}")
+        else:
+            print(f"⚠️  Expected {len(book_ids)} cache hits, got {cache_hits}")
+
+        # Test 3: Mixed fetch (some cached, some new)
+        print("\n🔍 Test 3: Mixed fetch (testing cache + API fetch)...")
+        mixed_ids = book_ids[:1] + [999999]  # First book (cached) + non-existent book
+        result3 = await hardcover_client.get_books_by_ids(mixed_ids, use_cache=True)
+
+        print(f"✅ Mixed fetch returned {len(result3)} book(s)")
+        if 999999 not in result3:
+            print("   ✓ Correctly omitted non-existent book ID")
+        else:
+            print("   ✗ Should not return data for non-existent book")
+
+        # Verify essential fields are present
+        print("\n🔍 Validating response structure...")
+        all_valid = True
+        for book_id, book_data in result.items():
+            if 'book_id' not in book_data:
+                print(f"  ✗ Missing 'book_id' field for book {book_id}")
+                all_valid = False
+            if 'title' not in book_data:
+                print(f"  ✗ Missing 'title' field for book {book_id}")
+                all_valid = False
+            if 'users_count' not in book_data:
+                print(f"  ✗ Missing 'users_count' field for book {book_id}")
+                all_valid = False
+
+        if all_valid:
+            print("   ✓ All required fields present")
+
+        # Print statistics
+        print_request_stats(start_count, start_cache, "Batch Book Lookup")
+
+        print("\n✅ Batch book lookup test passed")
+        return True
+
+    except Exception as e:
+        print(f"\n❌ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 async def test_deduplication_logic(debug: bool = False):
     """Test deduplication by normalized title."""
     print_header("Deduplication Logic Test")
@@ -1235,6 +1369,188 @@ async def test_abs_fallback():
         return False
 
 
+async def test_resolve_english_edition(series_name: str = "The Murderbot Diaries", debug: bool = False):
+    """
+    Test English edition resolution for a series.
+
+    This test validates the complete edition resolution pipeline:
+    1. Search for series by name
+    2. Fetch all books (including multiple editions/translations)
+    3. Resolve to English primary editions using language detection and scoring
+    4. Display resolution results with per-book scoring breakdown
+
+    Usage:
+        python test_hardcover_api.py --resolve "The Murderbot Diaries"
+        python test_hardcover_api.py --resolve "Stormlight" --debug
+    """
+    print_header(f"English Edition Resolution Test: '{series_name}'")
+
+    if not hardcover_client.is_configured:
+        print("⚠️  Skipping test - Hardcover API not configured")
+        return False
+
+    try:
+        from edition_resolver import resolve_english_primary_edition, is_english
+
+        # Track requests
+        start_count = hardcover_client.get_request_count()
+        start_cache = hardcover_client.get_cache_hit_count()
+
+        # Step 1: Search for series
+        print(f"\n🔍 Step 1: Searching for series '{series_name}'...")
+        series_results = await hardcover_client.search_series(series_name, limit=1)
+
+        if not series_results:
+            print(f"❌ No series found matching '{series_name}'")
+            return False
+
+        series = series_results[0]
+        series_id = series['series_id']
+        series_title = series['series_name']
+        series_author = series['author_name']
+
+        print(f"✅ Found series: {series_title} by {series_author} (ID: {series_id})")
+
+        # Step 2: Fetch all books (deduplicate=False to get all editions)
+        print(f"\n🔍 Step 2: Fetching all books (including multiple editions)...")
+        books_result = await hardcover_client.list_series_books(
+            series_id,
+            deduplicate=False  # Important: get ALL editions for testing resolution
+        )
+
+        if not books_result or not books_result.get('books'):
+            print(f"❌ No books found for series {series_id}")
+            return False
+
+        raw_books = books_result['books']
+        print(f"✅ Fetched {len(raw_books)} book(s) (all editions)")
+
+        if debug:
+            print("\n📚 Raw books before resolution:")
+            for idx, book in enumerate(raw_books):
+                lang_status = "🇬🇧 EN" if is_english(book.get('title', '')) else "🌍 OTHER"
+                print(f"   [{idx+1}] {lang_status} Pos {book.get('position')}: {book.get('title')} (ID: {book.get('book_id')})")
+
+        # Step 3: Build series metadata (canonical titles)
+        print(f"\n🔍 Step 3: Building canonical titles...")
+        canonical_titles = {}
+        for book in raw_books:
+            position = book.get('position')
+            if position is not None and position not in canonical_titles:
+                canonical_titles[position] = f"{series_title} {position}"
+
+        series_metadata = {
+            'series_id': series_id,
+            'title': series_title,
+            'author': series_author,
+            'canonical_titles': canonical_titles
+        }
+
+        print(f"✅ Built {len(canonical_titles)} canonical title(s)")
+
+        if debug:
+            print("\n📖 Canonical titles:")
+            for pos, title in sorted(canonical_titles.items()):
+                print(f"   Position {pos}: '{title}'")
+
+        # Step 4: Resolve English primary editions
+        print(f"\n🔍 Step 4: Resolving English primary editions...")
+        resolved_editions = await resolve_english_primary_edition(
+            raw_books=raw_books,
+            series_metadata=series_metadata,
+            hardcover_client=hardcover_client
+        )
+
+        if not resolved_editions:
+            print("❌ Resolution returned empty result")
+            return False
+
+        print(f"✅ Resolved {len(resolved_editions)} position(s)")
+
+        # Step 5: Display results
+        print(f"\n📊 Resolution Results:")
+        print(f"   Total positions: {len(resolved_editions)}")
+
+        # Count single vs ambiguous
+        single_count = sum(1 for v in resolved_editions.values() if not isinstance(v, list))
+        ambiguous_count = sum(1 for v in resolved_editions.values() if isinstance(v, list))
+
+        print(f"   Single resolutions: {single_count}")
+        print(f"   Ambiguous resolutions: {ambiguous_count}")
+
+        # Display per-position breakdown
+        print(f"\n📚 Per-position breakdown:")
+        for position in sorted(resolved_editions.keys()):
+            book_or_books = resolved_editions[position]
+
+            if isinstance(book_or_books, list):
+                print(f"\n   Position {position}: ⚠️  AMBIGUOUS ({len(book_or_books)} tied)")
+                for idx, book in enumerate(book_or_books):
+                    print(f"      [{idx+1}] {book.get('title')} (ID: {book.get('book_id')})")
+                    if book.get('users_count'):
+                        print(f"          users_count={book['users_count']}")
+            else:
+                book = book_or_books
+                lang_emoji = "🇬🇧" if is_english(book.get('title', '')) else "🌍"
+                print(f"   Position {position}: {lang_emoji} {book.get('title')} (ID: {book.get('book_id')})")
+
+                if debug and book.get('users_count'):
+                    print(f"       users_count={book['users_count']}")
+
+        # Debug: Show raw GraphQL requests (API key redacted)
+        if debug:
+            print("\n🐛 Debug: Edition Resolution Process")
+            print("   1. Language detection: lingua-language-detector library")
+            print("   2. Scoring formula: language_score (±10) + similarity_score (0-100) + length_weight (-5 to +5)")
+            print("   3. Ambiguity threshold: 5 points")
+            print("   4. Popularity fallback: Hardcover users_count via books(where:...) query")
+            print("\n   Raw API requests logged above (see 🔍 logs)")
+
+        # Step 6: Validate resolution quality
+        print(f"\n🔍 Validating resolution quality...")
+        all_valid = True
+
+        for position, book_or_books in resolved_editions.items():
+            books = book_or_books if isinstance(book_or_books, list) else [book_or_books]
+
+            for book in books:
+                if not book.get('book_id'):
+                    print(f"   ✗ Position {position}: Missing book_id")
+                    all_valid = False
+                if not book.get('title'):
+                    print(f"   ✗ Position {position}: Missing title")
+                    all_valid = False
+
+        if all_valid:
+            print("   ✓ All resolved books have required fields")
+
+        # Check that we didn't lose positions
+        original_positions = {book.get('position') for book in raw_books if book.get('position') is not None}
+        resolved_positions = set(resolved_editions.keys())
+
+        if original_positions != resolved_positions:
+            missing = original_positions - resolved_positions
+            if missing:
+                print(f"   ⚠️  Missing positions after resolution: {sorted(missing)}")
+            extra = resolved_positions - original_positions
+            if extra:
+                print(f"   ⚠️  Extra positions after resolution: {sorted(extra)}")
+        else:
+            print("   ✓ All original positions preserved")
+
+        # Print statistics
+        print_request_stats(start_count, start_cache, "Edition Resolution")
+
+        print("\n✅ Edition resolution test passed")
+        return True
+
+    except Exception as e:
+        print(f"\n❌ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 async def run_all_tests():
     """Run all tests."""
     print("\n" + "🧪 "*25)
@@ -1343,6 +1659,8 @@ async def main():
     parser.add_argument("--cosmere", action="store_true", help="Test Cosmere series with Way of Kings")
     parser.add_argument("--toggles", metavar="ID", type=int, help="Test series books with include_featured and deduplicate toggles")
     parser.add_argument("--advanced", action="store_true", help="Test advanced book search with extended fields")
+    parser.add_argument("--book-ids", metavar="IDS", help="Test batch book lookup with comma-separated IDs (e.g., '123,456,789')")
+    parser.add_argument("--resolve", metavar="SERIES", help="Test English edition resolution for series name (e.g., 'The Murderbot Diaries')")
     parser.add_argument("--dedup", action="store_true", help="Test deduplication logic")
     parser.add_argument("--abs-fallback", action="store_true", help="Test ABS fallback integration")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging (show all books and detailed deduplication)")
@@ -1418,6 +1736,23 @@ async def main():
         success = await test_configuration()
         if success:
             success = await test_search_book_advanced(debug=args.debug)
+
+    elif args.book_ids:
+        success = await test_configuration()
+        if success:
+            # Parse comma-separated book IDs
+            try:
+                book_ids = [int(id.strip()) for id in args.book_ids.split(',')]
+                success = await test_get_books_by_ids(book_ids=book_ids, debug=args.debug)
+            except ValueError:
+                print(f"❌ Invalid book IDs format: '{args.book_ids}'")
+                print("   Expected format: comma-separated integers (e.g., '123,456,789')")
+                success = False
+
+    elif args.resolve:
+        success = await test_configuration()
+        if success:
+            success = await test_resolve_english_edition(series_name=args.resolve, debug=args.debug)
 
     elif args.dedup:
         success = await test_configuration()

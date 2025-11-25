@@ -11,6 +11,7 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 COVERS_DIR = DATA_DIR / "covers"
 HISTORY_DB_PATH = os.getenv("HISTORY_DB_PATH", str(DATA_DIR / "history.db"))
 COVERS_DB_PATH = os.getenv("COVERS_DB_PATH", str(DATA_DIR / "covers.db"))
+SERIES_DB_PATH = os.getenv("SERIES_DB_PATH", str(DATA_DIR / "series.db"))
 
 # ---------------------------- Logging Configuration ----------------------------
 LOG_MAX_MB = int(os.getenv("LOG_MAX_MB", "5"))
