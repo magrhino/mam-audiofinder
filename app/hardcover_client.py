@@ -647,6 +647,7 @@ class HardcoverClient:
                 id
                 title
                 subtitle
+                users_count
               }
             }
           }
@@ -683,7 +684,8 @@ class HardcoverClient:
                 "book_id": book_data.get("id"),
                 "title": book_data.get("title", ""),
                 "subtitle": book_data.get("subtitle"),
-                "position": position
+                "position": position,
+                "users_count": book_data.get("users_count", 0)
             })
 
         logger.info(f"✅ Retrieved {len(books)} books from GraphQL")
@@ -1494,6 +1496,7 @@ class HardcoverClient:
             return filtered
 
         return results
+
 
 
 # Global instance

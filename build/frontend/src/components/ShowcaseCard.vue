@@ -9,6 +9,9 @@
     <div class="showcase-cover-skeleton" v-if="loadingCover || group.enrichment_pending">
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
       <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
+      <!-- Canonical edition badge (top-left) -->
+      <span v-if="group.is_canonical === true" class="canonical-badge canonical-primary" title="Primary English Edition">📘 Primary</span>
+      <span v-if="group.is_canonical === false" class="canonical-badge canonical-international" title="International Edition">🌐 Intl</span>
       <!-- Audiobook badges (only shown if metadata was fetched) -->
       <span v-if="group.has_audiobook === true" class="audiobook-available-badge" :title="`Audiobook available${audioDurationText}`">
         🎧{{ audioDurationText ? ' ' + audioDurationText : '' }}
@@ -22,6 +25,9 @@
       <div v-else class="showcase-cover-placeholder">📚</div>
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
       <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
+      <!-- Canonical edition badge (top-left) -->
+      <span v-if="group.is_canonical === true" class="canonical-badge canonical-primary" title="Primary English Edition">📘 Primary</span>
+      <span v-if="group.is_canonical === false" class="canonical-badge canonical-international" title="International Edition">🌐 Intl</span>
       <!-- Audiobook badges (only shown if metadata was fetched) -->
       <span v-if="group.has_audiobook === true" class="audiobook-available-badge" :title="`Audiobook available${audioDurationText}`">
         🎧{{ audioDurationText ? ' ' + audioDurationText : '' }}
@@ -426,6 +432,50 @@ const handleClick = () => {
 
 .audiobook-unavailable-badge:hover {
   background: rgba(200, 0, 0, 1);
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
+/* Canonical edition badges (top-left of cover) */
+.canonical-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  cursor: help;
+  animation: fadeIn 0.3s ease-in;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.canonical-primary {
+  background: rgba(80, 0, 0, 0.95);
+  color: white;
+  border: 1px solid rgba(106, 0, 0, 0.8);
+}
+
+.canonical-primary:hover {
+  background: rgba(106, 0, 0, 1);
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
+.canonical-international {
+  background: rgba(100, 100, 100, 0.85);
+  color: rgba(200, 200, 200, 1);
+  border: 1px solid rgba(120, 120, 120, 0.7);
+}
+
+.canonical-international:hover {
+  background: rgba(120, 120, 120, 0.95);
   transform: translateY(-2px);
   transition: all 0.2s ease;
 }

@@ -501,24 +501,38 @@ async def resolve_english_primary_edition(
             logger.info(f"   ✅ Single candidate after filtering, selected: {selected_book.get('title')}")
             continue
 
-        # STEP 3: Fetch popularity for ALL remaining candidates
-        book_ids = [book['book_id'] for book in candidates]
-        logger.debug(f"   Step 3: Fetching popularity for {len(book_ids)} candidates...")
+        # STEP 3: Fetch popularity for remaining candidates (use existing data if available)
+        logger.debug(f"   Step 3: Fetching popularity for {len(candidates)} candidates...")
 
-        popularity_data = await hardcover_client.get_books_by_ids(
-            book_ids,
-            fields=['users_count'],
-            use_cache=True
-        )
-
-        # Augment candidates with popularity data
+        # First, check if books already have users_count from list_series_books()
         for book in candidates:
-            book_id = book['book_id']
-            book_meta = popularity_data.get(book_id, {})
-            book['_users_count'] = book_meta.get('users_count', 0)
+            if '_users_count' not in book and 'users_count' in book:
+                book['_users_count'] = book['users_count']
 
+        # Identify candidates missing users_count data
+        missing_ids = [book['book_id'] for book in candidates if '_users_count' not in book]
+
+        if missing_ids:
+            logger.debug(f"   📦 Fetching {len(missing_ids)} missing user counts via API...")
+            popularity_data = await hardcover_client.get_books_by_ids(
+                missing_ids,
+                fields=['users_count'],
+                use_cache=True
+            )
+
+            # Augment missing candidates with popularity data
+            for book in candidates:
+                if '_users_count' not in book:
+                    book_id = book['book_id']
+                    book_meta = popularity_data.get(book_id, {})
+                    book['_users_count'] = book_meta.get('users_count', 0)
+        else:
+            logger.debug(f"   ✅ All candidates already have users_count (skipped API call)")
+
+        # Log popularity data for all candidates
+        for book in candidates:
             logger.debug(
-                f"   📊 Book {book_id} ('{book.get('title')[:40]}'): "
+                f"   📊 Book {book['book_id']} ('{book.get('title')[:40]}'): "
                 f"users_count={book['_users_count']}"
             )
 

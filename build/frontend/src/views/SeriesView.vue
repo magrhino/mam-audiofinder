@@ -111,6 +111,20 @@
             </template>
             Fetch Audiobook Info
           </n-button>
+
+          <!-- Toggle All Editions Button -->
+          <n-button
+            v-if="!booksLoading"
+            type="default"
+            size="small"
+            @click="toggleAllEditions"
+            :loading="isTogglingEditions"
+          >
+            <template #icon>
+              <span>{{ showAllEditions ? '📘' : '🌐' }}</span>
+            </template>
+            {{ showAllEditions ? 'Show Canonical Only' : 'Show non-English Titles' }}
+          </n-button>
         </n-space>
 
         <n-divider />
@@ -290,6 +304,10 @@ let pollIntervals = []  // Track all polling intervals (safety net for multiple 
 // Audiobook metadata fetching state
 const isFetchingAudioMeta = ref(false)
 
+// All editions toggle state
+const showAllEditions = ref(false)
+const isTogglingEditions = ref(false)
+
 // Check if any books don't have audiobook metadata yet
 const hasUnfetchedAudioMeta = computed(() => {
   return enrichedBooks.value.some(book => book.has_audiobook === undefined)
@@ -433,15 +451,17 @@ async function loadDetail(series, options = {}) {
   }
 
   try {
-    // Check cache first
-    const cached = seriesCache.get(series.series_id)
+    // Check cache first (with edition mode key)
+    const editionMode = showAllEditions.value ? 'all' : 'canonical'
+    const cacheKey = `${series.series_id}:${editionMode}`
+    const cached = seriesCache.get(cacheKey)
 
     // Use cached data if enrichment was complete OR still in progress (don't re-fetch)
     if (cached && (
       cached.enrichment_status === 'complete' ||
       cached.enrichment_status === 'in_progress'
     )) {
-      console.log(`[SeriesView] Cache HIT for series ${series.series_id} (status: ${cached.enrichment_status}) - using cached data`)
+      console.log(`[SeriesView] Cache HIT for series ${series.series_id} (${editionMode}, status: ${cached.enrichment_status}) - using cached data`)
       enrichedBooks.value = cached.books || []
       booksTotal.value = cached.total || 0
       enrichmentStatus.value = cached.enrichment_status
@@ -465,11 +485,12 @@ async function loadDetail(series, options = {}) {
       return  // Skip API call
     }
 
-    console.log(`[SeriesView] Cache MISS for series ${series.series_id} - fetching from API`)
+    console.log(`[SeriesView] Cache MISS for series ${series.series_id} (${editionMode}) - fetching from API`)
 
-    // Step 1: Fetch basic book data immediately (with positions)
+    // Step 1: Fetch basic book data immediately (with positions and edition filter)
     const data = await api.getSeriesBooks(series.series_id, {
-      enrich_mode: 'immediate'  // Progressive loading mode
+      enrich_mode: 'immediate',  // Progressive loading mode
+      showAllEditions: showAllEditions.value
     })
 
     // Step 2: Display books immediately with basic data
@@ -485,8 +506,8 @@ async function loadDetail(series, options = {}) {
     enrichmentStatus.value = data.enrichment_status
     enrichmentProgress.value = data.enrichment_progress
 
-    // Cache the result
-    seriesCache.set(series.series_id, {
+    // Cache the result (with edition mode key)
+    seriesCache.set(cacheKey, {
       books: enrichedBooks.value,
       total: booksTotal.value,
       enrichment_status: enrichmentStatus.value,
@@ -578,12 +599,14 @@ function startEnrichmentPolling(seriesId) {
 function mergeBooksData(newBooks) {
   // Use cache merge if we have detailItem (series_id available)
   if (detailItem.value && detailItem.value.series_id) {
-    // Try to merge via cache
-    const merged = seriesCache.mergeBooksData(detailItem.value.series_id, newBooks)
+    // Try to merge via cache (with edition mode key)
+    const editionMode = showAllEditions.value ? 'all' : 'canonical'
+    const cacheKey = `${detailItem.value.series_id}:${editionMode}`
+    const merged = seriesCache.mergeBooksData(cacheKey, newBooks)
 
     if (merged) {
       // Cache merge succeeded, retrieve updated data
-      const cached = seriesCache.get(detailItem.value.series_id)
+      const cached = seriesCache.get(cacheKey)
       if (cached && cached.books) {
         enrichedBooks.value = cached.books
         return
@@ -610,6 +633,78 @@ function mergeBooksData(newBooks) {
 
     return existingBook  // Keep existing data if no match
   })
+}
+
+// Toggle between canonical and all editions
+async function toggleAllEditions() {
+  if (!detailItem.value || isTogglingEditions.value) return
+
+  isTogglingEditions.value = true
+  showAllEditions.value = !showAllEditions.value
+
+  try {
+    // Stop ALL existing polling intervals
+    pollIntervals.forEach(id => clearInterval(id))
+    pollIntervals = []
+
+    // Reset books state
+    enrichedBooks.value = []
+    booksPage.value = 1
+    booksLoading.value = true
+    enrichmentProgress.value = null
+    enrichmentStatus.value = null
+
+    const seriesId = detailItem.value.series_id
+    const editionMode = showAllEditions.value ? 'all' : 'canonical'
+
+    console.log(`[SeriesView] Toggling to ${editionMode} editions for series ${seriesId}`)
+
+    // Fetch with new showAllEditions parameter
+    const data = await api.getSeriesBooks(seriesId, {
+      enrich_mode: 'immediate',
+      showAllEditions: showAllEditions.value
+    })
+
+    // Display books immediately with basic data
+    enrichedBooks.value = (data.books || []).map(book => ({
+      ...book,
+      display_title: book.display_title || book.title,
+      cover_url: book.cover_url || '',
+      enrichment_pending: !book.cover_url
+    }))
+
+    booksTotal.value = data.total || 0
+    enrichmentStatus.value = data.enrichment_status
+    enrichmentProgress.value = data.enrichment_progress
+
+    // Cache the result (with edition mode key)
+    const cacheKey = `${seriesId}:${editionMode}`
+    seriesCache.set(cacheKey, {
+      books: enrichedBooks.value,
+      total: booksTotal.value,
+      enrichment_status: enrichmentStatus.value,
+      enrichment_progress: enrichmentProgress.value
+    })
+
+    // Calculate pagination
+    booksTotalPages.value = Math.ceil(booksTotal.value / booksPerPage.value)
+    hasNextPage.value = booksPage.value < booksTotalPages.value
+    hasPrevPage.value = booksPage.value > 1
+
+    status.value = `${booksTotal.value} books in this series (${editionMode})`
+    booksLoading.value = false
+
+    // Start progressive enrichment polling
+    if (enrichmentStatus.value === 'pending' || enrichmentStatus.value === 'in_progress') {
+      startEnrichmentPolling(seriesId)
+    }
+  } catch (error) {
+    console.error('[SeriesView] Failed to toggle editions:', error)
+    status.value = 'Failed to load editions'
+    message.error('Failed to toggle editions. Please try again.')
+  } finally {
+    isTogglingEditions.value = false
+  }
 }
 
 // Fetch audiobook metadata for all books in the series
@@ -646,9 +741,11 @@ async function fetchAudioMetadataForAll() {
         return existingBook
       })
 
-      // Update cache with new audiobook metadata
+      // Update cache with new audiobook metadata (use edition mode key)
       if (detailItem.value && detailItem.value.series_id) {
-        seriesCache.set(detailItem.value.series_id, {
+        const editionMode = showAllEditions.value ? 'all' : 'canonical'
+        const cacheKey = `${detailItem.value.series_id}:${editionMode}`
+        seriesCache.set(cacheKey, {
           books: enrichedBooks.value,
           total: booksTotal.value,
           enrichment_status: enrichmentStatus.value,

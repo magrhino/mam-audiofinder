@@ -225,7 +225,8 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
             "description": "",
             "cover_url": "",
             "subtitle": book.get("subtitle"),
-            "position": book.get("position")
+            "position": book.get("position"),
+            "users_count": book.get("users_count", 0)
         })
 
     logger.info(f"✅ Formatted {len(enriched_books)} books with basic info")
@@ -478,6 +479,12 @@ async def get_series_books(
         default=False,
         description="If True, fetch audiobook metadata from Hardcover (slower). "
                     "Only applies when enrichment is performed."
+    ),
+    show_all_editions: bool = Query(
+        default=False,
+        description="If True, return all editions including non-English versions. "
+                    "If False (default), return only canonical English primary editions. "
+                    "Each book will have an 'is_canonical' field indicating canonical status."
     )
 ):
     """
@@ -623,6 +630,9 @@ async def get_series_books(
         # This ensures we only enrich the correct English edition per position
         logger.info(f"🔍 Resolving English primary editions for series {series_id}")
 
+        # Store original books for show_all_editions mode
+        raw_books = result['books']
+
         # Prepare series metadata for resolver (canonical_titles built after resolution)
         series_metadata = {
             'series_id': series_id,
@@ -633,7 +643,7 @@ async def get_series_books(
 
         # Resolve editions
         resolved_editions = await resolve_english_primary_edition(
-            raw_books=result['books'],
+            raw_books=raw_books,
             series_metadata=series_metadata,
             hardcover_client=hardcover_client
         )
@@ -653,22 +663,40 @@ async def get_series_books(
         # Flatten resolved editions back to books list
         # Handle both single books and ambiguous multi-book positions
         resolved_books = []
+        canonical_book_ids = set()  # Track canonical book IDs
         for position in sorted(resolved_editions.keys()):
             book_or_books = resolved_editions[position]
 
             if isinstance(book_or_books, list):
                 # Ambiguous - include all tied candidates
                 resolved_books.extend(book_or_books)
+                for book in book_or_books:
+                    canonical_book_ids.add(book.get('book_id'))
                 logger.debug(f"   Position {position}: Added {len(book_or_books)} ambiguous books")
             else:
                 # Single resolved book
                 resolved_books.append(book_or_books)
+                canonical_book_ids.add(book_or_books.get('book_id'))
                 logger.debug(f"   Position {position}: Added 1 resolved book")
 
-        logger.info(f"✅ Resolved to {len(resolved_books)} book(s) from {len(result['books'])} original(s)")
+        logger.info(f"✅ Resolved to {len(resolved_books)} book(s) from {len(raw_books)} original(s)")
 
-        # Replace books in result with resolved books
-        result['books'] = resolved_books
+        # Decide which books to return based on show_all_editions parameter
+        if show_all_editions:
+            # Return all editions, marking each with is_canonical field
+            logger.info(f"🌐 Showing all {len(raw_books)} editions (canonical + non-English)")
+            books_to_enrich = []
+            for book in raw_books:
+                book_copy = book.copy()
+                book_copy['is_canonical'] = book.get('book_id') in canonical_book_ids
+                books_to_enrich.append(book_copy)
+            result['books'] = books_to_enrich
+        else:
+            # Return only canonical books, all marked as canonical
+            logger.info(f"📘 Showing only {len(resolved_books)} canonical edition(s)")
+            for book in resolved_books:
+                book['is_canonical'] = True
+            result['books'] = resolved_books
 
         # ==================================================================
         # END RESOLUTION

@@ -268,15 +268,19 @@ export const api = {
    * @param {string} options.enrich_mode - Enrichment mode: "immediate" (return basic data, enrich in background),
    *                                       "wait" (wait for full enrichment), or "status" (check enrichment progress)
    *                                       Default: "immediate" for fast initial load
+   * @param {boolean} options.showAllEditions - If true, return all editions including non-English versions.
+   *                                            If false (default), return only canonical English primary editions.
+   *                                            Each book will have an 'is_canonical' field.
    * @param {number} options.per_page - Books per page (default: 5) [deprecated, pagination not implemented]
    * @param {number} options.page - Page number, 1-indexed (default: 1) [deprecated, pagination not implemented]
    * @returns {Promise<{series_id: number, series_name: string, author_name: string, books: Array, enrichment_status: string, enrichment_progress: Object, total: number, timestamp: string}>}
    */
   async getSeriesBooks(seriesId, options = {}) {
-    const { per_page = 5, page = 1, enrich_mode = 'immediate' } = options;
+    const { per_page = 5, page = 1, enrich_mode = 'immediate', showAllEditions = false } = options;
 
     const params = new URLSearchParams({
-      enrich_mode: enrich_mode
+      enrich_mode: enrich_mode,
+      show_all_editions: showAllEditions ? 'true' : 'false'
     });
 
     // Keep per_page and page for backward compatibility (though backend ignores them currently)
