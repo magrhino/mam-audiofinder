@@ -29,15 +29,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r build/requirements-dev.txt
 
-      - name: Create data directory
+      - name: Create test data directory
         run: |
-          mkdir -p /tmp/shelfarr-test-data
-          mkdir -p data
+          mkdir -p ${{ github.workspace }}/test-data/covers
+          mkdir -p ${{ github.workspace }}/test-data/logs
 
       - name: Run mock tests (backend only)
         working-directory: ./build
         env:
           PYTHONPATH: ${{ github.workspace }}
+          DATA_DIR: ${{ github.workspace }}/test-data
+          HISTORY_DB_PATH: ${{ github.workspace }}/test-data/history.db
+          COVERS_DB_PATH: ${{ github.workspace }}/test-data/covers.db
+          SERIES_DB_PATH: ${{ github.workspace }}/test-data/series.db
+          MAM_COOKIE: test_cookie_value
+          QB_URL: http://test-qb:8080
+          QB_USER: test_user
+          QB_PASS: test_pass
+          DL_DIR: ${{ github.workspace }}/test-data/downloads
+          LIB_DIR: ${{ github.workspace }}/test-data/library
         run: |
           cd .. && LIVE_API_TESTS=0 pytest app/tests/ -v --tb=short --ignore=app/tests/frontend/
 
