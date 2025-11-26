@@ -1,0 +1,122 @@
+{
+  "series": [
+    {
+      "series_id": "73391",
+      "series_name": "Foundation.",
+      "author_name": "Isaac Asimov",
+      "book_count": 1,
+      "readers_count": 0,
+      "books": [
+        "Forward the Foundation"
+      ]
+    },
+    {
+      "series_id": "202815",
+      "series_name": "Foundation",
+      "author_name": "Isaac Asimov",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "202814",
+      "series_name": "Foundation",
+      "author_name": "Isaac Asimov",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "1054",
+      "series_name": "Foundation",
+      "author_name": "",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "60563",
+      "series_name": "Greater Foundation Universe",
+      "author_name": "Isaac Asimov",
+      "book_count": 15,
+      "readers_count": 6108,
+      "books": [
+        "Foundation",
+        "I, Robot",
+        "Foundation and Empire",
+        "The Caves of Steel",
+        "Foundation's edge"
+      ]
+    },
+    {
+      "series_id": "5450",
+      "series_name": "Foundation (Publication Order)",
+      "author_name": "Isaac Asimov",
+      "book_count": 7,
+      "readers_count": 6004,
+      "books": [
+        "Foundation",
+        "Foundation and Empire",
+        "Second Foundation",
+        "Foundation's edge",
+        "Foundation and Earth"
+      ]
+    },
+    {
+      "series_id": "10331",
+      "series_name": "Foundation (Chronological Order)",
+      "author_name": "Isaac Asimov",
+      "book_count": 7,
+      "readers_count": 5667,
+      "books": [
+        "Foundation",
+        "Foundation and Empire",
+        "Second Foundation",
+        "Foundation's edge",
+        "Foundation and Earth"
+      ]
+    },
+    {
+      "series_id": "6237",
+      "series_name": "Razorland",
+      "author_name": "Ann Aguirre",
+      "book_count": 4,
+      "readers_count": 140,
+      "books": [
+        "Enclave",
+        "Outpost",
+        "Horde",
+        "Foundation",
+        "Endurance"
+      ]
+    },
+    {
+      "series_id": "6993",
+      "series_name": "Valdemar: Collegium Chronicles",
+      "author_name": "Mercedes Lackey",
+      "book_count": 5,
+      "readers_count": 106,
+      "books": [
+        "Foundation",
+        "Intrigues",
+        "Bastion",
+        "Redoubt",
+        "Changes"
+      ]
+    },
+    {
+      "series_id": "89187",
+      "series_name": "Brady Family",
+      "author_name": "Lainey Davis",
+      "book_count": 6,
+      "readers_count": 12,
+      "books": [
+        "Foundation",
+        "Vibration",
+        "Suspension",
+        "Inspection",
+        "Restoration"
+      ]
+    }
+  ]
+}

@@ -4,12 +4,225 @@ This document describes the testing infrastructure and workflows for both local 
 
 ## Overview
 
-The project supports **two testing modes** that work together:
+The project supports **three testing modes** that work together:
 
-1. **Local Testing** - Fast iteration during development (requires local Python setup)
-2. **Container Testing** - Full integration with Docker networking (tests can reach ABS/qBittorrent)
+1. **Mock Mode** (default) - Deterministic tests using pre-recorded API fixtures (fast, CI-safe)
+2. **Live Mode** - Tests hit real Hardcover API (slower, detects API changes)
+3. **Container Testing** - Full integration with Docker networking (tests can reach ABS/qBittorrent)
 
-Both modes use the **same test suite** (223 tests across 11 files) without modification.
+All modes use the **same test suite** (223+ tests across 11+ files) without modification.
+
+---
+
+## Dual-Mode Testing (Mock vs Live)
+
+The test suite supports **automatic dual-mode testing** for all external service API integration tests. The same tests can run in two modes controlled by the `LIVE_API_TESTS` environment variable:
+
+**Supported Services (Phase 1 & 2):**
+- ✅ **Hardcover API** - Series/book metadata
+- ✅ **Audiobookshelf (ABS) API** - Library verification, cover fetching, metadata
+- ✅ **qBittorrent API** - Torrent management
+- ✅ **MAM Cache** - Search result caching
+
+### Mock Mode (Default - Recommended for CI/CD)
+
+**When:** `LIVE_API_TESTS` is not set or `!= "1"`
+
+**Behavior:**
+- Tests use pre-recorded API responses from `app/tests/fixtures/{service}/*.json`
+- No real API calls are made
+- Fast, deterministic execution (~200ms per test)
+- No API tokens required
+- Safe for GitHub Actions and parallel test runs
+- All service clients are automatically patched with mock implementations:
+  - HardcoverClient → MockHardcoverClient
+  - AudiobookshelfClient → MockABSClient
+  - qb_login functions → mock_qb_login functions
+  - MAM cache functions → cache_mock functions
+
+**Run mock mode:**
+```bash
+# Using Makefile (recommended)
+make test-mock
+
+# Using pytest directly
+pytest app/tests/
+
+# Explicit mock mode
+LIVE_API_TESTS=0 pytest app/tests/
+```
+
+### Live Mode (For API Change Detection)
+
+**When:** `LIVE_API_TESTS=1`
+
+**Behavior:**
+- Tests make real calls to Hardcover GraphQL API
+- Requires `HARDCOVER_API_TOKEN` in environment
+- Slower execution (~2-5s per test due to rate limiting)
+- Detects API structure changes, field removals, response format updates
+- Subject to rate limits (60 req/min by default)
+
+**Run live mode:**
+```bash
+# Using Makefile (recommended)
+make test-live
+
+# Using pytest directly
+LIVE_API_TESTS=1 pytest app/tests/
+
+# With specific API token
+HARDCOVER_API_TOKEN=your-token-here LIVE_API_TESTS=1 pytest app/tests/
+```
+
+### Marking Tests as Requires-Live
+
+For tests that **must** run against the real API (e.g., testing rate limiting, caching behavior):
+
+```python
+@pytest.mark.requires_live
+@pytest.mark.asyncio
+async def test_rate_limiting(hardcover_client):
+    """This test requires real API to verify rate limiting."""
+    # Test implementation
+```
+
+**Behavior:**
+- ✅ Runs in live mode (`LIVE_API_TESTS=1`)
+- ⏭️ Skipped in mock mode with clear message
+
+### How It Works
+
+**Automatic Unified Patching (Phase 1 & 2):**
+The `conftest.py` fixture `auto_mock_services()` runs once per test session:
+- In **mock mode**: Patches all service clients with mock implementations
+  - `hardcover_client.HardcoverClient` → `MockHardcoverClient`
+  - `abs_client.AudiobookshelfClient` → `MockABSClient`
+  - `qb_client.qb_login` → `mock_qb_login`
+  - `qb_client.qb_login_sync` → `mock_qb_login_sync`
+  - `mam_cache.*` functions → `cache_mock.*` functions
+- In **live mode**: Does nothing (tests use real clients)
+
+**No Test Modification Required:**
+Tests simply use service client fixtures:
+```python
+@pytest.mark.asyncio
+async def test_search_series(hardcover_client):
+    result = await hardcover_client.search_series("Foundation")
+    assert result is not None
+    # Works in both modes!
+
+@pytest.mark.asyncio
+async def test_abs_verification(abs_client):
+    result = await abs_client.verify_import("The Hobbit", "J.R.R. Tolkien")
+    assert result["status"] == "verified"
+    # Works in both modes!
+```
+
+**Test Isolation (Phase 2):**
+- `reset_test_cache()` fixture clears mock cache before each test
+- Ensures no test pollution from cached data
+- Only active in mock mode
+
+### Fixture Management
+
+**Capturing New Fixtures:**
+
+**Hardcover API:**
+When you add new Hardcover API tests, capture fixtures from the live API:
+
+```bash
+# Activate virtual environment
+source tmp/bin/activate
+
+# Set API token
+export HARDCOVER_API_TOKEN="your-token-here"
+
+# Run capture script
+python app/tests/scripts/capture_fixtures.py
+```
+
+**Audiobookshelf (ABS) API (Phase 1):**
+When you add new ABS API tests, capture fixtures from your live ABS instance:
+
+```bash
+# Activate virtual environment
+source tmp/bin/activate
+
+# Set ABS environment variables
+export ABS_BASE_URL="http://your-abs-server:13378"
+export ABS_API_KEY="your-api-key"
+export ABS_LIBRARY_ID="your-library-id"
+
+# Run ABS capture script
+python app/tests/scripts/capture_abs_fixtures.py
+```
+
+**Fixture Storage:**
+- Hardcover: `app/tests/fixtures/hardcover/`
+- ABS: `app/tests/fixtures/abs/`
+- qBittorrent: `app/tests/fixtures/qbittorrent/` (empty - no fixtures needed)
+- Format: JSON files named by method and parameters
+- Example: `search_series_title=Foundation.json`, `verify_import_title=The_Hobbit.json`
+
+**Fixture Naming Convention:**
+```
+{method}_{param1}={value1}_{param2}={value2}.json
+
+Examples:
+search_series_title=Foundation.json
+search_series_title=Discworld_author=Terry_Pratchett.json
+list_series_books_series_id=1185.json
+search_book_by_title_title=Harry_Potter_and_the_Philosoph.json
+```
+
+### Best Practices
+
+1. **Default to Mock Mode:**
+   - Run `make test-mock` or `pytest` without env vars for daily development
+   - Fast feedback loop, no API dependency
+
+2. **Periodic Live Mode Runs:**
+   - Run `make test-live` weekly or before releases
+   - Detects Hardcover API changes early
+
+3. **CI/CD Uses Mock Mode:**
+   - GitHub Actions should run in mock mode (no secrets needed)
+   - Fast, deterministic, no rate limits
+
+4. **Fixture Maintenance:**
+   - Re-capture fixtures after Hardcover API updates
+   - Keep fixtures in version control
+   - Document any manual fixture edits
+
+5. **Test Isolation:**
+   - Each test should reset counters: `hardcover_client.reset_counters()`
+   - Provided automatically by `hardcover_client` fixture
+
+### Troubleshooting
+
+**"Fixture not found" errors:**
+```
+FixtureNotFoundError: ❌ FIXTURE NOT FOUND: search_series_title=MyNewSeries.json
+```
+
+**Fix:** Capture the fixture in live mode:
+```bash
+export HARDCOVER_API_TOKEN="your-token"
+python app/tests/scripts/capture_fixtures.py
+# Or manually add test case to capture script
+```
+
+**Mock mode passes, live mode fails:**
+- API response structure changed
+- Field was removed/renamed
+- Update fixtures to match new API
+- Update test assertions if needed
+
+**Live mode rate limiting:**
+- Hardcover API: 60 requests/minute
+- Tests include 1s delays between calls
+- Reduce parallelism or use mock mode for bulk runs
 
 ---
 

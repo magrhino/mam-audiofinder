@@ -1,0 +1,116 @@
+{
+  "series": [
+    {
+      "series_id": "1130",
+      "series_name": "The Lord of the Rings",
+      "author_name": "J.R.R. Tolkien",
+      "book_count": 3,
+      "readers_count": 17135,
+      "books": [
+        "The Hobbit",
+        "The Fellowship of the Ring",
+        "The Two Towers",
+        "The Lord of the Rings",
+        "The Return of the King"
+      ]
+    },
+    {
+      "series_id": "11926",
+      "series_name": "The Art of The Lord of the Rings",
+      "author_name": "Gary Russell",
+      "book_count": 3,
+      "readers_count": 98,
+      "books": [
+        "The Lord of the Rings: The Art of the Fellowship of the Ring",
+        "The Lord of the Rings: The Art of The Two Towers",
+        "The Art of The Return of the King",
+        "The Art of The Lord of the Rings",
+        "The Art of the Lord of the Rings Trilogy"
+      ]
+    },
+    {
+      "series_id": "15712",
+      "series_name": "The History of The Lord of the Rings",
+      "author_name": "J.R.R. Tolkien",
+      "book_count": 3,
+      "readers_count": 40,
+      "books": [
+        "The Return Of The Shadow: The History of the Lord of the Rings, Part One",
+        "The Treason of Isengard",
+        "The War of the Ring: The History of The Lord of the Rings, Part Three",
+        "The History of the Lord of the Rings",
+        "The Complete History of Middle-earth, Vol. 2"
+      ]
+    },
+    {
+      "series_id": "26445",
+      "series_name": "The Lord of the Rings: Visual Companion",
+      "author_name": "Jude Fisher",
+      "book_count": 3,
+      "readers_count": 32,
+      "books": [
+        "The Lord of The Rings: The Fellowship of the Ring - Visual Companion",
+        "Taru Sormusten herrasta: Kuninkaan paluu",
+        "The Lord of the Rings: The Two Towers: Visual Companion",
+        "The Lord Of The Rings: The Two Towers - Visual Companion",
+        "The Lord of the Rings: The Return of the King - Visual Companion"
+      ]
+    },
+    {
+      "series_id": "21229",
+      "series_name": "The Lord of the Rings: Seven Book Editions",
+      "author_name": "J.R.R. Tolkien",
+      "book_count": 7,
+      "readers_count": 20,
+      "books": [
+        "The End of the Third Age",
+        "Appendices",
+        "The War Of The Ring",
+        "The Ring Goes East",
+        "The Fellowship of the Ring: The Ring Sets Out"
+      ]
+    },
+    {
+      "series_id": "177324",
+      "series_name": "The Lord of the Rings Roleplaying 5E",
+      "author_name": "Gareth Hanrahan",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": [
+        "The Lord of the Rings Roleplaying - Moria: Shadow of Khazad-dûm"
+      ]
+    },
+    {
+      "series_id": "186338",
+      "series_name": "The Lord of the Rings #3",
+      "author_name": "J.R.R. Tolkien",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "186355",
+      "series_name": "The Lord of the Rings #1",
+      "author_name": "J.R.R. Tolkien",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "186283",
+      "series_name": "The Lord of the Rings #2",
+      "author_name": "J.R.R. Tolkien",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "186027",
+      "series_name": "The Lord of the Rings #0.5",
+      "author_name": "J.R.R. Tolkien",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    }
+  ]
+}

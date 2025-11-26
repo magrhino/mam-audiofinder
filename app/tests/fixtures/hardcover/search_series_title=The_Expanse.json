@@ -1,0 +1,117 @@
+{
+  "series": [
+    {
+      "series_id": "1026",
+      "series_name": "The Expanse",
+      "author_name": "James S. A. Corey",
+      "book_count": 9,
+      "readers_count": 13730,
+      "books": [
+        "Leviathan Wakes",
+        "Caliban's War",
+        "Abaddon's Gate",
+        "Cibola Burn",
+        "Nemesis Games"
+      ]
+    },
+    {
+      "series_id": "206735",
+      "series_name": "The Expanse",
+      "author_name": "Erik Davies",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "206738",
+      "series_name": "The Expanse",
+      "author_name": "Jefferson Mays",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "115421",
+      "series_name": "the Expanse",
+      "author_name": "Justin Reese",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "34440",
+      "series_name": "The Frontiers Saga (Part 1): Discovery",
+      "author_name": "Ryk Brown",
+      "book_count": 15,
+      "readers_count": 297,
+      "books": [
+        "Aurora: CV-01",
+        "The Rings of Haven",
+        "The Expanse",
+        "The Legend of Corinair",
+        "Freedom's Dawn"
+      ]
+    },
+    {
+      "series_id": "122819",
+      "series_name": "The Expanse Graphic Novels",
+      "author_name": "James S. A. Corey",
+      "book_count": 0,
+      "readers_count": 28,
+      "books": [
+        "The Expanse: Origins",
+        "The Expanse"
+      ]
+    },
+    {
+      "series_id": "156133",
+      "series_name": " The Expanse Comics",
+      "author_name": "",
+      "book_count": 4,
+      "readers_count": 9,
+      "books": [
+        "The Expanse",
+        "The Expanse #1",
+        "The Expanse #2",
+        "The Expanse #3",
+        "The Expanse #4"
+      ]
+    },
+    {
+      "series_id": "74117",
+      "series_name": "Star Trek Enterprise Novelizations",
+      "author_name": "Paul Ruditis",
+      "book_count": 2,
+      "readers_count": 2,
+      "books": [
+        "Shockwave",
+        "The Expanse"
+      ]
+    },
+    {
+      "series_id": "31284",
+      "series_name": "The Expanse Origins",
+      "author_name": "Hallie Lambert",
+      "book_count": 4,
+      "readers_count": 62,
+      "books": [
+        "The Expanse: Origins",
+        "The Expanse Origins: James Holden",
+        "The Expanse Origins: Amos Burton",
+        "The Expanse Origins: Naomi Nagata",
+        "The Expanse Origins: Alex Kamal"
+      ]
+    },
+    {
+      "series_id": "128826",
+      "series_name": "Expanse, The: Dragon Tooth",
+      "author_name": "Andy Diggle",
+      "book_count": 2,
+      "readers_count": 6,
+      "books": [
+        "The Expanse: Dragon Tooth, Vol. 2",
+        "The Expanse: Dragon Tooth, Vol. 3"
+      ]
+    }
+  ]
+}

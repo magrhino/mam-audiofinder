@@ -1,0 +1,102 @@
+{
+  "series": [
+    {
+      "series_id": "202575",
+      "series_name": "Mistborn",
+      "author_name": "Brandon Sanderson",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "5452",
+      "series_name": "The Mistborn Saga",
+      "author_name": "Brandon Sanderson",
+      "book_count": 10,
+      "readers_count": 17752,
+      "books": [
+        "Mistborn: The Final Empire",
+        "The Well of Ascension",
+        "The Hero of Ages",
+        "The Alloy of Law",
+        "Shadows of Self"
+      ]
+    },
+    {
+      "series_id": "10001",
+      "series_name": "The Mistborn Saga: The Original Trilogy",
+      "author_name": "Brandon Sanderson",
+      "book_count": 3,
+      "readers_count": 11358,
+      "books": [
+        "Mistborn: The Final Empire",
+        "The Well of Ascension",
+        "The Hero of Ages",
+        "Mistborn: Secret History",
+        "The Eleventh Metal"
+      ]
+    },
+    {
+      "series_id": "10825",
+      "series_name": "Mistborn: Wax & Wayne",
+      "author_name": "Brandon Sanderson",
+      "book_count": 4,
+      "readers_count": 6112,
+      "books": [
+        "The Alloy of Law",
+        "Shadows of Self",
+        "The Bands of Mourning",
+        "The Lost Metal",
+        "Allomancer Jak and the Pits of Eltania"
+      ]
+    },
+    {
+      "series_id": "216625",
+      "series_name": "Mistborn, Era 2: Wax & Wayne",
+      "author_name": "Brandon Sanderson",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "206702",
+      "series_name": "The Mistborn Saga",
+      "author_name": "Michael Kramer",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "201227",
+      "series_name": "Mistborn era 2",
+      "author_name": "Brandon Sanderson",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "198090",
+      "series_name": "Mistborn Era 1",
+      "author_name": "Brandon Sanderson",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "193577",
+      "series_name": "Shadows of Self: A Mistborn Novel by Brandon Sanderson",
+      "author_name": "Brandon Sanderson",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "193572",
+      "series_name": "Mistborn: The Final Empire by Brandon Sanderson",
+      "author_name": "Brandon Sanderson",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    }
+  ]
+}

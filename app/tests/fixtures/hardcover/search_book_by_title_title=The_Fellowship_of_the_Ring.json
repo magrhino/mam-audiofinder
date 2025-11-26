@@ -1,0 +1,72 @@
+{
+  "books": [
+    {
+      "book_id": "1304505",
+      "title": "The Superfriends of the Ring: A Parody of Tolkien's Fellowship of the Ring",
+      "authors": [],
+      "release_year": null,
+      "description": "",
+      "cover_url": {}
+    },
+    {
+      "book_id": "139773",
+      "title": "The Fellowship of the Ring",
+      "authors": [],
+      "release_year": 1954,
+      "description": "In ancient times the Rings of Power were crafted by the Elven-smiths, and Sauron, the Dark Lord, forged the One Ring, filling it with his own power so that he could rule all others. But the One Ring was taken from him, and though he sought it throughout Middle-earth, it remained lost to him. After many ages it fell into the hands of Bilbo Baggins, as told in The Hobbit.\n\nIn a sleepy village in the Shire, young Frodo Baggins finds himself faced with an immense task, as his elderly cousin Bilbo entrusts the Ring to his care. Frodo must leave his home and make a perilous journey across Middle-earth to the Cracks of Doom, there to destroy the Ring and foil the Dark Lord in his evil purpose.",
+      "cover_url": {
+        "color": "#888784",
+        "color_name": "Gray",
+        "height": 500,
+        "id": 1894040,
+        "url": "https://assets.hardcover.app/edition/29029601/6d64b05efec0ccb215640b38d8c6bc4c712da0f5.jpeg",
+        "width": 333
+      }
+    },
+    {
+      "book_id": "428609",
+      "title": "The Lord of the Rings: The Art of the Fellowship of the Ring",
+      "authors": [],
+      "release_year": 2003,
+      "description": "Presents over six hundred sketches, paintings, and digital artworks created during production of the film \"The Lord of the Rings: The Two Towers.\"",
+      "cover_url": {
+        "color": "#5f6653",
+        "color_name": "Brown",
+        "height": 162,
+        "id": 900187,
+        "url": "https://assets.hardcover.app/external_data/59865459/bdb9d05fbd98fa7ce994a3936f542d0171e7f206.jpeg",
+        "width": 128
+      }
+    },
+    {
+      "book_id": "523110",
+      "title": "The Lord of The Rings: The Fellowship of the Ring - Visual Companion",
+      "authors": [],
+      "release_year": 2001,
+      "description": "A full-colour photographic, encyclopaedic guide to the characters, places, landscapes, artefacts and costumes of the world of The Fellowship of the Ring.",
+      "cover_url": {
+        "color": "#592408",
+        "color_name": "Brown",
+        "height": 500,
+        "id": 4635077,
+        "url": "https://assets.hardcover.app/edition/30476657/0cc057e08d078949a652ef2d40c970462f2c60a3.jpeg",
+        "width": 361
+      }
+    },
+    {
+      "book_id": "1915806",
+      "title": "The Fellowship of the Ring: The Ring Sets Out",
+      "authors": [],
+      "release_year": 1954,
+      "description": "Book 1 of [Fellowship of the Ring](https://openlibrary.org/works/OL14933414W/The_Fellowship_of_the_Ring)",
+      "cover_url": {
+        "color": "#89775a",
+        "color_name": "Gray",
+        "height": 147,
+        "id": 5124097,
+        "url": "https://assets.hardcover.app/external_data/550216/4640e7178423003686e34e272c87bd5fe2fdff39.jpeg",
+        "width": 98
+      }
+    }
+  ]
+}

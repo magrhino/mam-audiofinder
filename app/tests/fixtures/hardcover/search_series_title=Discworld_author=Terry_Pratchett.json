@@ -1,0 +1,98 @@
+{
+  "series": [
+    {
+      "series_id": "1018",
+      "series_name": "Discworld",
+      "author_name": "Terry Pratchett",
+      "book_count": 41,
+      "readers_count": 21413,
+      "books": [
+        "The Colour of Magic",
+        "Mort",
+        "Guards! Guards!",
+        "Equal Rites",
+        "The Light Fantastic"
+      ]
+    },
+    {
+      "series_id": "219240",
+      "series_name": "Discworld",
+      "author_name": "Sir Terence David John Pratchett",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "212716",
+      "series_name": "Discworld",
+      "author_name": "Various",
+      "book_count": 1,
+      "readers_count": 0,
+      "books": [
+        "Le Guet des orfèvres"
+      ]
+    },
+    {
+      "series_id": "206774",
+      "series_name": "Discworld",
+      "author_name": "Richard Coyle",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "206785",
+      "series_name": "Discworld",
+      "author_name": "Celia Imrie",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "206796",
+      "series_name": "Discworld",
+      "author_name": "Bill Nighy",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "206719",
+      "series_name": "Discworld",
+      "author_name": "Tony Robinson",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "206731",
+      "series_name": "Discworld",
+      "author_name": "Nigel Planer",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "206443",
+      "series_name": "Discworld",
+      "author_name": "Stephen Briggs",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "6768",
+      "series_name": "Science of Discworld",
+      "author_name": "Terry Pratchett",
+      "book_count": 4,
+      "readers_count": 160,
+      "books": [
+        "The Science of Discworld",
+        "The Science of Discworld II: The Globe",
+        "The Science of Discworld III: Darwin's Watch",
+        "The Science of Discworld IV: Judgment Day",
+        "La scienza di Mondo Disco"
+      ]
+    }
+  ]
+}

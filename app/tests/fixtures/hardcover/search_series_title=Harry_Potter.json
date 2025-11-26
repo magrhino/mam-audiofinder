@@ -1,0 +1,122 @@
+{
+  "series": [
+    {
+      "series_id": "1185",
+      "series_name": "Harry Potter",
+      "author_name": "J.K. Rowling",
+      "book_count": 8,
+      "readers_count": 48069,
+      "books": [
+        "Harry Potter and the Sorcerer's Stone",
+        "Harry Potter and the Chamber of Secrets",
+        "Harry Potter and the Prisoner of Azkaban",
+        "Harry Potter and the Goblet of Fire",
+        "Harry Potter and the Order of the Phoenix"
+      ]
+    },
+    {
+      "series_id": "215419",
+      "series_name": "Harry Potter",
+      "author_name": "",
+      "book_count": 1,
+      "readers_count": 0,
+      "books": [
+        "Harry Potter And The Philosopher's Stone"
+      ]
+    },
+    {
+      "series_id": "161579",
+      "series_name": "Harry potter",
+      "author_name": "J.K. Rowling",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "101156",
+      "series_name": "harry potter",
+      "author_name": "John Tiffany",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "37857",
+      "series_name": "Harry Potter,",
+      "author_name": "",
+      "book_count": 0,
+      "readers_count": 0,
+      "books": []
+    },
+    {
+      "series_id": "11272",
+      "series_name": "Harry Potter and the Methods of Rationality",
+      "author_name": "Eliezer Yudkowsky",
+      "book_count": 6,
+      "readers_count": 176,
+      "books": [
+        "Harry Potter and the Methods of Rationality",
+        "Гарри Поттер и Методы рационального мышления",
+        "Harry James Potter-Evans-Verres and the Methods of Rationality",
+        "Harry James Potter-Evans-Verres and the Professor's Games",
+        "Harry James Potter-Evans-Verres and the Shadows of Death"
+      ]
+    },
+    {
+      "series_id": "7611",
+      "series_name": "Harry Potter: A History of Magic Exhibition",
+      "author_name": "British Library",
+      "book_count": 0,
+      "readers_count": 43,
+      "books": [
+        "Harry Potter: A History of Magic",
+        "Harry Potter: A Journey Through A History of Magic",
+        "Harry Potter: A History of Magic: The eBook of the Exhibition",
+        "A History of Magic: A Journey Through the Hogwarts Curriculum",
+        "Harry Potter: A Journey Through A History of Magic"
+      ]
+    },
+    {
+      "series_id": "1492",
+      "series_name": "Harry Potter: A Journey Through",
+      "author_name": "Pottermore Publishing",
+      "book_count": 4,
+      "readers_count": 14,
+      "books": [
+        "Harry Potter: A Journey Through Charms and Defence Against the Dark Arts",
+        "Harry Potter: A Journey Through Potions and Herbology",
+        "Harry Potter: A Journey Through Care of Magical Creatures",
+        "Harry Potter: A Journey Through Divination and Astronomy",
+        "A History of Magic: A Journey Through the Hogwarts Curriculum"
+      ]
+    },
+    {
+      "series_id": "51729",
+      "series_name": "Harry Potter Korean Split-Volume Paperback",
+      "author_name": "J.K. Rowling",
+      "book_count": 3,
+      "readers_count": 9,
+      "books": [
+        "해리 포터와 마법사의 돌 1",
+        "Harry Potter and the Deathly Hollows",
+        "Harry Potter y las Reliquias de la Muerte",
+        "Harry Potter y las reliquias de la muerte",
+        "해리 포터와 마법사의 돌 2"
+      ]
+    },
+    {
+      "series_id": "42118",
+      "series_name": "Harry Potter Cinematic Guide",
+      "author_name": "Felicity Baker",
+      "book_count": 0,
+      "readers_count": 6,
+      "books": [
+        "Harry Potter: Cinematic Guide",
+        "Hermione Granger: Cinematic Guide",
+        "Harry Potter: Cinematic Guide: Ron Weasley",
+        "Harry Potter: Hermiona Grangerová - Sprievodca k filmom",
+        "Harry Potter: Ron Weasley - Sprievodca k filmom"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "series_id": 1130,
+  "series_name": "The Lord of the Rings",
+  "author_name": "J.R.R. Tolkien",
+  "books_count": 4,
+  "books": [
+    {
+      "book_id": 1397225,
+      "title": "Essential Tolkien CD: The Hobbit and The Fellowship of the Ring",
+      "subtitle": "The Hobbit and The Fellowship of the Ring",
+      "position": 0,
+      "users_count": 1
+    },
+    {
+      "book_id": 346073,
+      "title": "The Hobbit & The Lord of the Rings",
+      "subtitle": "Illustrated edition",
+      "position": 0,
+      "users_count": 402
+    },
+    {
+      "book_id": 382700,
+      "title": "The Hobbit",
+      "subtitle": "Graphic Novel",
+      "position": 0,
+      "users_count": 7246
+    },
+    {
+      "book_id": 1265587,
+      "title": "The Hobbit (Part 1 and 2) Slipcase",
+      "subtitle": null,
+      "position": 0,
+      "users_count": 1
+    },
+    {
+      "book_id": 370408,
+      "title": "The Return Of The Shadow: The History of the Lord of the Rings, Part One",
+      "subtitle": "The History of the Lord of the Rings, Part One",
+      "position": 1,
+      "users_count": 55
+    },
+    {
+      "book_id": 377938,
+      "title": "The Lord of the Rings",
+      "subtitle": "The Fellowship of the Ring, The Two Towers, The Return of the King",
+      "position": 1,
+      "users_count": 2776
+    },
+    {
+      "book_id": 139773,
+      "title": "The Fellowship of the Ring",
+      "subtitle": "The Lord of the Rings: Part One",
+      "position": 1,
+      "users_count": 5682
+    },
+    {
+      "book_id": 1927700,
+      "title": "The Hobbit, Part 1 of 2",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 1
+    },
+    {
+      "book_id": 379631,
+      "title": "The Two Towers",
+      "subtitle": "The Two Towers",
+      "position": 2,
+      "users_count": 3867
+    },
+    {
+      "book_id": 374541,
+      "title": "The Return of the King",
+      "subtitle": "Being the Third Part of the Lord of the Rings",
+      "position": 3,
+      "users_count": 2560
+    }
+  ]
+}

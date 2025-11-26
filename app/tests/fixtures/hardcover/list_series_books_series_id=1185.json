@@ -1,0 +1,274 @@
+{
+  "series_id": 1185,
+  "series_name": "Harry Potter",
+  "author_name": "J.K. Rowling",
+  "books_count": 10,
+  "books": [
+    {
+      "book_id": 454247,
+      "title": "Harry Potter: The Prequel",
+      "subtitle": "The Prequel",
+      "position": 0.5,
+      "users_count": 188
+    },
+    {
+      "book_id": 328491,
+      "title": "Harry Potter and the Sorcerer's Stone",
+      "subtitle": "The Illustrated Edition",
+      "position": 1,
+      "users_count": 9183
+    },
+    {
+      "book_id": 1032534,
+      "title": "The Harry Potter Trilogy",
+      "subtitle": "a Magical Adventure Begins",
+      "position": 1,
+      "users_count": 58
+    },
+    {
+      "book_id": 1653906,
+      "title": "Harry Potter Collection #1-6",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 1
+    },
+    {
+      "book_id": 2054182,
+      "title": "Harry Potter y la piedra filosofal (Harry Potter, #1) audiolibro",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 2
+    },
+    {
+      "book_id": 1983978,
+      "title": "哈利•波特",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 1
+    },
+    {
+      "book_id": 439982,
+      "title": "Harry Potter Boxed Set, Books 1-5",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 50
+    },
+    {
+      "book_id": 386077,
+      "title": "The Harry Potter Collection #1-4",
+      "subtitle": "Harry Potter a l'Ecole des Sorciers; Harry Potter et la Chambre aux Secrets; Harry Potter et le Prisonnier d'Azkaban",
+      "position": 1,
+      "users_count": 39
+    },
+    {
+      "book_id": 793508,
+      "title": "Harry Potter: The Complete Collection",
+      "subtitle": "The Complete Collection",
+      "position": 1,
+      "users_count": 266
+    },
+    {
+      "book_id": 1960940,
+      "title": "Harry Potter Hufflepuff House Editions Hardback Box Set",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 2
+    },
+    {
+      "book_id": 137287,
+      "title": "Harry Potter és a Bölcsek Köve",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 4
+    },
+    {
+      "book_id": 1960944,
+      "title": "Harry Potter Ravenclaw House Editions Hardback Box Set",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 2
+    },
+    {
+      "book_id": 1968414,
+      "title": "Arcane Knight: An Epic LitRPG Fantasy",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 0
+    },
+    {
+      "book_id": 1967892,
+      "title": "O'Neal Gear, K: 1 The Ice Lion",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 0
+    },
+    {
+      "book_id": 1967972,
+      "title": "Heartstrikers",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 0
+    },
+    {
+      "book_id": 1968171,
+      "title": "Mined in Magic: A Falling for Fables Standalone",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 0
+    },
+    {
+      "book_id": 2143403,
+      "title": "Harry Potter Collection",
+      "subtitle": null,
+      "position": 1,
+      "users_count": 8
+    },
+    {
+      "book_id": 1558317,
+      "title": "Christmas at Hogwarts",
+      "subtitle": null,
+      "position": 1.5,
+      "users_count": 38
+    },
+    {
+      "book_id": 2104909,
+      "title": "Harry Potter és a Titkok Kamrája",
+      "subtitle": null,
+      "position": 2,
+      "users_count": 1
+    },
+    {
+      "book_id": 2113694,
+      "title": "Harry Potter e a Câmara Secreta",
+      "subtitle": null,
+      "position": 2,
+      "users_count": 1
+    },
+    {
+      "book_id": 429306,
+      "title": "Harry Potter and the Chamber of Secrets",
+      "subtitle": "Ilustrované vydání",
+      "position": 2,
+      "users_count": 7084
+    },
+    {
+      "book_id": 376219,
+      "title": "Harry Potter and the Prisoner of Azkaban",
+      "subtitle": "Signature Edition",
+      "position": 3,
+      "users_count": 7006
+    },
+    {
+      "book_id": 2049866,
+      "title": "Harry Potter and la Coupe de Feu",
+      "subtitle": null,
+      "position": 4,
+      "users_count": 1
+    },
+    {
+      "book_id": 383236,
+      "title": "Harry Potter and the Goblet of Fire",
+      "subtitle": "Harry Potter y el cáliz de fuego",
+      "position": 4,
+      "users_count": 6746
+    },
+    {
+      "book_id": 1939268,
+      "title": "Harry Potter a Ohnivý pohár",
+      "subtitle": null,
+      "position": 4,
+      "users_count": 2
+    },
+    {
+      "book_id": 2111703,
+      "title": "HARRY POTTER & THE ORDER OF THE PHEONIX.",
+      "subtitle": null,
+      "position": 5,
+      "users_count": 1
+    },
+    {
+      "book_id": 1967880,
+      "title": "Quell the Storm",
+      "subtitle": null,
+      "position": 5,
+      "users_count": 0
+    },
+    {
+      "book_id": 428465,
+      "title": "Harry Potter and the Order of the Phoenix",
+      "subtitle": "The Illustrated Edition",
+      "position": 5,
+      "users_count": 6436
+    },
+    {
+      "book_id": 1968666,
+      "title": "Fields of Fire: Backyard Starship, Book 9",
+      "subtitle": null,
+      "position": 6,
+      "users_count": 1
+    },
+    {
+      "book_id": 1556803,
+      "title": "Harry Potter and the Half-Blood Prince",
+      "subtitle": "A Novel of Suspense",
+      "position": 6,
+      "users_count": 1
+    },
+    {
+      "book_id": 1961050,
+      "title": "Harry Potter and the half blood Prince - Ravenclaw Edition",
+      "subtitle": null,
+      "position": 6,
+      "users_count": 2
+    },
+    {
+      "book_id": 1968084,
+      "title": "The Smell of Battle, the Taste of Siege",
+      "subtitle": null,
+      "position": 6,
+      "users_count": 1
+    },
+    {
+      "book_id": 428506,
+      "title": "Harry Potter and the Half-Blood Prince",
+      "subtitle": "Movie Poster Book",
+      "position": 6,
+      "users_count": 6301
+    },
+    {
+      "book_id": 2050980,
+      "title": "Harry Potter and the Deathly Hallows",
+      "subtitle": null,
+      "position": 7,
+      "users_count": 2
+    },
+    {
+      "book_id": 382143,
+      "title": "Harry Potter and the Deathly Hallows",
+      "subtitle": "Harry Potter y las reliquias de la muerte",
+      "position": 7,
+      "users_count": 6280
+    },
+    {
+      "book_id": 279285,
+      "title": "Harry Potter and the Cursed Child: Parts One and Two",
+      "subtitle": "Parts One and Two",
+      "position": 8,
+      "users_count": 2205
+    },
+    {
+      "book_id": 2036286,
+      "title": "Harry Potter dan Si Anak Terkutuk Bagian Satu dan Dua",
+      "subtitle": null,
+      "position": 8,
+      "users_count": 2
+    },
+    {
+      "book_id": 2098304,
+      "title": "Harry Potter and the Cursed Child: Parts One and Two - Playscript",
+      "subtitle": "Parts One and Two - Playscript",
+      "position": 8,
+      "users_count": 1
+    }
+  ]
+}

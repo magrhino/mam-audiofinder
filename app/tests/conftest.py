@@ -2,17 +2,57 @@
 Pytest configuration and shared fixtures for MAM Audiobook Finder tests.
 
 This module provides common test fixtures and configuration for all test modules.
+
+DUAL-MODE TESTING:
+    This test suite supports two modes controlled by the LIVE_API_TESTS environment variable:
+
+    1. MOCK MODE (default, LIVE_API_TESTS not set or != "1"):
+       - Tests use pre-recorded fixture data from app/tests/fixtures/hardcover/
+       - No real API calls are made
+       - Fast, deterministic, safe for CI/CD
+       - HardcoverClient is automatically patched to use MockHardcoverClient
+
+    2. LIVE MODE (LIVE_API_TESTS=1):
+       - Tests make real calls to Hardcover API
+       - Requires HARDCOVER_API_TOKEN in environment
+       - Slower, may hit rate limits, detects API changes
+       - HardcoverClient behaves normally
+
+    Usage:
+        # Run in mock mode (default)
+        pytest
+
+        # Run in live mode
+        LIVE_API_TESTS=1 pytest
+
+    Marking tests that require live mode:
+        @pytest.mark.requires_live
+        async def test_that_needs_real_api():
+            # This test will be skipped in mock mode
+            pass
 """
 import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 import pytest
 from sqlalchemy import create_engine, text
 
 # Add parent directory to path so we can import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Determine testing mode
+LIVE_MODE = os.getenv("LIVE_API_TESTS") == "1"
+
+if LIVE_MODE:
+    print("\n" + "="*80)
+    print("🔴 LIVE API MODE ENABLED - Tests will hit real Hardcover API")
+    print("="*80 + "\n")
+else:
+    print("\n" + "="*80)
+    print("🟢 MOCK MODE ENABLED - Tests will use fixture data")
+    print("="*80 + "\n")
 
 
 @pytest.fixture
@@ -230,20 +270,6 @@ def sample_file_tree():
     }
 
 
-@pytest.fixture
-def mock_abs_client():
-    """Create a mock AudiobookshelfClient for testing."""
-    client = Mock()
-    client.test_connection = Mock(return_value=(True, "Connection successful"))
-    client.fetch_cover = Mock(return_value=None)
-    client.verify_import = Mock(return_value={
-        'status': 'verified',
-        'note': 'Found in library',
-        'abs_item_id': 'item123'
-    })
-    return client
-
-
 @pytest.fixture(autouse=True)
 def reset_env():
     """Reset environment variables before each test."""
@@ -255,3 +281,148 @@ def reset_env():
     # Restore original env after test
     os.environ.clear()
     os.environ.update(original_env)
+
+
+@pytest.fixture(autouse=True)
+def reset_test_cache():
+    """Reset mock cache before each test for isolation (Phase 2)."""
+    if not LIVE_MODE:
+        from tests.mocks import cache_mock
+        cache_mock.reset_test_cache()
+    yield
+
+
+# ============================================================================
+# DUAL-MODE TESTING INFRASTRUCTURE
+# ============================================================================
+
+def pytest_configure(config):
+    """Register custom markers for dual-mode testing."""
+    config.addinivalue_line(
+        "markers",
+        "requires_live: mark test as requiring live API access (will be skipped in mock mode)"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip tests marked as requires_live when in mock mode."""
+    if not LIVE_MODE:
+        skip_live = pytest.mark.skip(reason="Test requires live API (LIVE_API_TESTS=1 to run)")
+        for item in items:
+            if "requires_live" in item.keywords:
+                item.add_marker(skip_live)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def auto_mock_services():
+    """
+    Automatically patch all external service clients in mock mode.
+
+    Patches:
+    - HardcoverClient → MockHardcoverClient
+    - AudiobookshelfClient → MockABSClient
+    - qb_login/qb_login_sync → mock_qb_login/mock_qb_login_sync
+
+    This fixture runs once per test session and patches all service clients
+    at the module level before any tests import them.
+
+    In LIVE mode: Does nothing (tests use real clients)
+    In MOCK mode: Patches all clients with mock implementations
+    """
+    if LIVE_MODE:
+        # Live mode: no patching needed
+        yield
+        return
+
+    # Mock mode: patch all external service clients
+    from tests.mocks.hardcover_mock import MockHardcoverClient
+    from tests.mocks.abs_mock import MockABSClient
+    from tests.mocks import qb_mock
+    from tests.mocks import cache_mock
+
+    # Create nested context managers for all patches
+    with patch('hardcover_client.HardcoverClient', MockHardcoverClient), \
+         patch('abs_client.AudiobookshelfClient', MockABSClient), \
+         patch('qb_client.qb_login', qb_mock.mock_qb_login), \
+         patch('qb_client.qb_login_sync', qb_mock.mock_qb_login_sync), \
+         patch('mam_cache.get_cached_mam_search', cache_mock.get_cached_mam_search), \
+         patch('mam_cache.cache_mam_search', cache_mock.cache_mam_search), \
+         patch('mam_cache.clear_expired_cache', cache_mock.clear_expired_cache), \
+         patch('mam_cache.get_cache_stats', cache_mock.get_cache_stats):
+
+        # Patch already-imported module references
+        import hardcover_client
+        import abs_client
+        import qb_client
+
+        # Store originals
+        orig_hc = hardcover_client.HardcoverClient
+        orig_abs = abs_client.AudiobookshelfClient
+        orig_qb_async = qb_client.qb_login
+        orig_qb_sync = qb_client.qb_login_sync
+
+        # Apply patches
+        hardcover_client.HardcoverClient = MockHardcoverClient
+        abs_client.AudiobookshelfClient = MockABSClient
+        qb_client.qb_login = qb_mock.mock_qb_login
+        qb_client.qb_login_sync = qb_mock.mock_qb_login_sync
+
+        # Patch global instances if they exist
+        if hasattr(hardcover_client, 'hardcover_client'):
+            hardcover_client.hardcover_client = MockHardcoverClient()
+
+        if hasattr(abs_client, 'abs_client'):
+            abs_client.abs_client = MockABSClient()
+
+        logger.info("🔧 MOCK MODE: All services patched (Hardcover, ABS, qBittorrent, MAM Cache)")
+
+        yield
+
+        # Restore originals (though typically tests end after this)
+        hardcover_client.HardcoverClient = orig_hc
+        abs_client.AudiobookshelfClient = orig_abs
+        qb_client.qb_login = orig_qb_async
+        qb_client.qb_login_sync = orig_qb_sync
+
+
+@pytest.fixture
+def hardcover_client():
+    """
+    Provide appropriate HardcoverClient instance based on test mode.
+
+    Returns:
+        HardcoverClient in live mode, MockHardcoverClient in mock mode
+    """
+    if LIVE_MODE:
+        from hardcover_client import HardcoverClient
+        client = HardcoverClient()
+    else:
+        from tests.mocks.hardcover_mock import MockHardcoverClient
+        client = MockHardcoverClient()
+
+    # Reset counters before each test
+    client.reset_counters()
+
+    yield client
+
+
+@pytest.fixture
+def abs_client():
+    """
+    Provide appropriate ABS client instance based on test mode.
+
+    Returns:
+        AudiobookshelfClient in live mode, MockABSClient in mock mode
+    """
+    if LIVE_MODE:
+        from abs_client import AudiobookshelfClient
+        client = AudiobookshelfClient()
+    else:
+        from tests.mocks.abs_mock import MockABSClient
+        client = MockABSClient()
+
+    # Reset counters if method exists
+    if hasattr(client, 'reset_counters'):
+        client.reset_counters()
+
+    yield client

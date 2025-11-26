@@ -11,7 +11,7 @@
 **Backend:** Python 3.12, FastAPI 0.4.0, Uvicorn, SQLite (SQLAlchemy), httpx (async HTTP)
 **Frontend:** Vue 3.4.21 (Composition API), Vue Router 4.3.0, Vite 5.1.6, NaiveUI 2.43.2, @vueuse/core 14.0.0
 **Infrastructure:** Docker (multi-stage builds), Docker Compose
-**Testing:** pytest (223+ test functions), Selenium (integrated Chromium), Makefile automation
+**Testing:** pytest (223+ test functions), Selenium (integrated Chromium), dual-mode API testing (mock/live), Makefile automation
 
 ## Codebase Structure
 
@@ -46,9 +46,12 @@ shelfarr/
 │   │   └── js/                   # ⚠️ LEGACY - scheduled for removal
 │   │       ├── core/             # api.js, utils.js (reused by Vue via aliases)
 │   │       └── services/         # coverLoader.js
-│   └── tests/                    # Test suite (23 test files)
-│       ├── conftest.py           # Shared fixtures
-│       ├── test_*.py             # Backend tests (15 files)
+│   └── tests/                    # Test suite (24+ test files)
+│       ├── conftest.py           # Shared fixtures + dual-mode auto-patching
+│       ├── mocks/                # Mock implementations (hardcover_mock.py)
+│       ├── fixtures/             # Test fixtures (JSON API responses)
+│       ├── scripts/              # Test utilities (capture_fixtures.py)
+│       ├── test_*.py             # Backend tests (16+ files)
 │       └── frontend/             # Selenium E2E tests (4 files)
 ├── build/                        # Build tooling & dependencies
 │   ├── Dockerfile                # Multi-stage build (Node 20 + Python 3.12)
@@ -437,39 +440,68 @@ Edit .env → `docker compose up -d --force-recreate`
 
 ### Testing
 
-**Two testing modes - same test suite (223+ tests), different environments:**
+**Three testing modes - same test suite (223+ tests), different execution strategies:**
 
-**Local Testing** (fast iteration, development):
+#### Dual-Mode Testing (Mock vs Live API)
+
+Hardcover API tests support automatic dual-mode execution:
+
+**Mock Mode** (default - fast, deterministic, CI-safe):
+```bash
+cd build/
+make test-mock                             # Uses JSON fixtures, no API token needed
+pytest app/tests/                          # Same as mock mode
+```
+
+**Live Mode** (periodic verification, detects API changes):
+```bash
+cd build/
+make test-live                             # Requires HARDCOVER_API_TOKEN
+LIVE_API_TESTS=1 pytest app/tests/        # Tests hit real Hardcover API
+```
+
+**Key Features:**
+- Same tests run in both modes without code changes
+- Mock mode uses pre-recorded JSON fixtures (~200ms per test)
+- Live mode validates against real API (~2-5s per test)
+- `@pytest.mark.requires_live` for API-dependent tests
+- Automatic client patching via `conftest.py`
+
+#### Local Testing (Development)
+
+Fast iteration with virtual environment:
 ```bash
 cd build/
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements-dev.txt
-make test-backend                          # Run all backend tests
+make test-backend                          # All backend tests (mock mode)
 make test-coverage                         # With HTML coverage report
 pytest app/tests/test_verification.py -v   # Specific file
 ```
 
-**Container Testing** (integration, Docker networking, can reach ABS):
+#### Container Testing (Integration)
+
+Full Docker integration with ABS/qBittorrent networking:
 ```bash
 cd build/
 make docker-test-build                     # Build test container (first time)
-make docker-test-run                       # Run full test suite in container
+make docker-test-run                       # Full test suite in container
 make docker-test-backend                   # Backend tests only
 make docker-test-frontend                  # Frontend tests (Selenium)
 make docker-test-shell                     # Debug shell in container
 ```
 
+**Test Infrastructure:**
+- 17 JSON fixtures for Hardcover API (Foundation, Harry Potter, LOTR, etc.)
+- Fixture capture script: `app/tests/scripts/capture_fixtures.py`
+- MockHardcoverClient mirrors real client (600+ lines)
+- Multi-stage Dockerfile with integrated Chromium for Selenium
+- Isolated test data, configurable database paths
+
 **Test Coverage:**
-Verification logic, cover caching, description fetch, search, MAM cache, helpers, migrations, multi-book imports, frontend E2E workflows
+Verification, cover caching, descriptions, search, MAM cache, helpers, migrations, multi-book imports, Hardcover series, frontend E2E workflows
 
-**Key Testing Features:**
-- Database paths configurable via DATA_DIR, HISTORY_DB_PATH, COVERS_DB_PATH env vars
-- Multi-stage Dockerfile: production stage (lean, ~200MB) + testing stage (with pytest, selenium, make, chromium)
-- Integrated Selenium browser in test container (no separate 2GB selenium container needed)
-- Isolated test data (/data/test-data/) doesn't interfere with production
-- Live code mounting for rapid iteration in container tests
-
-See [TESTING.md](TESTING.md) for comprehensive testing guide and troubleshooting.
+See [TESTING.md](TESTING.md) for comprehensive dual-mode guide, troubleshooting, and fixture management.
 
 ## Important Patterns
 
@@ -779,9 +811,14 @@ The legacy JavaScript modules in `app/static/js/` are scheduled for removal. The
 
 1. Add unit tests for new backend logic (pytest)
 2. Add integration tests for API endpoints if they interact with external services
-3. Manual E2E testing for frontend features
-4. Run full test suite before pushing (`make test-backend` or `make docker-test-run`)
-5. Aim for 70%+ code coverage on new code
+3. **For Hardcover API tests:** Capture fixtures in live mode, verify in both modes
+   - Add test using `hardcover_client` fixture (works in both modes automatically)
+   - Capture fixture: `HARDCOVER_API_TOKEN=xxx python app/tests/scripts/capture_fixtures.py`
+   - Verify mock mode: `pytest app/tests/test_yourfeature.py -v`
+   - Verify live mode: `LIVE_API_TESTS=1 pytest app/tests/test_yourfeature.py -v`
+4. Manual E2E testing for frontend features
+5. Run full test suite before pushing (`make test-mock` or `make docker-test-run`)
+6. Aim for 70%+ code coverage on new code
 
 ## Project Philosophy
 

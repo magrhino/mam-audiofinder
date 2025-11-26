@@ -1,0 +1,79 @@
+{
+  "books": [
+    {
+      "book_id": "188628",
+      "title": "Foundation",
+      "authors": [],
+      "release_year": 1951,
+      "description": "One of the great masterworks of science fiction, the Foundation novels of Isaac Asimov are unsurpassed for their unique blend of nonstop action, daring ideas, and extensive world-building. \r\n\r\nThe story of our future begins with the history of Foundation and its greatest psychohistorian: Hari Seldon.  For twelve thousand years the Galactic Empire has ruled supreme. Now it is dying.  Only Hari Seldon, creator of the revolutionary science of psychohistory, can see into the future--a dark age of ignorance, barbarism, and warfare that will last thirty thousand years. To preserve knowledge and save mankind, Seldon gathers the best minds in the Empire--both scientists and scholars--and brings them to a bleak planet at the edge of the Galaxy to serve as a beacon of hope for future generations. He calls his sanctuary the Foundation.\r\n\r\nBut soon the fledgling Foundation finds itself at the mercy of corrupt warlords rising in the wake of the receding Empire. And mankind's last best hope is faced with an agonizing choice: submit to the barbarians and live as slaves--or take a stand for freedom and risk total destruction.",
+      "cover_url": {
+        "color": "#72635e",
+        "color_name": "Gray",
+        "height": 499,
+        "id": 3960809,
+        "url": "https://assets.hardcover.app/editions/30404892/5661545646660324.jpg",
+        "width": 334
+      }
+    },
+    {
+      "book_id": "484176",
+      "title": "Foundation",
+      "authors": [],
+      "release_year": 2008,
+      "description": "In this chronicle of the early history of Valdemar, Mercedes Lackey's bestselling world, a thirteen-year-old orphan named Magpie escapes a life of slavery in the gem mines when he is chosen by one of the magical Companion horses of Valdemar to be trained as a Herald. Thrust into the center of a legend in the making, Magpie discovers talents he never knew he had--and witnesses the founding of the great Heralds' Collegium.",
+      "cover_url": {
+        "color": "#989da0",
+        "color_name": "Purple",
+        "height": 500,
+        "id": 3656768,
+        "url": "https://assets.hardcover.app/external_data/25076627/d49cda6d93ad4e206126f89a17c2f0526f189e68.jpeg",
+        "width": 303
+      }
+    },
+    {
+      "book_id": "459662",
+      "title": "Foundation",
+      "authors": [],
+      "release_year": 2012,
+      "description": "In Ann Aguirre's award-winning novel, Enclave, humans have taken refuge in colonies below ground. Here is the story of what drove them there, told through the eyes of a teen who would later have vast influence over the fate of many, and who gave his heart to the one person who needed him most. At the Publisher's request, this title is being sold without Digital Rights Management Software (DRM) applied.",
+      "cover_url": {
+        "color": "#9d0201",
+        "color_name": "Brown",
+        "height": 192,
+        "id": 5826858,
+        "url": "https://assets.hardcover.app/external_data/1388559/e439b268460cfefe279a9af4877f1c43ef09f57f.jpeg",
+        "width": 128
+      }
+    },
+    {
+      "book_id": "1237063",
+      "title": "Foundation",
+      "authors": [],
+      "release_year": 2020,
+      "description": "",
+      "cover_url": {
+        "color": "#9b9588",
+        "color_name": "Gray",
+        "height": 157,
+        "id": 1770515,
+        "url": "https://assets.hardcover.app/external_data/60388339/70a4d50740d47d77d8def039eddaf86f35331b76.jpeg",
+        "width": 98
+      }
+    },
+    {
+      "book_id": "597288",
+      "title": "Foundation",
+      "authors": [],
+      "release_year": 2011,
+      "description": "A sense of fatigue dogs the fitness world. Many of the new programs that are tagged as groundbreaking are actually recycled ideas. Foundation offers something completely different for novices and athletes alike: a simple program with powerful and proven results that will remedy bad posture, alleviate back pain, and help readers break through fitness challenges and plateaus. Dr. Eric Goodman, a brilliant and dynamic young chiropractor, teams up with Peter Park, one of the top trainers in the United States, to radically redefine the core--shifting the focus from the front of the body to the back. Their groundbreaking approach works to strengthen the lower back and the full posterior chain and correct poor movement patterns by addressing mechanical imbalances and weaknesses. Foundation training involves simple movement patterns and is equipment free, creating maximum power, flexibility, and endurance. Word-of-mouth enthusiasm has inspired both Hollywood luminaries and world-class athletes to make Foundation training the core of their fitness programs. Eric and Peter's client list has grown exponentially to include Lance Armstrong, NBA star Derek Fisher, world-champion surfer Kelly Slater, and actor Matthew McConaughey.",
+      "cover_url": {
+        "color": "#5c5c5d",
+        "color_name": "Purple",
+        "height": 156,
+        "id": 673906,
+        "url": "https://assets.hardcover.app/edition/30575478/content.jpeg",
+        "width": 128
+      }
+    }
+  ]
+}
