@@ -9,7 +9,7 @@
  * - Badge overlay metadata (library, audiobook, series indicators)
  */
 
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, watch, toRef, unref } from 'vue'
 import { useApi } from '../useApi.js'
 
 // Cache configuration
@@ -102,15 +102,21 @@ export function useCover({
   const observer = ref(null)
   const observedElement = ref(null)
 
-  const cacheKey = getCacheKey(mamId, title)
+  // Convert params to refs for reactivity (support both ref and non-ref inputs)
+  const mamIdRef = toRef(() => unref(mamId))
+  const titleRef = toRef(() => unref(title))
+  const authorRef = toRef(() => unref(author))
+  const initialUrlRef = toRef(() => unref(initialUrl))
+
+  const cacheKey = getCacheKey(mamIdRef.value, titleRef.value)
 
   // Backend cover_url passthrough - use provided URL without fetch
-  if (initialUrl) {
-    coverUrl.value = initialUrl
+  if (initialUrlRef.value) {
+    coverUrl.value = initialUrlRef.value
     loading.value = false
     // Cache the passthrough URL
     if (enableCache) {
-      setCache(cacheKey, { coverUrl: initialUrl })
+      setCache(cacheKey, { coverUrl: initialUrlRef.value })
     }
   } else if (enableCache) {
     // Check cache on initialization if enabled and no initialUrl
@@ -125,14 +131,21 @@ export function useCover({
    * Fetch cover from backend (with optional cache bypass)
    */
   const fetchCover = async (bypassCache = false) => {
-    if (!mamId || !title) {
+    const currentMamId = mamIdRef.value
+    const currentTitle = titleRef.value
+    const currentAuthor = authorRef.value
+
+    if (!currentMamId || !currentTitle) {
       error.value = 'Missing required info'
       return
     }
 
+    // Recalculate cache key with current values
+    const currentCacheKey = getCacheKey(currentMamId, currentTitle)
+
     // Return cached value if available and not bypassing
     if (enableCache && !bypassCache) {
-      const cached = getCached(cacheKey)
+      const cached = getCached(currentCacheKey)
       if (cached) {
         coverUrl.value = cached.coverUrl
         return
@@ -144,9 +157,9 @@ export function useCover({
 
     try {
       const data = await api.fetchCover({
-        mam_id: mamId,
-        title: title,
-        author: author || '',
+        mam_id: currentMamId,
+        title: currentTitle,
+        author: currentAuthor || '',
         max_retries: '2'
       })
 
@@ -155,7 +168,7 @@ export function useCover({
 
         // Cache the result if caching is enabled
         if (enableCache) {
-          setCache(cacheKey, { coverUrl: data.cover_url })
+          setCache(currentCacheKey, { coverUrl: data.cover_url })
         }
       } else {
         error.value = data.error || 'No cover found'
@@ -236,6 +249,35 @@ export function useCover({
 
   // Auto-cleanup on unmount
   onUnmounted(cleanup)
+
+  // Watch for prop changes and refetch cover when mamId, title, or author change
+  watch(
+    [mamIdRef, titleRef, authorRef],
+    ([newMamId, newTitle, newAuthor], [oldMamId, oldTitle, oldAuthor]) => {
+      // Skip if values are the same or if this is the initial mount (no old values)
+      if (
+        !oldMamId ||
+        (newMamId === oldMamId && newTitle === oldTitle && newAuthor === oldAuthor)
+      ) {
+        return
+      }
+
+      // Props changed - clear state and refetch
+      console.log('[useCover] Props changed, refetching cover:', {
+        mamId: `${oldMamId} → ${newMamId}`,
+        title: `${oldTitle} → ${newTitle}`
+      })
+
+      // Clear current state
+      coverUrl.value = ''
+      loading.value = true
+      error.value = ''
+
+      // Fetch with new values
+      fetchCover()
+    },
+    { flush: 'post' }  // Run after component updates
+  )
 
   // Badge overlay metadata
   const badges = {

@@ -163,6 +163,7 @@
             :group="book"
             :seriesNumber="book.position"
             :hideVersionBadge="true"
+            :showCanonicalBadge="showAllEditions"
             @select="handleBookClick"
           />
         </div>

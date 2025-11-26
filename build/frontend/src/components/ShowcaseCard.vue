@@ -9,9 +9,19 @@
     <div class="showcase-cover-skeleton" v-if="loadingCover || group.enrichment_pending">
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
       <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
-      <!-- Canonical edition badge (top-left) -->
-      <span v-if="group.is_canonical === true" class="canonical-badge canonical-primary" title="Primary English Edition">📘 Primary</span>
-      <span v-if="group.is_canonical === false" class="canonical-badge canonical-international" title="International Edition">🌐 Intl</span>
+      <!-- Canonical edition badges (bottom-right, icon-only with tooltips) -->
+      <n-tooltip v-if="showCanonicalBadge && group.is_canonical === true" trigger="hover">
+        <template #trigger>
+          <span class="canonical-badge canonical-primary" :style="{ right: canonicalBadgeOffset }">📘</span>
+        </template>
+        Primary English Edition
+      </n-tooltip>
+      <n-tooltip v-if="showCanonicalBadge && group.is_canonical === false" trigger="hover">
+        <template #trigger>
+          <span class="canonical-badge canonical-international" :style="{ right: canonicalBadgeOffset }">🌐</span>
+        </template>
+        International/Non-English Edition
+      </n-tooltip>
       <!-- Audiobook badges (only shown if metadata was fetched) -->
       <span v-if="group.has_audiobook === true" class="audiobook-available-badge" :title="`Audiobook available${audioDurationText}`">
         🎧{{ audioDurationText ? ' ' + audioDurationText : '' }}
@@ -25,9 +35,19 @@
       <div v-else class="showcase-cover-placeholder">📚</div>
       <span v-if="group.in_abs_library" class="in-library-indicator" title="Already in your library">✓</span>
       <span v-if="seriesNumber" class="series-number-badge" title="Series Number">{{ seriesNumber }}</span>
-      <!-- Canonical edition badge (top-left) -->
-      <span v-if="group.is_canonical === true" class="canonical-badge canonical-primary" title="Primary English Edition">📘 Primary</span>
-      <span v-if="group.is_canonical === false" class="canonical-badge canonical-international" title="International Edition">🌐 Intl</span>
+      <!-- Canonical edition badges (bottom-right, icon-only with tooltips) -->
+      <n-tooltip v-if="showCanonicalBadge && group.is_canonical === true" trigger="hover">
+        <template #trigger>
+          <span class="canonical-badge canonical-primary" :style="{ right: canonicalBadgeOffset }">📘</span>
+        </template>
+        Primary English Edition
+      </n-tooltip>
+      <n-tooltip v-if="showCanonicalBadge && group.is_canonical === false" trigger="hover">
+        <template #trigger>
+          <span class="canonical-badge canonical-international" :style="{ right: canonicalBadgeOffset }">🌐</span>
+        </template>
+        International/Non-English Edition
+      </n-tooltip>
       <!-- Audiobook badges (only shown if metadata was fetched) -->
       <span v-if="group.has_audiobook === true" class="audiobook-available-badge" :title="`Audiobook available${audioDurationText}`">
         🎧{{ audioDurationText ? ' ' + audioDurationText : '' }}
@@ -45,6 +65,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { NTooltip } from 'naive-ui'
 import { useCover } from '@composables/naive/useCover'
 
 const props = defineProps({
@@ -57,6 +78,10 @@ const props = defineProps({
     default: null
   },
   hideVersionBadge: {
+    type: Boolean,
+    default: false
+  },
+  showCanonicalBadge: {
     type: Boolean,
     default: false
   }
@@ -91,6 +116,12 @@ onMounted(() => {
 const versionsLabel = computed(() => {
   const total = props.group.total_versions || 0
   return `${total} version${total === 1 ? '' : 's'}`
+})
+
+// Determine if canonical badge should be offset to avoid library indicator overlap
+const canonicalBadgeOffset = computed(() => {
+  // If library indicator is present, offset canonical badge to the left
+  return props.group.in_abs_library ? '32px' : '4px'
 })
 
 // Format audio duration from seconds to "Xh Ym" format
@@ -436,18 +467,19 @@ const handleClick = () => {
   transition: all 0.2s ease;
 }
 
-/* Canonical edition badges (top-left of cover) */
+/* Canonical edition badges (bottom-right of cover, icon-only) */
 .canonical-badge {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  padding: 3px 8px;
+  bottom: 4px;
+  /* right position set dynamically via inline style to avoid library indicator overlap */
+  min-width: 24px;
+  height: 24px;
+  padding: 2px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 14px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   z-index: 10;
   cursor: help;
@@ -464,7 +496,7 @@ const handleClick = () => {
 
 .canonical-primary:hover {
   background: rgba(106, 0, 0, 1);
-  transform: translateY(-2px);
+  transform: scale(1.1);
   transition: all 0.2s ease;
 }
 
@@ -476,7 +508,7 @@ const handleClick = () => {
 
 .canonical-international:hover {
   background: rgba(120, 120, 120, 0.95);
-  transform: translateY(-2px);
+  transform: scale(1.1);
   transition: all 0.2s ease;
 }
 
