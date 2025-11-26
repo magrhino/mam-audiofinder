@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from config import MAM_BASE, MAM_COOKIE, ABS_BASE_URL, ABS_API_KEY, ABS_CHECK_LIBRARY
 from abs_client import abs_client
 from mam_cache import get_cached_mam_search, cache_mam_search
-from dependencies.mam import normalize_mam_result
+from dependencies.mam import normalize_mam_result, flatten, detect_format
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
