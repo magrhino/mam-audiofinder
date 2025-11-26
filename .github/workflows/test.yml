@@ -1,0 +1,52 @@
+name: Run Mock Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    name: Mock Tests (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'build/requirements-dev.txt'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r build/requirements-dev.txt
+
+      - name: Create data directory
+        run: |
+          mkdir -p /tmp/shelfarr-test-data
+          mkdir -p data
+
+      - name: Run mock tests (backend only)
+        working-directory: ./build
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          cd .. && LIVE_API_TESTS=0 pytest app/tests/ -v --tb=short --ignore=app/tests/frontend/
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build/htmlcov/
+            .coverage
+          retention-days: 7

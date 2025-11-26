@@ -34,10 +34,13 @@ DUAL-MODE TESTING:
 import os
 import sys
 import tempfile
+import logging
 from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
 import pytest
 from sqlalchemy import create_engine, text
+
+logger = logging.getLogger("mam-audiofinder")
 
 # Add parent directory to path so we can import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
