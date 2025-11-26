@@ -1,6 +1,8 @@
 # ShelfArr
 
-ShelfArr is a Vue 3 + Naive UI single-page app backed by a FastAPI API surface for searching MyAnonamouse, adding torrents to qBittorrent, and importing completed downloads into Audiobookshelf.
+ShelfArr is an audiobook first management application for searching MyAnonamouse, adding torrents to qBittorrent, and importing completed downloads into Audiobookshelf, with asperations to become a full fledge management tool.
+
+Orginally forked from raygan/mam-audiofinder and theoretically compatible for upgrading to. Thank you Raygan for the original idea.
 
 ![Search](docs/documentation/screenshots/search.jpg)
 ![History](docs/documentation/screenshots/history.jpg)
