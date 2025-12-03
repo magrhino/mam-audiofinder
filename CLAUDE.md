@@ -22,8 +22,15 @@ shelfarr/
 │   ├── config.py                 # Environment configuration
 │   ├── db/
 │   │   ├── db.py                 # SQLAlchemy engines & migrations
-│   │   └── migrations/           # SQL migration files (001-010)
-│   ├── abs_client.py             # Audiobookshelf API client (~850 lines)
+│   │   └── migrations/           # SQL migration files (001-013)
+│   ├── abs/                      # New ABS integration package
+│   │   ├── __init__.py           # Exports AbsClient, AbsConfig, models
+│   │   ├── client.py             # Async httpx client
+│   │   ├── config.py             # Env-var config wrapper
+│   │   ├── models.py             # Pydantic models for API responses
+│   │   ├── library_cache.py      # SQLite-backed library cache with sync
+│   │   └── matching.py           # Title/author/ASIN matching logic
+│   ├── abs_client.py             # Compatibility shim (wraps app.abs.AbsClient)
 │   ├── hardcover_client.py       # Hardcover GraphQL API client (~920 lines)
 │   ├── covers.py                 # CoverService class (~350 lines)
 │   ├── qb_client.py              # qBittorrent API helpers
@@ -40,7 +47,8 @@ shelfarr/
 │   │   ├── showcase.py           # Grouped search results
 │   │   ├── series.py             # Hardcover series discovery
 │   │   ├── covers_route.py       # Cover serving endpoint
-│   │   └── logs_route.py         # Application logs endpoint
+│   │   ├── logs_route.py         # Application logs endpoint
+│   │   └── abs_route.py          # ABS library sync management
 │   ├── static/
 │   │   ├── dist/                 # Vue build output (gitignored, generated)
 │   │   └── js/                   # ⚠️ LEGACY - scheduled for removal
@@ -51,6 +59,7 @@ shelfarr/
 │       ├── mocks/                # Mock implementations (hardcover_mock.py)
 │       ├── fixtures/             # Test fixtures (JSON API responses)
 │       ├── scripts/              # Test utilities (capture_fixtures.py)
+│       ├── abs_providers_integration.py  # Standalone ABS provider testing tool
 │       ├── test_*.py             # Backend tests (16+ files)
 │       └── frontend/             # Selenium E2E tests (4 files)
 ├── build/                        # Build tooling & dependencies
@@ -162,12 +171,23 @@ Environment variable parsing with defaults, validation
 **`db/db.py` (200 lines):**
 SQLAlchemy engines (history.db, covers.db), smart migration system with per-statement error handling
 
-**`abs_client.py` (~850 lines):**
-Key methods:
-- `verify_import()` - ASIN/ISBN matching with retry logic (3 attempts, exponential backoff)
-- `check_library_items()` - Batch library checking with 5-min caching
-- `fetch_item_details()` - Fetch book descriptions and metadata
-- Connection pooling (max 50 connections), semaphore limiting (10 concurrent)
+**`abs/` package:**
+New modular ABS integration architecture (replaces monolithic abs_client_legacy.py):
+- `abs/client.py` - Async AbsClient with connection pooling, semaphore limiting (10 concurrent)
+- `abs/config.py` - AbsConfig dataclass for environment configuration
+- `abs/models.py` - Pydantic models (LibraryItem, VerificationResult, CoverResult, LibrarySyncStatus)
+- `abs/library_cache.py` - SQLite-backed LibraryCache with TTL-aware sync (replaces in-memory cache)
+- `abs/matching.py` - Scoring logic for title/author/ASIN matching (ASIN/ISBN=200pts, Title=100pts, Author=50pts)
+
+**`abs_client.py`:**
+Compatibility shim wrapping `app.abs.AbsClient` for backward compatibility.
+All existing routes use this shim transparently.
+Key methods (mapped to new client):
+- `test_connection()` → `AbsClient.ping()`
+- `check_library_items()` → `AbsClient.check_library_presence()`
+- `verify_import()` → `AbsClient.verify_import()`
+- `fetch_cover()` → `AbsClient.fetch_cover()`
+- `fetch_item_details()` → `AbsClient.fetch_item_details()`
 
 **`hardcover_client.py` (~920 lines):**
 GraphQL API client for series discovery:
@@ -201,6 +221,7 @@ All routes are `async def` endpoints:
 - `series.py` - POST /api/series/search, GET /api/series/{id}/books (Hardcover integration, default `enrich_mode=immediate`, optional `include_audio_meta`), POST /api/series/{id}/books/fetch-audio (on-demand audiobook metadata)
 - `covers_route.py` - GET /covers/{filename} (serve cached covers)
 - `logs_route.py` - GET /api/logs (application logs)
+- `abs_route.py` - POST /api/abs/sync (force library sync), GET /api/abs/status (sync status)
 
 ### Frontend Architecture (Vue 3)
 
@@ -446,24 +467,27 @@ Edit .env → `docker compose up -d --force-recreate`
 
 Hardcover API tests support automatic dual-mode execution:
 
-**Mock Mode** (default - fast, deterministic, CI-safe):
+**Local Tests (Mock by default):**
 ```bash
 cd build/
-make test-mock                             # Uses JSON fixtures, no API token needed
-pytest app/tests/                          # Same as mock mode
+./run-tests.sh                             # Mock mode - uses JSON fixtures
+./run-tests.sh backend                     # Backend only (mock)
+./run-tests.sh --live                      # Override to live API mode
 ```
 
-**Live Mode** (periodic verification, detects API changes):
+**Docker Tests (Live by default):**
 ```bash
 cd build/
-make test-live                             # Requires HARDCOVER_API_TOKEN
-LIVE_API_TESTS=1 pytest app/tests/        # Tests hit real Hardcover API
+./run-tests.sh --docker                    # Live mode - hits real APIs
+./run-tests.sh --docker backend            # Backend only (live)
+./run-tests.sh --docker --mock             # Override to mock mode
 ```
 
 **Key Features:**
 - Same tests run in both modes without code changes
 - Mock mode uses pre-recorded JSON fixtures (~200ms per test)
 - Live mode validates against real API (~2-5s per test)
+- Docker tests use production .env for integration testing
 - `@pytest.mark.requires_live` for API-dependent tests
 - Automatic client patching via `conftest.py`
 
@@ -474,29 +498,34 @@ Fast iteration with virtual environment:
 cd build/
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements-dev.txt
-make test-backend                          # All backend tests (mock mode)
-make test-coverage                         # With HTML coverage report
-pytest app/tests/test_verification.py -v   # Specific file
+./run-tests.sh backend                     # All backend tests (mock mode)
+./run-tests.sh coverage                    # With HTML coverage report
+./run-tests.sh backend -- tests/test_verification.py -v   # Specific file
 ```
 
 #### Container Testing (Integration)
 
-Full Docker integration with ABS/qBittorrent networking:
+Full Docker integration with ABS/qBittorrent networking (uses production .env, defaults to LIVE API):
 ```bash
 cd build/
-make docker-test-build                     # Build test container (first time)
-make docker-test-run                       # Full test suite in container
-make docker-test-backend                   # Backend tests only
-make docker-test-frontend                  # Frontend tests (Selenium)
-make docker-test-shell                     # Debug shell in container
+./run-tests.sh build                       # Build test container (first time)
+./run-tests.sh --docker                    # Full test suite (LIVE mode)
+./run-tests.sh --docker backend            # Backend tests only (LIVE)
+./run-tests.sh --docker --mock             # Use mock mode in Docker
+./run-tests.sh frontend                    # Frontend tests (Selenium, LIVE)
+./run-tests.sh shell                       # Debug shell in container
 ```
 
 **Test Infrastructure:**
 - 17 JSON fixtures for Hardcover API (Foundation, Harry Potter, LOTR, etc.)
-- Fixture capture script: `app/tests/scripts/capture_fixtures.py`
+- Fixture capture scripts:
+  - `app/tests/scripts/capture_fixtures.py` (Hardcover)
+  - `app/tests/scripts/capture_abs_fixtures.py` (ABS - with automatic sanitization)
 - MockHardcoverClient mirrors real client (600+ lines)
+- MockABSClient with sanitized test fixtures
 - Multi-stage Dockerfile with integrated Chromium for Selenium
 - Isolated test data, configurable database paths
+- **Automatic fixture sanitization:** ABS fixtures automatically redact URLs, library IDs, item IDs, file paths, and usernames
 
 **Test Coverage:**
 Verification, cover caching, descriptions, search, MAM cache, helpers, migrations, multi-book imports, Hardcover series, frontend E2E workflows
@@ -816,9 +845,13 @@ The legacy JavaScript modules in `app/static/js/` are scheduled for removal. The
    - Capture fixture: `HARDCOVER_API_TOKEN=xxx python app/tests/scripts/capture_fixtures.py`
    - Verify mock mode: `pytest app/tests/test_yourfeature.py -v`
    - Verify live mode: `LIVE_API_TESTS=1 pytest app/tests/test_yourfeature.py -v`
-4. Manual E2E testing for frontend features
-5. Run full test suite before pushing (`make test-mock` or `make docker-test-run`)
-6. Aim for 70%+ code coverage on new code
+4. **For ABS API tests:** Capture fixtures with automatic sanitization
+   - Capture fixture: `ABS_BASE_URL=xxx ABS_API_KEY=xxx ABS_LIBRARY_ID=xxx python app/tests/scripts/capture_abs_fixtures.py`
+   - All sensitive data (URLs, IDs, paths, usernames) automatically sanitized with placeholders
+   - Safe to commit fixtures to version control
+5. Manual E2E testing for frontend features
+6. Run full test suite before pushing (`make test-mock` or `make docker-test-run`)
+7. Aim for 70%+ code coverage on new code
 
 ## Project Philosophy
 

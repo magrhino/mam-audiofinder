@@ -17,6 +17,35 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from routes.import_route import insert_torrent_book, BookPayload, MultiBookImportBody
 
 
+def create_httpx_context_manager_mock(response_data):
+    """
+    Create a properly configured httpx.Client context manager mock.
+
+    Args:
+        response_data: The data to return from json() call (e.g., [{"content_path": "..."}])
+
+    Returns:
+        MagicMock configured for context manager usage
+    """
+    # Mock response object
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json = MagicMock(return_value=response_data)
+    mock_response.raise_for_status = MagicMock()
+
+    # Mock client instance
+    mock_client_instance = MagicMock()
+    mock_client_instance.get = MagicMock(return_value=mock_response)
+    mock_client_instance.post = MagicMock(return_value=mock_response)
+
+    # Mock context manager class
+    mock_client = MagicMock()
+    mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+    mock_client.return_value.__exit__ = MagicMock(return_value=None)
+
+    return mock_client
+
+
 class TestInsertTorrentBook:
     """Test the insert_torrent_book() database helper function."""
 
@@ -184,14 +213,21 @@ class TestMultiBookImportEndpoint:
     @pytest.fixture
     def mock_httpx_context_manager(self, mock_qb_response):
         """Create properly configured httpx.Client context manager mock."""
-        mock_client_instance = MagicMock()
-        mock_client_instance.get.return_value.status_code = 200
-        mock_client_instance.get.return_value.json.return_value = mock_qb_response["info"]
-        mock_client_instance.post.return_value.status_code = 200
+        # Mock response object with explicit attributes
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json = MagicMock(return_value=mock_qb_response["info"])
+        mock_response.raise_for_status = MagicMock()
 
+        # Mock client instance with HTTP methods
+        mock_client_instance = MagicMock()
+        mock_client_instance.get = MagicMock(return_value=mock_response)
+        mock_client_instance.post = MagicMock(return_value=mock_response)
+
+        # Mock context manager class
         mock_client = MagicMock()
-        mock_client.return_value.__enter__.return_value = mock_client_instance
-        mock_client.return_value.__exit__.return_value = None
+        mock_client.return_value.__enter__ = MagicMock(return_value=mock_client_instance)
+        mock_client.return_value.__exit__ = MagicMock(return_value=None)
 
         return mock_client
 
@@ -269,8 +305,8 @@ class TestMultiBookImportEndpoint:
              patch('routes.import_route.abs_client.verify_import', mock_abs_verify), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
-             patch('routes.import_route.DL_DIR', str(temp_torrent_structure["root"].parent)), \
-             patch('routes.import_route.QB_INNER_DL_PREFIX', "/downloads"):
+             patch('dependencies.qb.DL_DIR', str(temp_torrent_structure["root"].parent)), \
+             patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
 
             from routes.import_route import do_multi_book_import
 
@@ -348,7 +384,7 @@ class TestMultiBookImportEndpoint:
              patch('routes.import_route.abs_client.verify_import', AsyncMock(return_value={"status": "verified", "note": "Match"})), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
-             patch('routes.import_route.QB_INNER_DL_PREFIX', "/downloads"):
+             patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
 
             from routes.import_route import do_multi_book_import
 
@@ -389,11 +425,9 @@ class TestMultiBookImportEndpoint:
                 )
             """))
 
-        mock_httpx_client = MagicMock()
-        mock_httpx_client.get.return_value.status_code = 200
-        mock_httpx_client.get.return_value.json.return_value = [{
+        mock_httpx_client = create_httpx_context_manager_mock([{
             "content_path": str(temp_torrent_structure["root"])
-        }]
+        }])
 
         body = MultiBookImportBody(
             torrent_hash="abc123",
@@ -413,7 +447,7 @@ class TestMultiBookImportEndpoint:
              patch('routes.import_route.qb_login_sync'), \
              patch('routes.import_route.engine', engine), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
-             patch('routes.import_route.QB_INNER_DL_PREFIX', "/downloads"):
+             patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
 
             from routes.import_route import do_multi_book_import
 
@@ -447,11 +481,9 @@ class TestMultiBookImportEndpoint:
                 )
             """))
 
-        mock_httpx_client = MagicMock()
-        mock_httpx_client.get.return_value.status_code = 200
-        mock_httpx_client.get.return_value.json.return_value = [{
+        mock_httpx_client = create_httpx_context_manager_mock([{
             "content_path": str(temp_torrent_structure["root"])
-        }]
+        }])
 
         # Mock ABS verification with different results per book
         verify_calls = [
@@ -476,7 +508,7 @@ class TestMultiBookImportEndpoint:
              patch('routes.import_route.abs_client.verify_import', mock_abs_verify), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
-             patch('routes.import_route.QB_INNER_DL_PREFIX', "/downloads"):
+             patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
 
             from routes.import_route import do_multi_book_import
 
@@ -509,11 +541,9 @@ class TestMultiBookImportEndpoint:
                 )
             """))
 
-        mock_httpx_client = MagicMock()
-        mock_httpx_client.get.return_value.status_code = 200
-        mock_httpx_client.get.return_value.json.return_value = [{
+        mock_httpx_client = create_httpx_context_manager_mock([{
             "content_path": str(temp_torrent_structure["root"])
-        }]
+        }])
 
         body = MultiBookImportBody(
             torrent_hash="abc123",
@@ -531,7 +561,7 @@ class TestMultiBookImportEndpoint:
              patch('routes.import_route.abs_client.verify_import', AsyncMock(return_value={"status": "verified", "note": "Match", "abs_item_id": "abs-123"})), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
-             patch('routes.import_route.QB_INNER_DL_PREFIX', "/downloads"):
+             patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
 
             from routes.import_route import do_multi_book_import
 

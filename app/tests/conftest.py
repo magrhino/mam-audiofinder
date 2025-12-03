@@ -33,6 +33,13 @@ DUAL-MODE TESTING:
 """
 import os
 import sys
+
+# Set up DATA_DIR before any other imports that might use config
+if 'DATA_DIR' not in os.environ:
+    test_data_dir = '/tmp/test_data'
+    os.makedirs(test_data_dir, exist_ok=True)
+    os.environ['DATA_DIR'] = test_data_dir
+
 import tempfile
 import logging
 from pathlib import Path
@@ -101,7 +108,7 @@ def mock_covers_db_engine():
     """Create an in-memory SQLite database engine for covers testing."""
     engine = create_engine("sqlite:///:memory:")
 
-    # Create covers table schema
+    # Create covers table schema (matching covers_schema.sql)
     with engine.begin() as conn:
         conn.execute(text("""
             CREATE TABLE covers (
@@ -110,10 +117,79 @@ def mock_covers_db_engine():
                 title TEXT,
                 author TEXT,
                 cover_url TEXT NOT NULL,
-                abs_item_id TEXT,
                 local_file TEXT,
                 file_size INTEGER,
-                fetched_at TEXT DEFAULT (datetime('now'))
+                abs_item_id TEXT,
+                narrator TEXT,
+                publisher TEXT,
+                published_year TEXT,
+                language TEXT,
+                region TEXT,
+                rating TEXT,
+                duration INTEGER,
+                abridged INTEGER DEFAULT 0,
+                has_audiobook INTEGER DEFAULT 0,
+                asin TEXT,
+                isbn TEXT,
+                abs_description TEXT,
+                description_plain TEXT,
+                series_data TEXT,
+                genres TEXT,
+                tags TEXT,
+                abs_metadata TEXT,
+                fetched_at TEXT DEFAULT (datetime('now')),
+                abs_metadata_fetched_at TEXT,
+                description_source TEXT
+            )
+        """))
+
+        # Create series_cache table (from covers_schema.sql)
+        conn.execute(text("""
+            CREATE TABLE series_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cache_key TEXT UNIQUE NOT NULL,
+                cache_type TEXT NOT NULL,
+                query_title TEXT,
+                query_author TEXT,
+                query_normalized TEXT,
+                series_id INTEGER,
+                series_name TEXT,
+                series_author TEXT,
+                response_data TEXT NOT NULL,
+                cached_at TEXT DEFAULT (datetime('now')),
+                expires_at TEXT NOT NULL,
+                hit_count INTEGER DEFAULT 0
+            )
+        """))
+
+        # Create library_items table (from migration 013)
+        conn.execute(text("""
+            CREATE TABLE library_items (
+                id TEXT PRIMARY KEY,
+                library_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                author TEXT,
+                narrator TEXT,
+                series_name TEXT,
+                asin TEXT,
+                isbn TEXT,
+                cover_path TEXT,
+                duration_seconds REAL,
+                path TEXT,
+                title_normalized TEXT,
+                author_normalized TEXT,
+                synced_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(id, library_id)
+            )
+        """))
+
+        # Create library_sync_status table (from migration 013)
+        conn.execute(text("""
+            CREATE TABLE library_sync_status (
+                library_id TEXT PRIMARY KEY,
+                last_full_sync TEXT,
+                last_item_count INTEGER,
+                sync_in_progress INTEGER DEFAULT 0
             )
         """))
 
@@ -274,6 +350,54 @@ def sample_file_tree():
 
 
 @pytest.fixture(autouse=True)
+def reset_shared_clients():
+    """
+    Reset class-level shared httpx clients before each test.
+
+    Required because AsyncClient retains event loop references that become
+    invalid when tests run sequentially with different event loops.
+
+    Resets:
+    - HardcoverClient._shared_client and _rate_limiter
+    - AbsClient._shared_client and _semaphore (from abs.client module)
+
+    This fixture runs before EVERY test to ensure clean client state.
+    """
+    # Reset Hardcover client class variables
+    try:
+        import hardcover_client
+        hardcover_client.HardcoverClient._shared_client = None
+        hardcover_client.HardcoverClient._rate_limiter = None
+    except (ImportError, AttributeError):
+        pass  # Module may not be imported yet
+
+    # Reset ABS client class variables (new abs.client module)
+    try:
+        from abs.client import AbsClient
+        AbsClient._shared_client = None
+        AbsClient._semaphore = None
+    except (ImportError, AttributeError):
+        pass  # Module may not be available in all contexts
+
+    yield
+
+    # Optional cleanup after test (good practice)
+    try:
+        import hardcover_client
+        hardcover_client.HardcoverClient._shared_client = None
+        hardcover_client.HardcoverClient._rate_limiter = None
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from abs.client import AbsClient
+        AbsClient._shared_client = None
+        AbsClient._semaphore = None
+    except (ImportError, AttributeError):
+        pass
+
+
+@pytest.fixture(autouse=True)
 def reset_env():
     """Reset environment variables before each test."""
     # Store original env
@@ -314,6 +438,40 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "requires_live" in item.keywords:
                 item.add_marker(skip_live)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def initialize_test_databases():
+    """
+    Initialize test databases before any tests run.
+
+    For Docker tests and local tests with real database files:
+    - Creates covers.db and series.db from fresh schemas
+    - Runs history.db migrations
+    - Ensures library_items and library_sync_status tables exist
+
+    For local tests with in-memory databases:
+    - Skips initialization (handled by individual fixtures)
+    """
+    # Only initialize real database files (not in-memory)
+    from config import COVERS_DB_PATH, DATA_DIR
+    from pathlib import Path
+
+    # Check if we're using real database files (not in-memory) AND the data directory exists/is writable
+    if ':memory:' not in str(COVERS_DB_PATH):
+        data_dir = Path(DATA_DIR)
+        # Only initialize if the data directory exists or we can create it
+        if data_dir.exists() or data_dir.parent.exists():
+            try:
+                data_dir.mkdir(parents=True, exist_ok=True)
+                from db.db import initialize_databases
+                initialize_databases()
+                logger.info("✓ Test databases initialized")
+            except (PermissionError, OSError) as e:
+                # Local test environment without writable data directory - skip initialization
+                logger.debug(f"Skipping database initialization (permission denied): {e}")
+
+    yield
 
 
 @pytest.fixture(scope="session", autouse=True)

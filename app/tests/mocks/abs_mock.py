@@ -31,9 +31,17 @@ class MockABSClient:
 
     def __init__(self):
         """Initialize mock ABS client."""
-        self.base_url = "http://mock-abs:13378"
-        self.api_key = "mock-abs-api-key"
-        self.library_id = "mock-library-id"
+        # Try to read from abs_client module to respect monkeypatched values
+        try:
+            import abs_client
+            self.base_url = abs_client.ABS_BASE_URL if hasattr(abs_client, 'ABS_BASE_URL') else "http://mock-abs:13378"
+            self.api_key = abs_client.ABS_API_KEY if hasattr(abs_client, 'ABS_API_KEY') else "mock-abs-api-key"
+            self.library_id = abs_client.ABS_LIBRARY_ID if hasattr(abs_client, 'ABS_LIBRARY_ID') else "mock-library-id"
+        except (ImportError, AttributeError):
+            # Fallback to defaults if abs_client not available
+            self.base_url = "http://mock-abs:13378"
+            self.api_key = "mock-abs-api-key"
+            self.library_id = "mock-library-id"
 
         # In-memory cache for library items (same as real client)
         self._library_cache: Dict[str, Tuple[bool, float]] = {}
@@ -49,8 +57,8 @@ class MockABSClient:
 
     @property
     def is_configured(self) -> bool:
-        """Mock always returns True (configured in tests)."""
-        return True
+        """Check if ABS is configured (respects monkeypatched values)."""
+        return bool(self.base_url and self.api_key)
 
     @classmethod
     def get_request_count(cls) -> int:
@@ -117,36 +125,53 @@ class MockABSClient:
         Returns:
             Fixture filename (without .json extension)
         """
-        # Build parameter string
+        # Build parameter string using fixed order to match capture script convention
+        # Order: title, author, library_path, metadata (then any remaining keys alphabetically)
+        param_order = ['title', 'author', 'library_path', 'metadata']
         param_parts = []
+
+        # Process known keys in fixed order
+        for key in param_order:
+            if key in params:
+                value = params[key]
+                if value is not None and value != "":
+                    # Sanitize value for filename
+                    safe_value = str(value).replace(" ", "_").replace("/", "_").replace("\\", "_")[:30]
+                    param_parts.append(f"{key}={safe_value}")
+
+        # Process any remaining keys alphabetically (for future compatibility)
         for key, value in sorted(params.items()):
-            if value is not None and value != "":
-                # Sanitize value for filename
+            if key not in param_order and value is not None and value != "":
                 safe_value = str(value).replace(" ", "_").replace("/", "_").replace("\\", "_")[:30]
                 param_parts.append(f"{key}={safe_value}")
 
         param_str = "_".join(param_parts) if param_parts else "default"
         return f"{method}_{param_str}"
 
-    async def test_connection(self) -> Tuple[bool, str]:
+    async def test_connection(self) -> bool:
         """
         Mock ABS connection test.
 
         Returns:
-            Tuple of (success: bool, username: str)
+            bool: True if connection successful, False otherwise
         """
         logger.debug("🔧 MOCK test_connection called")
+
+        # Check if configured
+        if not self.is_configured:
+            logger.info("ℹ️  MOCK ABS not configured, returning False")
+            return False
 
         try:
             fixture = self._load_fixture("test_connection")
             success = fixture.get("success", True)
             username = fixture.get("username", "MockUser")
             logger.info(f"✅ MOCK ABS connection test: {username}")
-            return (success, username)
+            return success
         except FixtureNotFoundError:
-            # Default response if no fixture
-            logger.info("✅ MOCK ABS connection test (default): MockUser")
-            return (True, "MockUser")
+            # Default response if no fixture - assume success if configured
+            logger.info("✅ MOCK ABS connection test (default): True")
+            return True
 
     async def check_library_items(self, items: List[Tuple[str, str]]) -> Dict[str, bool]:
         """
@@ -247,6 +272,21 @@ class MockABSClient:
                 - note: Diagnostic message
                 - abs_item_id: ABS item ID if found
         """
+        # Check if ABS is configured
+        if not self.is_configured:
+            return {
+                "status": "not_configured",
+                "note": "ABS integration not configured",
+                "abs_item_id": None
+            }
+
+        if not self.library_id:
+            return {
+                "status": "not_configured",
+                "note": "ABS_LIBRARY_ID not configured",
+                "abs_item_id": None
+            }
+
         if not title:
             return {
                 "status": "not_found",

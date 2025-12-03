@@ -116,3 +116,51 @@ BEGIN
     DELETE FROM series_cache
     WHERE datetime(expires_at) < datetime('now');
 END;
+
+-- ============================================================================
+-- Library Items Cache (from migration 013)
+-- ABS library item cache for presence checks and verification matching
+-- ============================================================================
+
+CREATE TABLE library_items (
+    id TEXT PRIMARY KEY,
+    library_id TEXT NOT NULL,
+
+    -- Core metadata
+    title TEXT NOT NULL,
+    author TEXT,
+    narrator TEXT,
+    series_name TEXT,
+
+    -- Identifiers for verification matching
+    asin TEXT,
+    isbn TEXT,
+
+    -- Additional metadata
+    cover_path TEXT,
+    duration_seconds REAL,
+    path TEXT,
+
+    -- Pre-computed normalized fields for indexed lookup
+    title_normalized TEXT,
+    author_normalized TEXT,
+
+    -- Sync tracking
+    synced_at TEXT DEFAULT (datetime('now')),
+
+    UNIQUE(id, library_id)
+);
+
+CREATE INDEX idx_library_items_title_norm ON library_items(title_normalized);
+CREATE INDEX idx_library_items_author_norm ON library_items(author_normalized);
+CREATE INDEX idx_library_items_asin ON library_items(asin) WHERE asin IS NOT NULL;
+CREATE INDEX idx_library_items_isbn ON library_items(isbn) WHERE isbn IS NOT NULL;
+CREATE INDEX idx_library_items_library ON library_items(library_id);
+
+-- Sync status tracking
+CREATE TABLE library_sync_status (
+    library_id TEXT PRIMARY KEY,
+    last_full_sync TEXT,
+    last_item_count INTEGER,
+    sync_in_progress INTEGER DEFAULT 0
+);

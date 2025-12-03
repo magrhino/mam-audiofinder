@@ -265,6 +265,7 @@ class TestVerifyImport:
         if result["status"] == "mismatch":
             assert "mismatch" in result["note"].lower()
 
+    @pytest.mark.requires_live
     async def test_verify_import_retry_logic(self, mock_abs_client):
         """Test retry logic with exponential backoff."""
         # Mock responses: first two fail, third succeeds
@@ -294,6 +295,7 @@ class TestVerifyImport:
         # Should have retried and eventually succeeded
         assert call_count == 3
 
+    @pytest.mark.requires_live
     async def test_verify_import_timeout_handling(self, mock_abs_client):
         """Test handling of timeout exceptions."""
         import httpx
@@ -310,6 +312,7 @@ class TestVerifyImport:
         assert result["status"] == "unreachable"
         assert "Timeout" in result["note"]
 
+    @pytest.mark.requires_live
     async def test_verify_import_asin_match_priority(self, mock_abs_client):
         """Test that ASIN match takes priority over title match."""
         # Create item with different title but matching ASIN
@@ -381,6 +384,7 @@ class TestConnectionTest:
 
         assert result is True
 
+    @pytest.mark.requires_live
     async def test_connection_failure(self, monkeypatch):
         """Test connection failure."""
         monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")

@@ -51,7 +51,15 @@ logger = logging.getLogger(__name__)
 
 
 class ABSFixtureCapturer:
-    """Captures ABS API responses and saves them as fixtures."""
+    """Captures ABS API responses and saves them as fixtures.
+
+    All captured data is automatically sanitized before saving:
+    - URLs → https://abs.example.com
+    - Library IDs → test-library-id
+    - Item IDs → test-item-XXX
+    - File paths → /media/audiobooks/test
+    - Usernames → test-user
+    """
 
     def __init__(self):
         """Initialize capturer."""
@@ -65,15 +73,24 @@ class ABSFixtureCapturer:
                 "❌ ABS not configured. Set ABS_BASE_URL, ABS_API_KEY, ABS_LIBRARY_ID"
             )
 
-        logger.info(f"✅ ABS configured: {self.client.base_url}")
-        logger.info(f"✅ Library ID: {self.client.library_id}")
+        # Redact URL to prevent leaking in CI/CD logs
+        redacted_url = self.client.base_url.replace(
+            self.client.base_url.split('://')[1].split('/')[0],
+            '***'
+        ) if self.client.base_url else 'not-set'
+
+        logger.info(f"✅ ABS configured: {redacted_url}")
+        logger.info(f"✅ Library ID: ***-{self.client.library_id[-4:] if self.client.library_id else 'not-set'}")
 
     def _save_fixture(self, filename: str, data: dict):
-        """Save data to a fixture file."""
+        """Save data to a fixture file with automatic sanitization."""
         filepath = self.fixtures_dir / f"{filename}.json"
 
+        # Sanitize sensitive data before saving
+        sanitized_data = self._sanitize_data(data)
+
         with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            json.dump(sanitized_data, f, indent=2, ensure_ascii=False)
 
         logger.info(f"💾 Saved fixture: {filename}.json ({filepath.stat().st_size} bytes)")
 
@@ -81,18 +98,59 @@ class ABSFixtureCapturer:
         """Sanitize string for use in filename."""
         return s.replace(" ", "_").replace("/", "_").replace("\\", "_")[:30]
 
+    def _sanitize_data(self, data: dict) -> dict:
+        """Sanitize sensitive data in captured responses.
+
+        Replaces:
+        - URLs with https://abs.example.com
+        - Library IDs with test-library-id
+        - Item IDs with test-item-{index}
+        - File paths with /media/audiobooks/test
+        - Usernames with test-user
+
+        Args:
+            data: Raw API response data
+
+        Returns:
+            Sanitized copy of data with placeholders
+        """
+        import copy
+        sanitized = copy.deepcopy(data)
+
+        def _sanitize_recursive(obj):
+            """Recursively sanitize dict/list structures."""
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    if key in ('base_url', 'serverAddress', 'url', 'coverPath'):
+                        obj[key] = 'https://abs.example.com'
+                    elif key in ('libraryId', 'library_id'):
+                        obj[key] = 'test-library-id'
+                    elif key in ('id', 'item_id', 'abs_item_id'):
+                        obj[key] = f'test-item-{hash(str(value)) % 1000:03d}'
+                    elif key in ('path', 'fullPath', 'absolutePath'):
+                        obj[key] = '/media/audiobooks/test'
+                    elif key in ('username', 'user'):
+                        obj[key] = 'test-user'
+                    elif isinstance(value, (dict, list)):
+                        _sanitize_recursive(value)
+            elif isinstance(obj, list):
+                for item in obj:
+                    _sanitize_recursive(item)
+
+        _sanitize_recursive(sanitized)
+        return sanitized
+
     async def capture_test_connection(self):
         """Capture connection test response."""
         logger.info("🔍 Capturing test_connection")
 
-        success, username = await self.client.test_connection()
+        success = await self.client.test_connection()
 
         self._save_fixture("test_connection", {
-            "success": success,
-            "username": username
+            "success": success
         })
 
-        return (success, username)
+        return success
 
     async def capture_verify_import(self, title: str, author: str = "", metadata: dict = None):
         """Capture import verification response."""

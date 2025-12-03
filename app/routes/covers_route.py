@@ -12,7 +12,7 @@ from typing import Optional
 from config import COVERS_DIR
 from abs_client import abs_client
 from db import engine
-from covers import cover_service
+from covers import get_cover_service
 import logging
 
 router = APIRouter()
@@ -54,7 +54,7 @@ async def refresh_cover(mam_id: str):
         raise HTTPException(status_code=404, detail="MAM ID not found in history")
 
     # Remove any stale cache entries/files before fetching again
-    cover_service.invalidate_cover(mam_id)
+    get_cover_service().invalidate_cover(mam_id)
 
     result = await abs_client.fetch_cover(row.title or "", row.author or "", mam_id, force_refresh=True)
     if not result or not result.get("cover_url"):

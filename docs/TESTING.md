@@ -42,31 +42,43 @@ The test suite supports **automatic dual-mode testing** for all external service
 
 **Run mock mode:**
 ```bash
-# Using Makefile (recommended)
-make test-mock
+# Using run-tests.sh script (recommended) - LOCAL TESTS
+cd build/
+./run-tests.sh                             # Mock by default (local)
+./run-tests.sh backend                     # Backend only (mock)
+
+# Docker tests - use --mock to override live default
+./run-tests.sh --docker --mock             # Force mock in Docker
 
 # Using pytest directly
-pytest app/tests/
+pytest app/tests/                          # Mock mode (local Python)
 
 # Explicit mock mode
 LIVE_API_TESTS=0 pytest app/tests/
 ```
 
-### Live Mode (For API Change Detection)
+### Live Mode (For API Change Detection & Docker Integration)
 
 **When:** `LIVE_API_TESTS=1`
 
 **Behavior:**
-- Tests make real calls to Hardcover GraphQL API
-- Requires `HARDCOVER_API_TOKEN` in environment
+- Tests make real calls to Hardcover GraphQL API and ABS
+- Requires `HARDCOVER_API_TOKEN` and other API credentials in .env
 - Slower execution (~2-5s per test due to rate limiting)
 - Detects API structure changes, field removals, response format updates
 - Subject to rate limits (60 req/min by default)
 
 **Run live mode:**
 ```bash
-# Using Makefile (recommended)
-make test-live
+# Using run-tests.sh script (recommended)
+# DOCKER TESTS: Live by default
+cd build/
+./run-tests.sh --docker                    # Live mode (default for Docker)
+./run-tests.sh --docker backend            # Backend only (live)
+
+# LOCAL TESTS: Use --live flag
+./run-tests.sh --live                      # Force live mode (local)
+./run-tests.sh --live -- -k hardcover      # Specific tests (live)
 
 # Using pytest directly
 LIVE_API_TESTS=1 pytest app/tests/
@@ -178,24 +190,31 @@ search_book_by_title_title=Harry_Potter_and_the_Philosoph.json
 
 ### Best Practices
 
-1. **Default to Mock Mode:**
-   - Run `make test-mock` or `pytest` without env vars for daily development
+1. **Local Development (Mock Mode):**
+   - Run `./run-tests.sh` for fast daily development
    - Fast feedback loop, no API dependency
+   - No API tokens needed
 
-2. **Periodic Live Mode Runs:**
-   - Run `make test-live` weekly or before releases
-   - Detects Hardcover API changes early
+2. **Integration Testing (Docker Live Mode):**
+   - Run `./run-tests.sh --docker` for full integration tests
+   - Tests hit real APIs (Hardcover, ABS, qBittorrent)
+   - Requires .env with valid API tokens
+   - Run before releases or after major changes
 
-3. **CI/CD Uses Mock Mode:**
+3. **Periodic Live Mode Checks:**
+   - Run `./run-tests.sh --live` locally weekly
+   - Detects Hardcover API changes early without Docker
+
+4. **CI/CD Uses Mock Mode:**
    - GitHub Actions should run in mock mode (no secrets needed)
    - Fast, deterministic, no rate limits
 
-4. **Fixture Maintenance:**
+5. **Fixture Maintenance:**
    - Re-capture fixtures after Hardcover API updates
    - Keep fixtures in version control
    - Document any manual fixture edits
 
-5. **Test Isolation:**
+6. **Test Isolation:**
    - Each test should reset counters: `hardcover_client.reset_counters()`
    - Provided automatically by `hardcover_client` fixture
 
@@ -282,19 +301,20 @@ pip install -r requirements-dev.txt
 
 ```bash
 # Quick backend tests
-make test-backend
+cd build/
+./run-tests.sh backend
 
 # With coverage
-make test-coverage
+./run-tests.sh coverage
 
 # Specific test file
-pytest app/tests/test_verification.py -v
+./run-tests.sh backend -- tests/test_verification.py -v
 
 # Specific test function
-pytest app/tests/test_verification.py::TestVerification::test_verify_import -v
+./run-tests.sh backend -- tests/test_verification.py::TestVerification::test_verify_import -v
 
-# Watch mode (re-run on file changes)
-make watch-tests
+# Using pytest directly (if in app/ directory)
+pytest tests/test_verification.py -v
 ```
 
 ### Local Selenium Tests
@@ -351,38 +371,39 @@ FROM production AS testing
 
 ```bash
 # Build test image (includes all test dependencies)
-make docker-test-build
+cd build/
+./run-tests.sh build
 
 # Or manually:
-docker compose -f docker-compose.yml -f docker-compose.test.yml build mam-audiofinder-test
+docker compose -f build/docker-compose.test.yml build test
 ```
 
-This creates an image: `mam-audiofinder:test` (~400MB vs ~200MB for production)
+This creates an image: `mam-audiofinder-test:latest` (~400MB vs ~200MB for production)
 
 ### Running Container Tests
 
 ```bash
 # Run full test suite
-make docker-test-run
+cd build/
+./run-tests.sh --docker
 
 # Run only backend tests (fast)
-make docker-test-backend
+./run-tests.sh --docker backend
 
 # Run only frontend tests (with integrated Selenium)
-make docker-test-frontend
+./run-tests.sh frontend
 
 # Run specific test file
-make docker-test-specific TEST=test_verification.py
+./run-tests.sh --docker backend -- tests/test_verification.py -v
 
 # Run with coverage report
-make docker-test-coverage
+./run-tests.sh --docker coverage
 
 # Open shell for debugging
-make docker-test-shell
+./run-tests.sh shell
 # Inside container:
 > pytest tests/test_verification.py -v
 > pytest tests/ -k "test_verify" -v
-> make test-backend
 ```
 
 ### Container Test Environment Variables
@@ -509,12 +530,12 @@ This enables:
 
 | Task | Local | Container |
 |------|-------|-----------|
-| **Initial Setup** | `make venv && make install-dev` | `make docker-test-build` |
-| **Run All Tests** | `make test-backend` | `make docker-test-run` |
-| **Run One Test** | `pytest tests/test_X.py -v` | `make docker-test-specific TEST=test_X.py` |
-| **With Coverage** | `make test-coverage` | `make docker-test-coverage` |
-| **Debug Tests** | `pytest tests/test_X.py -vv --pdb` | `make docker-test-shell` then `pytest ...` |
-| **Frontend Tests** | `pytest tests/frontend/ -v` (needs app running) | `make docker-test-frontend` |
+| **Initial Setup** | `python3 -m venv venv && pip install -r requirements-dev.txt` | `./run-tests.sh build` |
+| **Run All Tests** | `./run-tests.sh backend` | `./run-tests.sh --docker` |
+| **Run One Test** | `pytest tests/test_X.py -v` | `./run-tests.sh --docker backend -- tests/test_X.py -v` |
+| **With Coverage** | `./run-tests.sh coverage` | `./run-tests.sh --docker coverage` |
+| **Debug Tests** | `pytest tests/test_X.py -vv --pdb` | `./run-tests.sh shell` then `pytest ...` |
+| **Frontend Tests** | `pytest tests/frontend/ -v` (needs app running) | `./run-tests.sh frontend` |
 | **Integration Tests** | ❌ No ABS/qB networking | ✅ Full docker networking |
 | **Speed** | ⚡⚡⚡ Instant | 🐌 Container startup overhead |
 | **Iteration** | ⚡⚡⚡ Edit + run | ⚡⚡ Live mounted (no rebuild) |
@@ -527,13 +548,14 @@ This enables:
 
 ```bash
 # Fast local testing while coding
-pytest app/tests/test_verification.py -v
+cd build/
+./run-tests.sh backend -- tests/test_verification.py -v
 
 # Before commit: run full suite locally
-make test-backend
+./run-tests.sh backend
 
 # Before PR: run container tests to verify integration
-make docker-test-run
+./run-tests.sh --docker
 ```
 
 ### CI/CD Pipeline
@@ -541,13 +563,13 @@ make docker-test-run
 ```yaml
 # .github/workflows/test.yml
 - name: Build test image
-  run: make docker-test-build
+  run: cd build && ./run-tests.sh build
 
 - name: Run tests in container
-  run: make docker-test-run
+  run: cd build && ./run-tests.sh --docker
 
 - name: Generate coverage report
-  run: make docker-test-coverage
+  run: cd build && ./run-tests.sh --docker coverage
 ```
 
 ### Writing New Tests
@@ -565,7 +587,7 @@ def test_my_function(mock_db_engine):  # Use fixtures from conftest.py
 # tests/test_abs_integration.py
 @pytest.mark.integration
 async def test_abs_verify_import():
-    # Requires: make docker-test-run (can reach ABS via network)
+    # Requires: ./run-tests.sh --docker (can reach ABS via network)
     result = await abs_client.verify_import("Book Title", "Author")
     assert result['status'] == 'verified'
 ```
@@ -584,13 +606,13 @@ def test_search_workflow(navigate_to, wait_for_element):
 
 ```bash
 # Remove test containers and volumes
-make docker-test-clean
+docker compose -f build/docker-compose.test.yml down -v
 
-# Remove test artifacts
-make clean-test
+# Remove test image
+docker rmi mam-audiofinder-test:latest
 
-# Full cleanup
-make clean
+# Remove coverage reports
+rm -rf htmlcov/ .coverage
 ```
 
 ---
@@ -621,8 +643,8 @@ pytest app/tests/ -v
 docker ps
 
 # Try clean build
-make docker-test-clean
-make docker-test-build
+docker compose -f build/docker-compose.test.yml down -v
+cd build && ./run-tests.sh build
 ```
 
 **Tests can't reach ABS:**
@@ -638,7 +660,7 @@ grep ABS_BASE_URL .env
 **Selenium errors in container:**
 ```bash
 # Check chromium installed
-make docker-test-shell
+cd build && ./run-tests.sh shell
 > which chromium
 > chromium --version
 
@@ -665,24 +687,169 @@ PGID=1000
 If you have existing local test setup:
 
 ```bash
-# 1. Pull latest changes (includes new docker-compose.test.yml)
+# 1. Pull latest changes (includes new run-tests.sh script)
 git pull
 
 # 2. Your local testing still works unchanged
-make test-backend
+cd build && ./run-tests.sh backend
 
 # 3. Build new test container
-make docker-test-build
+./run-tests.sh build
 
 # 4. Try container testing
-make docker-test-run
+./run-tests.sh --docker
 
-# 5. Update CI/CD to use new targets
-# Replace: docker compose exec mam-audiofinder pytest ...
-# With:    make docker-test-run
+# 5. Update CI/CD to use new script
+# Replace: make docker-test-run
+# With:    cd build && ./run-tests.sh --docker
 ```
 
 No changes to test code required - everything is backward compatible!
+
+### What Changed
+
+- **Old:** Makefile with `make test-backend`, `make docker-test-run`, etc.
+- **New:** Shell script with `./run-tests.sh backend`, `./run-tests.sh --docker`, etc.
+- **Benefit:** Better help (`--help`), auto-detection, pytest passthrough, clearer errors
+
+---
+
+## Branch Strategy & CI/CD
+
+### GitHub Actions Test Triggers
+
+Tests run automatically on:
+- **Push to `master`** - Production branch (all tests must pass)
+- **Push to `dev`** - Development branch (catch bugs before master)
+- **Pull requests to `master` or `dev`** - PR validation
+
+**Branch Workflow:**
+```
+feature/* → dev (PR + tests) → master (PR + tests)
+```
+
+**Why dev branch:**
+- Catch integration issues before master
+- Safe experimentation without breaking production
+- Parallel feature development
+
+**Workflow file:** `.github/workflows/test.yml`
+
+### CI Test Configuration
+
+```yaml
+# Backend tests only (frontend tests via Vitest/Playwright in future)
+run: pytest app/tests/ -v --tb=short --ignore=app/tests/frontend/
+
+# Mock mode by default (fast, no API tokens needed)
+env:
+  LIVE_API_TESTS: 0
+```
+
+---
+
+## Ephemeral Test Environments
+
+### tmpfs Volumes for Test Isolation
+
+**What:** Test data stored in RAM (in-memory filesystem), auto-cleanup on exit
+
+**Configuration:** `build/docker-compose.test.yml`
+
+```yaml
+volumes:
+  test-data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=500m,mode=1777  # 500MB limit, world-writable
+```
+
+**Benefits:**
+- ✅ **Automatic cleanup** - No manual `docker volume rm` needed
+- ✅ **Fastest I/O** - RAM-based storage (~10x faster than disk)
+- ✅ **No disk accumulation** - Prevents test data filling disk over time
+- ✅ **True ephemeral** - Lost on container exit (acceptable for tests)
+
+**Limitations:**
+- 500MB size limit (sufficient for test DBs, covers, logs)
+- Data lost on system crash (not a problem for ephemeral tests)
+
+**Usage:**
+```bash
+# Run tests - tmpfs volume created automatically
+cd build && ./run-tests.sh --docker
+
+# Container exits, tmpfs volume destroyed automatically
+# No cleanup needed!
+```
+
+**Why not persistent volumes:**
+- Test data should not persist between runs
+- Prevents "dirty" test environments
+- Faster test execution
+- No manual cleanup required
+
+---
+
+## Future Frontend Testing
+
+### Current State (Backend Only)
+
+Frontend E2E tests exist but are **not run in CI**:
+- `app/tests/frontend/` - 4 Selenium test files
+- Skipped in GitHub Actions via `--ignore=app/tests/frontend/`
+- Can run locally: `cd build && ./run-tests.sh frontend`
+
+### Planned Migration: Vitest + Playwright
+
+**Why migrate:**
+- Selenium tests slow (~30s+ per test)
+- Chromium integration complex (100MB+ in Docker)
+- Modern frontend needs modern testing tools
+
+**Future stack:**
+- **Vitest** - Unit/component tests for Vue 3 SPA
+- **Playwright** - E2E browser automation (faster than Selenium)
+- **@testing-library/vue** - Component testing best practices
+
+**When to implement:**
+- After Vue 3 migration complete
+- When frontend features stabilize
+- When team bandwidth allows
+
+**Preparation:**
+- Workflow structured for easy frontend test addition
+- Can add matrix job for frontend tests later
+- Documentation in place for future contributors
+
+---
+
+## Standalone Test Scripts
+
+### abs_providers_integration.py
+
+**What:** Standalone CLI tool for testing ABS metadata providers
+
+**Location:** `app/tests/abs_providers_integration.py` (not collected by pytest)
+
+**Usage:**
+```bash
+# Run directly (not via pytest)
+python app/tests/abs_providers_integration.py --help
+
+# Example: Test all providers
+python app/tests/abs_providers_integration.py --test-all
+```
+
+**Why not a pytest test:**
+- Has CLI argument parsing (argparse)
+- Designed for manual interactive testing
+- Has `if __name__ == '__main__'` entry point
+- Would fail pytest collection with ERROR status
+
+**Note:** Renamed from `test_abs_providers.py` to prevent pytest collection
 
 ---
 
@@ -699,5 +866,11 @@ No changes to test code required - everything is backward compatible!
 - Verifying production-like behavior
 - Running CI/CD pipeline
 - Need consistent environment across team
+
+**Use Ephemeral Environments (tmpfs) For:**
+- CI/CD pipelines (GitHub Actions)
+- Ensuring clean test state
+- Preventing disk accumulation
+- Maximum test performance
 
 **Both modes use the same test suite** - pick the right tool for the task!

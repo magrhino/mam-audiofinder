@@ -212,10 +212,6 @@ def wait(driver) -> WebDriverWait:
     return WebDriverWait(driver, 10)
 
 
-@pytest.fixture(scope="function")
-def base_url(browser_config) -> str:
-    """Get the base URL for the application."""
-    return browser_config["base_url"]
 
 
 @pytest.fixture(scope="function")

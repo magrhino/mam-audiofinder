@@ -385,10 +385,10 @@ def generate_test_cases() -> List[TestCase]:
             description="Subtitle with dash instead of colon",
             query_title="Sapiens - A Brief History of Humankind",
             query_author="Yuval Noah Harari",
-            expected_status="mismatch",
-            expected_min_score=50,
+            expected_status="verified",
+            expected_min_score=100,
             category="subtitle",
-            notes="Won't be exact match but should be partial"
+            notes="Dash and colon normalize identically - both removed with subtitle"
         ),
 
         # ========== SERIES HANDLING ==========
@@ -408,10 +408,10 @@ def generate_test_cases() -> List[TestCase]:
             description="Query includes 'Book 1' variation",
             query_title="Harry Potter and the Philosopher's Stone Book 1",
             query_author="J.K. Rowling",
-            expected_status="mismatch",
-            expected_min_score=50,
+            expected_status="verified",
+            expected_min_score=100,
             category="series",
-            notes="Partial match only (title substring)"
+            notes="Book number suffix treated as noise - substring match (50) + author exact (50) = verified"
         ),
 
         # ========== AUTHOR NAME VARIATIONS ==========
@@ -420,10 +420,10 @@ def generate_test_cases() -> List[TestCase]:
             description="Query has initials, library has full dots",
             query_title="The Hobbit",
             query_author="JRR Tolkien",
-            expected_status="mismatch",
-            expected_min_score=100,
+            expected_status="verified",
+            expected_min_score=150,
             category="author_variations",
-            notes="Title matches but author format differs"
+            notes="Periods in initials normalized - 'JRR Tolkien' == 'J.R.R. Tolkien' after normalization"
         ),
 
         TestCase(
@@ -465,10 +465,10 @@ def generate_test_cases() -> List[TestCase]:
             description="Different apostrophe types",
             query_title="Ender's Game",
             query_author="Orson Scott Card",
-            expected_status="mismatch",
-            expected_min_score=50,
+            expected_status="verified",
+            expected_min_score=150,
             category="special_chars",
-            notes="Curly vs straight apostrophe mismatch"
+            notes="Apostrophe types normalized - both removed, exact title + author match"
         ),
 
         TestCase(
@@ -547,9 +547,9 @@ def generate_test_cases() -> List[TestCase]:
             query_title="Foundation",
             query_author="Robert A. Heinlein",
             expected_status="mismatch",
-            expected_min_score=100,
+            expected_min_score=50,  # Score is capped to 75 (mismatch range) due to author mismatch
             category="disambiguation",
-            notes="Title matches but author doesn't"
+            notes="Title matches but author doesn't - score capped to prevent false verification"
         ),
 
         # ========== NOT FOUND CASES ==========
@@ -608,15 +608,20 @@ def generate_test_cases() -> List[TestCase]:
 # ============================================================================
 
 class MatchAnalyzer:
-    """Analyzes match results and provides detailed scoring breakdown."""
+    """Analyzes match results using the ACTUAL matching logic from matching.py."""
 
     @staticmethod
     def analyze_match(test_case: TestCase, abs_library: Dict, result: Dict) -> Dict:
         """
-        Analyze why a match succeeded or failed.
+        Analyze why a match succeeded or failed using REAL matching logic.
 
-        Returns detailed breakdown of scoring logic.
+        This now uses the actual calculate_match_score() function from app/abs/matching.py
+        instead of duplicating the logic. This ensures tests validate production code.
         """
+        from abs.matching import calculate_match_score, determine_verification_status
+        from abs.models import LibraryItem
+        from utils import normalize_title, normalize_author
+
         breakdown = {
             "title_score": 0,
             "author_score": 0,
@@ -627,71 +632,84 @@ class MatchAnalyzer:
             "match_explanation": []
         }
 
-        # Simulate the matching logic from abs_client.py
-        title_lower = test_case.query_title.lower().strip()
-        author_lower = test_case.query_author.lower().strip() if test_case.query_author else ""
-
-        metadata_asin = test_case.query_metadata.get("asin", "") if test_case.query_metadata else ""
-        metadata_isbn = test_case.query_metadata.get("isbn", "") if test_case.query_metadata else ""
+        # Extract query parameters
+        metadata_asin = test_case.query_metadata.get("asin") if test_case.query_metadata else None
+        metadata_isbn = test_case.query_metadata.get("isbn") if test_case.query_metadata else None
 
         best_score = 0
         best_item = None
+        best_item_data = None
 
+        # Convert mock library items to LibraryItem objects and score them
         for item in abs_library.get("results", []):
             item_metadata = item.get("media", {}).get("metadata", {})
-            item_title = (item_metadata.get("title") or "").lower().strip()
-            item_author = (item_metadata.get("authorName") or "").lower().strip()
-            item_asin = (item_metadata.get("asin") or "").lower().strip()
-            item_isbn = (item_metadata.get("isbn") or "").lower().strip()
-            item_path = item.get("path", "")
+            title = item_metadata.get("title", "")
+            author = item_metadata.get("authorName", "")
 
-            score = 0
+            # Create LibraryItem object
+            library_item = LibraryItem(
+                id=item.get("id"),
+                library_id="mock-lib",
+                title=title,
+                author=author,
+                narrator=item_metadata.get("narratorName"),
+                series_name=item_metadata.get("seriesName"),
+                asin=item_metadata.get("asin"),
+                isbn=item_metadata.get("isbn"),
+                cover_path=item.get("media", {}).get("coverPath"),
+                duration_seconds=item.get("media", {}).get("duration"),
+                path=item.get("path"),
+                title_normalized=normalize_title(title),
+                author_normalized=normalize_author(author),
+            )
+
+            # Use ACTUAL matching logic from matching.py
+            score = calculate_match_score(
+                query_title=test_case.query_title,
+                query_author=test_case.query_author,
+                candidate=library_item,
+                query_asin=metadata_asin,
+                query_isbn=metadata_isbn,
+                query_path=test_case.query_path,
+            )
+
+            # Generate explanation (simplified - matches actual logic)
             explanations = []
-
-            # ASIN/ISBN matching (highest priority)
-            if metadata_asin and item_asin and metadata_asin.lower() == item_asin:
-                score += 200
+            if metadata_asin and library_item.asin and metadata_asin.lower() == library_item.asin.lower():
                 explanations.append(f"ASIN match: {metadata_asin} (+200)")
-            elif metadata_isbn and item_isbn and metadata_isbn.lower() == item_isbn:
-                score += 200
+            elif metadata_isbn and library_item.isbn and metadata_isbn.lower() == library_item.isbn.lower():
                 explanations.append(f"ISBN match: {metadata_isbn} (+200)")
             else:
-                # Title matching
-                if item_title == title_lower:
-                    score += 100
-                    explanations.append(f"Exact title match (+100)")
-                elif title_lower in item_title or item_title in title_lower:
-                    score += 50
-                    explanations.append(f"Partial title match (+50)")
+                query_title_norm = normalize_title(test_case.query_title)
+                item_title_norm = library_item.title_normalized
 
-                # Author matching
-                if author_lower:
-                    if item_author == author_lower:
-                        score += 50
-                        explanations.append(f"Exact author match (+50)")
-                    elif author_lower in item_author or item_author in author_lower:
-                        score += 25
-                        explanations.append(f"Partial author match (+25)")
+                if query_title_norm == item_title_norm:
+                    explanations.append("Exact title match (+100)")
+                elif query_title_norm in item_title_norm or item_title_norm in query_title_norm:
+                    explanations.append("Partial title match (+50)")
+
+                if test_case.query_author:
+                    query_author_norm = normalize_author(test_case.query_author)
+                    item_author_norm = library_item.author_normalized
+
+                    if query_author_norm == item_author_norm:
+                        explanations.append("Exact author match (+50)")
+                    elif query_author_norm in item_author_norm or item_author_norm in query_author_norm:
+                        explanations.append("Partial author match (+25)")
+                    elif score < 100:  # Author mismatch penalty was applied
+                        explanations.append("Author mismatch - score capped")
                 else:
-                    score += 10
-                    explanations.append(f"No author provided (+10)")
-
-                # Path matching
-                if test_case.query_path and item_path:
-                    lib_path_norm = test_case.query_path.lower().replace("\\", "/").strip("/")
-                    item_path_norm = item_path.lower().replace("\\", "/").strip("/")
-                    if lib_path_norm in item_path_norm or item_path_norm in lib_path_norm:
-                        score += 25
-                        explanations.append(f"Path match bonus (+25)")
+                    explanations.append("No author provided (+10)")
 
             # Track best match
-            if score > best_score and (score >= 50 or metadata_asin or metadata_isbn):
+            if score > best_score:
                 best_score = score
+                best_item_data = library_item
                 best_item = {
-                    "id": item.get("id"),
-                    "title": item_metadata.get("title"),
-                    "author": item_metadata.get("authorName"),
-                    "path": item_path,
+                    "id": library_item.id,
+                    "title": library_item.title,
+                    "author": library_item.author,
+                    "path": library_item.path,
                     "score": score,
                     "explanations": explanations
                 }
@@ -925,6 +943,12 @@ class LibraryMatchingTestRunner:
 
 async def main():
     """Main entry point for CLI execution."""
+    # Ensure test data directory exists
+    import os
+    test_data_dir = os.environ.get('DATA_DIR', '/tmp/test_data')
+    os.makedirs(test_data_dir, exist_ok=True)
+    os.environ['DATA_DIR'] = test_data_dir
+
     parser = argparse.ArgumentParser(
         description="Library Matching Intelligence Test for MAM Audiobook Finder",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -978,6 +1002,18 @@ Examples:
 # ============================================================================
 
 import pytest
+
+
+@pytest.fixture(scope="class", autouse=True)
+def setup_test_environment():
+    """Ensure test environment is configured before tests."""
+    import os
+    test_data_dir = os.environ.get('DATA_DIR', '/tmp/test_data')
+    os.makedirs(test_data_dir, exist_ok=True)
+    os.environ['DATA_DIR'] = test_data_dir
+    yield  # Run tests
+    # Cleanup not needed for /tmp
+
 
 @pytest.mark.asyncio
 class TestLibraryMatchingIntelligence:

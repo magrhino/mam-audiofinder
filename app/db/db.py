@@ -234,21 +234,36 @@ def run_migrations():
 
 def _initialize_covers_db_from_schema():
     """
-    Initialize covers.db from fresh schema file.
-    Replaces deprecated migrations 005, 008, 009.
+    Initialize covers.db from fresh schema file with validation.
+    Auto-rebuilds if schema validation fails.
     """
     schema_file = Path(__file__).parent / "covers_schema.sql"
-
     if not schema_file.exists():
         logger.warning(f"⚠️  Covers schema file not found: {schema_file}")
         return
+
+    expected_tables = ["covers", "series_cache", "library_items", "library_sync_status"]
+
+    # Validate existing database
+    db_path = Path(COVERS_DB_PATH)
+    if db_path.exists():
+        if _validate_database_schema(covers_engine, expected_tables, "covers.db"):
+            logger.info("✓ covers.db schema up to date, skipping initialization")
+            return
+        else:
+            logger.warning("⚠️  covers.db schema invalid, rebuilding...")
+            logger.warning(f"⚠️  Deleting stale database: {db_path}")
+            try:
+                db_path.unlink()
+                logger.info("✓ Deleted stale covers.db")
+            except Exception as e:
+                logger.error(f"✗ Failed to delete {db_path}: {e}")
+                raise
 
     logger.info("🔧 Initializing covers.db from fresh schema...")
 
     try:
         sql = schema_file.read_text()
-
-        # Use executescript for schema file (handles triggers properly)
         with covers_engine.connect() as conn:
             raw_conn = conn.connection.driver_connection
             raw_conn.executescript(sql)
@@ -256,27 +271,45 @@ def _initialize_covers_db_from_schema():
 
         logger.info("✓ Covers database schema initialized")
 
+        # Verify initialization succeeded
+        if not _validate_database_schema(covers_engine, expected_tables, "covers.db"):
+            raise RuntimeError("covers.db schema initialization failed validation")
     except Exception as e:
         logger.error(f"✗ Failed to initialize covers.db from schema: {e}")
         raise
 
 def _initialize_series_db_from_schema():
     """
-    Initialize series.db from fresh schema file.
-    Handles series metadata, resolved editions, and book metadata.
+    Initialize series.db from fresh schema file with validation.
+    Auto-rebuilds if schema validation fails.
     """
     schema_file = Path(__file__).parent / "series_schema.sql"
-
     if not schema_file.exists():
         logger.warning(f"⚠️  Series schema file not found: {schema_file}")
         return
+
+    expected_tables = ["series_metadata", "resolved_editions", "book_metadata"]
+
+    # Validate existing database
+    db_path = Path(SERIES_DB_PATH)
+    if db_path.exists():
+        if _validate_database_schema(series_engine, expected_tables, "series.db"):
+            logger.info("✓ series.db schema up to date, skipping initialization")
+            return
+        else:
+            logger.warning("⚠️  series.db schema invalid, rebuilding...")
+            logger.warning(f"⚠️  Deleting stale database: {db_path}")
+            try:
+                db_path.unlink()
+                logger.info("✓ Deleted stale series.db")
+            except Exception as e:
+                logger.error(f"✗ Failed to delete {db_path}: {e}")
+                raise
 
     logger.info("🔧 Initializing series.db from fresh schema...")
 
     try:
         sql = schema_file.read_text()
-
-        # Use executescript for schema file (handles triggers properly)
         with series_engine.connect() as conn:
             raw_conn = conn.connection.driver_connection
             raw_conn.executescript(sql)
@@ -284,9 +317,42 @@ def _initialize_series_db_from_schema():
 
         logger.info("✓ Series database schema initialized")
 
+        # Verify initialization succeeded
+        if not _validate_database_schema(series_engine, expected_tables, "series.db"):
+            raise RuntimeError("series.db schema initialization failed validation")
     except Exception as e:
         logger.error(f"✗ Failed to initialize series.db from schema: {e}")
         raise
+
+
+def _validate_database_schema(engine, expected_tables, db_name):
+    """
+    Validate that all expected tables exist in the database.
+    Returns True if valid, False if rebuild needed.
+    """
+    logger.info(f"🔍 Validating {db_name} schema...")
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            ))
+            existing_tables = {row[0] for row in result.fetchall()}
+
+            missing_tables = set(expected_tables) - existing_tables
+
+            if missing_tables:
+                logger.warning(
+                    f"⚠️  {db_name} missing tables: {', '.join(sorted(missing_tables))}"
+                )
+                return False
+
+            logger.info(f"✓ {db_name} schema valid ({len(expected_tables)} tables)")
+            return True
+
+    except Exception as e:
+        logger.error(f"✗ Schema validation failed for {db_name}: {e}")
+        return False
 
 
 def initialize_databases():

@@ -14,7 +14,7 @@ COPY build/frontend/index.html build/frontend/vite.config.js ./
 COPY build/frontend/src/ ./src/
 COPY build/frontend/static/ ./static/
 COPY app/static/js/ ./app/static/js/
-COPY app/static/css/ ./app/static/css/
+# CSS removed - migrated to UnoCSS (Vue 3 migration)
 
 # Build Vue application for production
 RUN npm run build
@@ -68,11 +68,9 @@ FROM production AS testing
 USER root
 
 # Install system dependencies for testing
-# - make: For Makefile test targets
 # - chromium & chromium-driver: For Selenium browser testing
 # - fonts & locales: For proper rendering in headless browser
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    make \
     chromium \
     chromium-driver \
     fonts-liberation \
@@ -87,7 +85,6 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 
 # Copy test suite
 COPY app/tests/ /app/tests/
-COPY build/Makefile /app/
 
 # Set environment variables for Selenium to use local Chrome
 ENV SELENIUM_DRIVER_TYPE=local \

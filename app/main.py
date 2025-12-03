@@ -49,8 +49,23 @@ logger.info(f"Logging initialized: {log_file} (max {LOG_MAX_MB}MB, {LOG_MAX_FILE
 
 # ---------------------------- Database Initialization ----------------------------
 from db import initialize_databases
+from config import DATA_DIR
 
-initialize_databases()
+try:
+    logger.info("="*70)
+    logger.info("🗃️  Initializing database schemas...")
+    logger.info("="*70)
+    initialize_databases()
+    logger.info("="*70)
+    logger.info("✅ All database schemas initialized successfully")
+    logger.info("="*70)
+except Exception as e:
+    logger.error("="*70)
+    logger.error(f"❌ Database initialization failed: {e}")
+    logger.error("="*70)
+    logger.error("💡 Tip: Check for stale databases or schema mismatches")
+    logger.error(f"📁 Data directory: {DATA_DIR}")
+    raise
 
 # ---------------------------- FastAPI Application ----------------------------
 app = FastAPI(title="MAM Audiobook Finder", version="0.4.0")

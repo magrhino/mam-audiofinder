@@ -519,5 +519,20 @@ class CoverService:
         return removed
 
 
-# Global instance
-cover_service = CoverService()
+# Global instance - lazy initialization to avoid directory creation at import time
+_cover_service = None
+
+def get_cover_service() -> CoverService:
+    """
+    Get or create the global CoverService instance.
+
+    Lazy initialization avoids creating directories at import time,
+    which prevents permission errors during test collection.
+
+    Returns:
+        CoverService: The singleton CoverService instance
+    """
+    global _cover_service
+    if _cover_service is None:
+        _cover_service = CoverService()
+    return _cover_service

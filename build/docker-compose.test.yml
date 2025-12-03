@@ -1,24 +1,26 @@
 # Docker Compose override for testing
-# Usage: docker compose -f docker-compose.yml -f build/docker-compose.test.yml <command>
-# Or use the Makefile targets: make docker-test-build, make docker-test-run
+# Usage: docker compose -f build/docker-compose.test.yml build test
+# Or use the run-tests.sh script: cd build && ./run-tests.sh build
 
 services:
   # Test service - uses testing stage with all dependencies
-  mam-audiofinder-test:
+  test:
     build:
-      context: .
+      context: ..  # Workspace root (parent of build/)
       dockerfile: build/Dockerfile
       target: testing  # Uses the testing stage from Dockerfile
       args:
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
-    image: mam-audiofinder:test
-    container_name: mam-audiofinder-test
+    image: mam-audiofinder-test:latest
+    container_name: mam-test
     networks:
       - nginx-network  # Same network as production for ABS connectivity
     env_file:
-      - .env
+      - ../.env  # Load production env (required for API tokens)
     environment:
+      # Docker tests use LIVE API by default (integration testing)
+      LIVE_API_TESTS: "1"
       # Override database paths for isolated testing
       DATA_DIR: /data/test-data
       HISTORY_DB_PATH: /data/test-data/history.db
@@ -28,10 +30,10 @@ services:
       SELENIUM_BROWSER: chrome
     volumes:
       # Mount test directories for live code updates during development
-      - ./app/tests:/app/tests
-      - ./app:/app/app
-      - ${DATA_DIR:-./data}:/data
-      - ${MEDIA_ROOT:-./media}:/media
+      - ../app/tests:/app/tests
+      - ../app:/app/app
+      - ${DATA_DIR:-../data}:/data
+      - ${MEDIA_ROOT:-../media}:/media
       # Create isolated test data directory
       - test-data:/data/test-data
     command: pytest tests/ -v --tb=short
@@ -40,7 +42,13 @@ services:
 
 volumes:
   # Isolated volume for test data (doesn't interfere with production data)
+  # Uses tmpfs (in-memory) for ephemeral test data with auto-cleanup
   test-data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=500m,mode=1777
 
 networks:
   nginx-network:

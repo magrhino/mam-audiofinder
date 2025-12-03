@@ -288,7 +288,7 @@ class TestTryHardlink:
         # Mock stat to simulate different filesystems
         original_stat = Path.stat
 
-        def mock_stat(path_self):
+        def mock_stat(path_self, *, follow_symlinks=True):
             stat_result = original_stat(path_self)
             if str(path_self) == str(src):
                 # Mock source on different device
