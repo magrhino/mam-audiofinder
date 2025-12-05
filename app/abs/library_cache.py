@@ -113,13 +113,31 @@ class LibraryCache:
                 title = metadata.get("title", "")
                 author = metadata.get("authorName", "")
 
+                # Extract series index from metadata
+                # ABS stores series as list: [{"name": "...", "sequence": "1"}]
+                # or as flat fields: seriesName + series (sequence)
+                series_index = None
+                series_name = metadata.get("seriesName")
+                series_list = metadata.get("series", [])
+
+                if series_list and isinstance(series_list, list) and len(series_list) > 0:
+                    first_series = series_list[0]
+                    if isinstance(first_series, dict):
+                        series_name = first_series.get("name") or series_name
+                        seq = first_series.get("sequence")
+                        if seq:
+                            try:
+                                series_index = float(seq)
+                            except (ValueError, TypeError):
+                                pass
+
                 conn.execute(text("""
                     INSERT INTO library_items
-                    (id, library_id, title, author, narrator, series_name,
+                    (id, library_id, title, author, narrator, series_name, series_index,
                      asin, isbn, cover_path, duration_seconds, path,
                      title_normalized, author_normalized, synced_at)
                     VALUES
-                    (:id, :lib_id, :title, :author, :narrator, :series,
+                    (:id, :lib_id, :title, :author, :narrator, :series, :series_index,
                      :asin, :isbn, :cover, :duration, :path,
                      :title_norm, :author_norm, datetime('now'))
                 """), {
@@ -128,7 +146,8 @@ class LibraryCache:
                     "title": title,
                     "author": author,
                     "narrator": metadata.get("narratorName"),
-                    "series": metadata.get("seriesName"),
+                    "series": series_name,
+                    "series_index": series_index,
                     "asin": metadata.get("asin"),
                     "isbn": metadata.get("isbn"),
                     "cover": item.get("media", {}).get("coverPath"),
@@ -246,6 +265,54 @@ class LibraryCache:
 
             return best_item, best_score
 
+    def get_series_books(self, series_name: str) -> List[LibraryItem]:
+        """Get all books belonging to a series."""
+        with covers_engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT * FROM library_items
+                WHERE library_id = :lib_id
+                  AND series_name IS NOT NULL
+                  AND (
+                      series_name = :name
+                      OR series_name LIKE :pattern
+                  )
+                ORDER BY series_index NULLS LAST, title_normalized
+            """), {
+                "lib_id": self.library_id,
+                "name": series_name,
+                "pattern": f"{series_name} #%",
+            }).fetchall()
+
+            return [self._row_to_item(row) for row in rows]
+
+    def get_series_summary(self) -> List[Dict]:
+        """Get aggregated series summary for fast UI rendering."""
+        with covers_engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT
+                    series_name,
+                    COUNT(*) as book_count,
+                    MIN(series_index) as first_index,
+                    MAX(series_index) as last_index,
+                    GROUP_CONCAT(title, ' | ') as titles
+                FROM library_items
+                WHERE library_id = :lib_id
+                  AND series_name IS NOT NULL
+                GROUP BY series_name
+                ORDER BY series_name
+            """), {"lib_id": self.library_id}).fetchall()
+
+            return [
+                {
+                    "name": row.series_name,
+                    "book_count": row.book_count,
+                    "first_index": row.first_index,
+                    "last_index": row.last_index,
+                    "titles": row.titles.split(" | ") if row.titles else [],
+                }
+                for row in rows
+            ]
+
     def _row_to_item(self, row) -> LibraryItem:
         """Convert database row to LibraryItem model."""
         return LibraryItem(
@@ -255,6 +322,7 @@ class LibraryCache:
             author=row.author,
             narrator=row.narrator,
             series_name=row.series_name,
+            series_index=getattr(row, 'series_index', None),
             asin=row.asin,
             isbn=row.isbn,
             cover_path=row.cover_path,

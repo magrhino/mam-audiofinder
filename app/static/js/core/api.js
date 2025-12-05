@@ -8,6 +8,17 @@
  */
 export const api = {
   /**
+   * Generic GET request helper
+   * @param {string} url - URL to fetch
+   * @returns {Promise<Object>}
+   */
+  async get(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  },
+
+  /**
    * Health check endpoint
    * @returns {Promise<{ok: boolean}>}
    */

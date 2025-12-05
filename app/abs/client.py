@@ -120,6 +120,42 @@ class AbsClient:
             return None
         return self._library_cache.get_sync_status()
 
+    async def get_series_list(self) -> List[Dict]:
+        """
+        Fetch series list from ABS filterdata endpoint.
+
+        Returns:
+            List of series: [{"id": "...", "name": "...", "books": [...]}]
+        """
+        if not self.is_configured or not self.config.library_id:
+            return []
+
+        async with self._semaphore:
+            url = f"{self.config.base_url}/api/libraries/{self.config.library_id}"
+            headers = {"Authorization": f"Bearer {self.config.api_key}"}
+            params = {"include": "filterdata"}
+
+            try:
+                r = await self._shared_client.get(url, headers=headers, params=params)
+                if r.status_code == 200:
+                    data = r.json()
+                    filterdata = data.get("filterdata", {})
+                    series_list = filterdata.get("series", [])
+                    logger.info(f"📚 Fetched {len(series_list)} series from ABS")
+                    return series_list
+                return []
+            except Exception as e:
+                logger.error(f"❌ Failed to fetch ABS series: {e}")
+                return []
+
+    async def get_books_in_series(self, series_name: str) -> List[LibraryItem]:
+        """Get all books in a specific series from library cache."""
+        if not self._library_cache:
+            return []
+
+        await self._library_cache.ensure_fresh(self.get_library_items)
+        return self._library_cache.get_series_books(series_name)
+
     # --- Verification ---
 
     async def verify_import(

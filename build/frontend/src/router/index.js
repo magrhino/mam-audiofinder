@@ -11,6 +11,7 @@ const HistoryView = () => import('@views/HistoryView.vue')
 const ShowcaseView = () => import('@views/ShowcaseView.vue')
 const LogsView = () => import('@views/LogsView.vue')
 const SeriesView = () => import('@views/SeriesView.vue')
+const LibraryView = () => import('@views/LibraryView.vue')
 
 const routes = [
   {
@@ -42,6 +43,12 @@ const routes = [
     name: 'series',
     component: SeriesView,
     meta: { title: 'Series - Audiobook Finder' }
+  },
+  {
+    path: '/library',
+    name: 'library',
+    component: LibraryView,
+    meta: { title: 'Library - Audiobook Finder' }
   },
   // Catch-all route for unmatched paths - redirect to home
   {

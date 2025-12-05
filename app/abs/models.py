@@ -13,6 +13,7 @@ class LibraryItem(BaseModel):
     author: Optional[str] = None
     narrator: Optional[str] = None
     series_name: Optional[str] = None
+    series_index: Optional[float] = None
     asin: Optional[str] = None
     isbn: Optional[str] = None
     cover_path: Optional[str] = None
