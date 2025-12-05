@@ -175,9 +175,10 @@ class LibraryCache:
 
         with covers_engine.connect() as conn:
             for title, author in items:
-                cache_key = f"{title}||{author}"
+                # Normalize keys to align with callers (which lowercase/strip)
                 title_norm = normalize_title(title)
                 author_norm = normalize_author(author)
+                cache_key = f"{title_norm}||{author_norm}"
 
                 row = conn.execute(text("""
                     SELECT 1 FROM library_items

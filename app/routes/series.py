@@ -351,7 +351,7 @@ async def enrich_books_with_abs(
 
             # Process library check results
             if isinstance(library_check, dict) and library_check:
-                cache_key = f"{book_title.lower().strip()}||{book_author.lower().strip()}"
+                cache_key = f"{normalize_title(book_title)}||{normalize_author(book_author)}"
                 in_library = library_check.get(cache_key, False)
 
             # Process hardcover results (only if include_audio_meta was True)

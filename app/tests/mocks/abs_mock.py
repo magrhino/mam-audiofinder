@@ -14,6 +14,8 @@ import hashlib
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
+from utils import normalize_title, normalize_author
+
 logger = logging.getLogger("mam-audiofinder")
 
 
@@ -205,7 +207,7 @@ class MockABSClient:
                 # Return results for requested items (default to False if not in fixture)
                 results = {}
                 for title, author in items:
-                    cache_key = f"{title.lower().strip()}||{author.lower().strip()}"
+                    cache_key = f"{normalize_title(title)}||{normalize_author(author)}"
                     # Check if this exact key is in the fixture
                     results[cache_key] = fixture.get(cache_key, False)
 
@@ -213,7 +215,7 @@ class MockABSClient:
             except FixtureNotFoundError:
                 # If no fixture at all, return all False
                 logger.warning("⚠️  No library check fixtures found, returning all False")
-                return {f"{title.lower().strip()}||{author.lower().strip()}": False
+                return {f"{normalize_title(title)}||{normalize_author(author)}": False
                         for title, author in items}
 
     async def fetch_cover(self, title: str, author: str = "", mam_id: str = "", force_refresh: bool = False) -> dict:

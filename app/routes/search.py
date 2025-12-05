@@ -12,6 +12,7 @@ from config import MAM_BASE, MAM_COOKIE, ABS_BASE_URL, ABS_API_KEY, ABS_CHECK_LI
 from abs_client import abs_client
 from mam_cache import get_cached_mam_search, cache_mam_search
 from dependencies.mam import normalize_mam_result, flatten, detect_format
+from utils import normalize_title, normalize_author
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -90,7 +91,7 @@ async def search(payload: dict):
 
             # Update results with library status
             for result in out:
-                cache_key = f"{(result['title'] or '').lower().strip()}||{(result['author_info'] or '').lower().strip()}"
+                cache_key = f"{normalize_title(result.get('title') or '')}||{normalize_author(result.get('author_info') or '')}"
                 result["in_abs_library"] = library_results.get(cache_key, False)
 
             logger.info(f"📚 Library check: {sum(r['in_abs_library'] for r in out)}/{len(out)} items found in ABS")

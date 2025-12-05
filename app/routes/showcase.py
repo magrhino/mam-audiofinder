@@ -14,6 +14,7 @@ from config import MAM_BASE, MAM_COOKIE, ABS_CHECK_LIBRARY
 from abs_client import abs_client
 from mam_cache import get_cached_mam_search, cache_mam_search
 from dependencies.mam import normalize_mam_result
+from utils import normalize_title as normalize_title_match, normalize_author as normalize_author_match
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -189,7 +190,7 @@ async def showcase(
 
             # Update groups with library status
             for group in groups:
-                cache_key = f"{(group['display_title'] or '').lower().strip()}||{(group['author'] or '').lower().strip()}"
+                cache_key = f"{normalize_title_match(group.get('display_title') or '')}||{normalize_author_match(group.get('author') or '')}"
                 group["in_abs_library"] = library_results.get(cache_key, False)
 
             logger.info(f"📚 Showcase library check: {sum(g['in_abs_library'] for g in groups)}/{len(groups)} groups found in ABS")
