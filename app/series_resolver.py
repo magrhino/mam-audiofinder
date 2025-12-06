@@ -5,8 +5,9 @@ Matches series across sources and provides unified diff interface.
 
 import hashlib
 import logging
+import re
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Literal
+from typing import Dict, List, Optional
 from enum import Enum
 
 from utils import normalize_title, normalize_author
@@ -28,6 +29,8 @@ class SeriesInfo:
     name_normalized: str
     author: Optional[str] = None
     book_count: int = 0
+    abs_book_count: int = 0
+    series_book_count: int = 0
     source: SeriesSource = SeriesSource.ABS
 
     # Source-specific IDs
@@ -83,6 +86,9 @@ class SeriesDiffResult:
     # Ambiguous matches
     uncertain: List[Dict] = field(default_factory=list)
 
+    # Explicit discrepancy list (e.g., position/title differences)
+    discrepancies: List[Dict] = field(default_factory=list)
+
     # Counts
     abs_book_count: int = 0
     hardcover_book_count: int = 0
@@ -109,6 +115,29 @@ def normalize_series_name(name: str) -> str:
         words = words[:-1]
 
     return " ".join(words)
+
+
+def canonicalize_title_for_match(title: str) -> str:
+    """Loosened title normalization to ignore edition/part/adaptation suffixes."""
+    normalized = normalize_title(title)
+    if not normalized:
+        return ""
+
+    # Drop common suffix tokens that cause false mismatches
+    tokens = [
+        r"\bdramatized adaptation\b",
+        r"\bgraphic audio\b",
+        r"\bgraphicaudio\b",
+        r"\bopus test\b",
+        r"\bpart\s+\d+(?:\s+of\s+\d+)?\b",
+        r"\b\d+\s+of\s+\d+\b",
+        r"\bbook\s+\d+\b",
+    ]
+    canonical = normalized
+    for pattern in tokens:
+        canonical = re.sub(pattern, "", canonical).strip()
+    canonical = re.sub(r"\s+", " ", canonical).strip()
+    return canonical
 
 
 def score_series_match(abs_name: str, hc_name: str, abs_author: str = "", hc_author: str = "") -> int:
@@ -167,6 +196,7 @@ def match_books_across_sources(
     for hc_book in hardcover_books:
         hc_title = hc_book.get("title", "")
         hc_title_norm = normalize_title(hc_title)
+        hc_title_core = canonicalize_title_for_match(hc_title)
         hc_authors = hc_book.get("authors") or hc_book.get("author_names") or []
         hc_author = hc_authors[0] if hc_authors else ""
         hc_position = hc_book.get("position")
@@ -187,6 +217,8 @@ def match_books_across_sources(
         best_score = 0
 
         for abs_book in abs_books:
+            abs_title_core = canonicalize_title_for_match(abs_book.title)
+
             # ASIN match
             if hc_asin and abs_book.asin:
                 if hc_asin.lower() == abs_book.asin.lower():
@@ -199,12 +231,17 @@ def match_books_across_sources(
                     best_match, best_score = abs_book, 200
                     break
 
-            # Title matching
+            # Title matching with tolerant normalization
             score = 0
-            if abs_book.title_normalized == hc_title_norm:
-                score += 100
-            elif abs_book.title_normalized in hc_title_norm or hc_title_norm in abs_book.title_normalized:
-                score += 50
+            if abs_book.title_normalized == hc_title_norm or abs_title_core == hc_title_core:
+                score += 120  # Prefer ABS title when core matches
+            elif (
+                abs_book.title_normalized in hc_title_norm
+                or hc_title_norm in abs_book.title_normalized
+                or abs_title_core in hc_title_core
+                or hc_title_core in abs_title_core
+            ):
+                score += 90
             else:
                 continue  # No title match = skip
 
@@ -213,14 +250,16 @@ def match_books_across_sources(
                 abs_author_norm = normalize_author(abs_book.author)
                 hc_author_norm = normalize_author(hc_author)
                 if abs_author_norm == hc_author_norm:
-                    score += 50
+                    score += 40
                 elif abs_author_norm in hc_author_norm or hc_author_norm in abs_author_norm:
-                    score += 25
+                    score += 20
 
-            # Position matching
-            if abs_book.series_index and hc_position:
+            # Position matching (tolerant of slight drift)
+            if abs_book.series_index is not None and hc_position is not None:
                 if abs_book.series_index == hc_position:
                     score += 25
+                elif abs(abs_book.series_index - hc_position) <= 1:
+                    score += 15
 
             if score > best_score:
                 best_match, best_score = abs_book, score
@@ -231,6 +270,22 @@ def match_books_across_sources(
             "abs": best_match.__dict__ if best_match else None,
             "score": best_score,
         }
+
+        if best_match is not None:
+            entry["position_abs"] = best_match.series_index
+        if hc_position is not None:
+            entry["position_hc"] = hc_position
+
+        if best_match and hc_position is not None and best_match.series_index is not None:
+            if abs(best_match.series_index - hc_position) > 0.01:
+                result.discrepancies.append({
+                    "type": "position_mismatch",
+                    "abs": best_match.__dict__,
+                    "hardcover": hc_book,
+                    "position_abs": best_match.series_index,
+                    "position_hc": hc_position,
+                    "score": best_score,
+                })
 
         if best_score >= 100:
             result.present.append(entry)

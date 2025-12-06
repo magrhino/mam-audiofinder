@@ -114,3 +114,36 @@ class TestMatchBooksAcrossSources:
 
         result = match_books_across_sources(abs_books, hc_books)
         assert len(result.abs_only) == 1
+
+    def test_disc_suffix_and_position_discrepancy(self):
+        """Disc/part suffixes still match and record position mismatches."""
+        abs_books = [
+            BookInSeries(
+                id="abs1", title="The Bands of Mourning (1 of 2)", title_normalized="bands of mourning 1 of 2",
+                series_index=14.0, author="Brandon Sanderson", source=SeriesSource.ABS
+            )
+        ]
+        hc_books = [
+            {"book_id": 1, "title": "The Bands of Mourning", "position": 16, "authors": ["Brandon Sanderson"]}
+        ]
+
+        result = match_books_across_sources(abs_books, hc_books)
+        assert len(result.present) == 1
+        assert result.present[0]["score"] >= 100
+        assert any(d.get("type") == "position_mismatch" for d in result.discrepancies)
+
+    def test_adaptation_suffixes_match(self):
+        """Adaptation suffixes should not block matches."""
+        abs_books = [
+            BookInSeries(
+                id="abs1", title="Warbreaker (Dramatized Adaptation)", title_normalized="warbreaker dramatized adaptation",
+                author="Brandon Sanderson", series_index=5.0, source=SeriesSource.ABS
+            )
+        ]
+        hc_books = [
+            {"book_id": 2, "title": "Warbreaker", "position": 6}
+        ]
+
+        result = match_books_across_sources(abs_books, hc_books)
+        assert len(result.present) == 1
+        assert result.present[0]["score"] >= 100

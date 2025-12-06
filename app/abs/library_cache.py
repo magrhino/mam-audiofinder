@@ -2,9 +2,10 @@
 
 import asyncio
 import logging
+import re
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 
 from db.db import covers_engine
 from utils import normalize_title, normalize_author
@@ -101,46 +102,107 @@ class LibraryCache:
             """), {"lib_id": self.library_id, "in_progress": int(in_progress)})
 
     def _upsert_items(self, items: List[dict]) -> None:
-        """Bulk upsert items with pre-computed normalized fields."""
+        """Bulk upsert items with pre-computed normalized fields (multi-series aware)."""
         with covers_engine.begin() as conn:
-            # Clear existing items for this library
+            # Reset cache for this library before inserting fresh data
             conn.execute(text("""
                 DELETE FROM library_items WHERE library_id = :lib_id
             """), {"lib_id": self.library_id})
+            conn.execute(text("""
+                DELETE FROM library_item_series WHERE library_id = :lib_id
+            """), {"lib_id": self.library_id})
+
+            item_rows = []
+            series_rows = []
+
+            def parse_series_tokens(raw_name: Optional[str], sequence_value) -> List[Tuple[Optional[str], Optional[float]]]:
+                if not isinstance(raw_name, str):
+                    return []
+
+                parts = [p.strip() for p in raw_name.split(',') if p and p.strip()]
+                results: List[Tuple[Optional[str], Optional[float]]] = []
+
+                for part in parts:
+                    base = part
+                    index = None
+
+                    if sequence_value is not None:
+                        try:
+                            index = float(sequence_value)
+                        except (ValueError, TypeError):
+                            index = None
+
+                    match = re.match(r"^(.*?)(?:\s*#\s*(\d+(?:\.\d+)?))$", base)
+                    if match:
+                        base = match.group(1).strip()
+                        if index is None:
+                            try:
+                                index = float(match.group(2))
+                            except (ValueError, TypeError):
+                                index = None
+                    else:
+                        base = base.strip()
+
+                    if base:
+                        results.append((base, index))
+
+                return results
 
             for item in items:
                 metadata = item.get("media", {}).get("metadata", {})
                 title = metadata.get("title", "")
                 author = metadata.get("authorName", "")
 
-                # Extract series index from metadata
-                # ABS stores series as list: [{"name": "...", "sequence": "1"}]
-                # or as flat fields: seriesName + series (sequence)
+                raw_series_name = metadata.get("seriesName")
+                series_list = metadata.get("series", []) if isinstance(metadata.get("series", []), list) else []
+
+                item_series_rows = []
+                seen_keys = set()
+
+                # Collect all series mappings for this item from explicit series list
+                for series_entry in series_list:
+                    if not isinstance(series_entry, dict):
+                        continue
+                    raw_name = series_entry.get("name") or raw_series_name
+                    tokens = parse_series_tokens(raw_name, series_entry.get("sequence"))
+                    for mapped_name, mapped_index in tokens:
+                        key = (mapped_name, mapped_index)
+                        if key in seen_keys:
+                            continue
+                        seen_keys.add(key)
+                        item_series_rows.append({
+                            "item_id": item.get("id"),
+                            "lib_id": self.library_id,
+                            "series": mapped_name,
+                            "series_index": mapped_index,
+                        })
+
+                # Fallback: parse seriesName if series array missing
+                if not item_series_rows and raw_series_name:
+                    tokens = parse_series_tokens(raw_series_name, None)
+                    for mapped_name, mapped_index in tokens:
+                        key = (mapped_name, mapped_index)
+                        if key in seen_keys:
+                            continue
+                        seen_keys.add(key)
+                        item_series_rows.append({
+                            "item_id": item.get("id"),
+                            "lib_id": self.library_id,
+                            "series": mapped_name,
+                            "series_index": mapped_index,
+                        })
+
+                series_rows.extend(item_series_rows)
+
+                # Preserve backward-compatible single-series columns using the first mapping (if any)
+                series_name = None
                 series_index = None
-                series_name = metadata.get("seriesName")
-                series_list = metadata.get("series", [])
+                if item_series_rows:
+                    first_mapping = item_series_rows[0]
+                    series_name = first_mapping["series"]
+                    series_index = first_mapping["series_index"]
 
-                if series_list and isinstance(series_list, list) and len(series_list) > 0:
-                    first_series = series_list[0]
-                    if isinstance(first_series, dict):
-                        series_name = first_series.get("name") or series_name
-                        seq = first_series.get("sequence")
-                        if seq:
-                            try:
-                                series_index = float(seq)
-                            except (ValueError, TypeError):
-                                pass
-
-                conn.execute(text("""
-                    INSERT INTO library_items
-                    (id, library_id, title, author, narrator, series_name, series_index,
-                     asin, isbn, cover_path, duration_seconds, path,
-                     title_normalized, author_normalized, synced_at)
-                    VALUES
-                    (:id, :lib_id, :title, :author, :narrator, :series, :series_index,
-                     :asin, :isbn, :cover, :duration, :path,
-                     :title_norm, :author_norm, datetime('now'))
-                """), {
+                item_rows.append({
                     "id": item.get("id"),
                     "lib_id": self.library_id,
                     "title": title,
@@ -157,6 +219,26 @@ class LibraryCache:
                     "author_norm": normalize_author(author),
                 })
 
+            if item_rows:
+                conn.execute(text("""
+                    INSERT INTO library_items
+                    (id, library_id, title, author, narrator, series_name, series_index,
+                     asin, isbn, cover_path, duration_seconds, path,
+                     title_normalized, author_normalized, synced_at)
+                    VALUES
+                    (:id, :lib_id, :title, :author, :narrator, :series, :series_index,
+                     :asin, :isbn, :cover, :duration, :path,
+                     :title_norm, :author_norm, datetime('now'))
+                """), item_rows)
+
+            if series_rows:
+                conn.execute(text("""
+                    INSERT INTO library_item_series
+                    (item_id, library_id, series_name, series_index)
+                    VALUES
+                    (:item_id, :lib_id, :series, :series_index)
+                """), series_rows)
+
     def _update_sync_status(self, count: int) -> None:
         """Update sync status after successful sync."""
         with covers_engine.begin() as conn:
@@ -170,32 +252,49 @@ class LibraryCache:
             """), {"lib_id": self.library_id, "count": count})
 
     def check_presence(self, items: List[Tuple[str, str]]) -> Dict[str, bool]:
-        """Check presence of (title, author) pairs in library."""
-        results = {}
+        """Check presence of (title, author) pairs in library with a single query."""
+        if not items:
+            return {}
+
+        normalized_pairs = []
+        title_norms = set()
+        for title, author in items:
+            title_norm = normalize_title(title)
+            author_norm = normalize_author(author)
+            normalized_pairs.append((title_norm, author_norm))
+            title_norms.add(title_norm)
+
+        results: Dict[str, bool] = {f"{t}||{a}": False for t, a in normalized_pairs}
 
         with covers_engine.connect() as conn:
-            for title, author in items:
-                # Normalize keys to align with callers (which lowercase/strip)
-                title_norm = normalize_title(title)
-                author_norm = normalize_author(author)
-                cache_key = f"{title_norm}||{author_norm}"
-
-                row = conn.execute(text("""
-                    SELECT 1 FROM library_items
+            rows = conn.execute(
+                text("""
+                    SELECT title_normalized, author_normalized
+                    FROM library_items
                     WHERE library_id = :lib_id
-                      AND title_normalized = :title_norm
-                      AND (author_normalized = :author_norm
-                           OR author_normalized LIKE :author_pattern
-                           OR :author_norm LIKE '%' || author_normalized || '%')
-                    LIMIT 1
-                """), {
-                    "lib_id": self.library_id,
-                    "title_norm": title_norm,
-                    "author_norm": author_norm,
-                    "author_pattern": f"%{author_norm}%",
-                }).fetchone()
+                      AND title_normalized IN :title_norms
+                """)
+                .bindparams(bindparam("title_norms", expanding=True)),
+                {"lib_id": self.library_id, "title_norms": list(title_norms)},
+            ).fetchall()
 
-                results[cache_key] = row is not None
+            by_title = {}
+            for row in rows:
+                by_title.setdefault(row.title_normalized, []).append(row.author_normalized)
+
+            for title_norm, author_norm in normalized_pairs:
+                key = f"{title_norm}||{author_norm}"
+                authors = by_title.get(title_norm)
+                if not authors:
+                    continue
+
+                for candidate_author in authors:
+                    if candidate_author == author_norm:
+                        results[key] = True
+                        break
+                    if author_norm in candidate_author or candidate_author in author_norm:
+                        results[key] = True
+                        break
 
         return results
 
@@ -267,63 +366,86 @@ class LibraryCache:
             return best_item, best_score
 
     def get_series_books(self, series_name: str) -> List[LibraryItem]:
-        """Get all books belonging to a series."""
+        """Get all books belonging to a series (multi-series aware)."""
         with covers_engine.connect() as conn:
             rows = conn.execute(text("""
-                SELECT * FROM library_items
-                WHERE library_id = :lib_id
-                  AND series_name IS NOT NULL
-                  AND (
-                      series_name = :name
-                      OR series_name LIKE :pattern
-                  )
-                ORDER BY series_index NULLS LAST, title_normalized
+                SELECT li.*, sis.series_name AS mapped_series_name, sis.series_index AS mapped_series_index
+                FROM library_item_series sis
+                JOIN library_items li
+                  ON li.id = sis.item_id AND li.library_id = sis.library_id
+                WHERE sis.library_id = :lib_id
+                  AND sis.series_name = :name
+                ORDER BY sis.series_index NULLS LAST, li.title_normalized
             """), {
                 "lib_id": self.library_id,
                 "name": series_name,
-                "pattern": f"{series_name} #%",
             }).fetchall()
 
             return [self._row_to_item(row) for row in rows]
 
     def get_series_summary(self) -> List[Dict]:
-        """Get aggregated series summary for fast UI rendering."""
+        """Get aggregated series summary (supports books mapped to multiple series)."""
         with covers_engine.connect() as conn:
-            rows = conn.execute(text("""
-                SELECT
-                    series_name,
-                    COUNT(*) as book_count,
-                    MIN(series_index) as first_index,
-                    MAX(series_index) as last_index,
-                    GROUP_CONCAT(title, ' | ') as titles
-                FROM library_items
-                WHERE library_id = :lib_id
-                  AND series_name IS NOT NULL
-                GROUP BY series_name
-                ORDER BY series_name
+            series_rows = conn.execute(text("""
+                SELECT sis.series_name,
+                       sis.series_index,
+                       li.author
+                FROM library_item_series sis
+                JOIN library_items li
+                  ON li.id = sis.item_id AND li.library_id = sis.library_id
+                WHERE sis.library_id = :lib_id
             """), {"lib_id": self.library_id}).fetchall()
 
-            return [
-                {
-                    "name": row.series_name,
-                    "book_count": row.book_count,
-                    "first_index": row.first_index,
-                    "last_index": row.last_index,
-                    "titles": row.titles.split(" | ") if row.titles else [],
-                }
-                for row in rows
-            ]
+        summaries: Dict[str, Dict] = {}
+        for row in series_rows:
+            entry = summaries.setdefault(row.series_name, {
+                "name": row.series_name,
+                "book_count": 0,
+                "first_index": None,
+                "last_index": None,
+                "authors": [],
+            })
+            entry["book_count"] += 1
+            if row.series_index is not None:
+                if entry["first_index"] is None or row.series_index < entry["first_index"]:
+                    entry["first_index"] = row.series_index
+                if entry["last_index"] is None or row.series_index > entry["last_index"]:
+                    entry["last_index"] = row.series_index
+            if row.author:
+                entry["authors"].append(row.author)
+
+        # Derive most common author for each series
+        from collections import Counter
+        result = []
+        for entry in summaries.values():
+            author = None
+            if entry["authors"]:
+                counts = Counter(entry["authors"])
+                author = counts.most_common(1)[0][0]
+            result.append({
+                "name": entry["name"],
+                "book_count": entry["book_count"],
+                "first_index": entry["first_index"],
+                "last_index": entry["last_index"],
+                "author": author,
+            })
+
+        return sorted(result, key=lambda x: x["name"])
 
     def _row_to_item(self, row) -> LibraryItem:
         """Convert database row to LibraryItem model."""
+        series_index = getattr(row, 'mapped_series_index', None)
+        if series_index is None:
+            series_index = getattr(row, 'series_index', None)
+
         return LibraryItem(
             id=row.id,
             library_id=row.library_id,
             title=row.title,
             author=row.author,
             narrator=row.narrator,
-            series_name=row.series_name,
-            series_index=getattr(row, 'series_index', None),
+            series_name=getattr(row, 'mapped_series_name', None) or row.series_name,
+            series_index=series_index,
             asin=row.asin,
             isbn=row.isbn,
             cover_path=row.cover_path,

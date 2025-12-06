@@ -18,6 +18,7 @@ def mock_abs_client():
     mock_client.get_books_in_series = AsyncMock(return_value=[])
     mock_client._library_cache = MagicMock()
     mock_client._library_cache.ensure_fresh = AsyncMock()
+    mock_client._library_cache.find_best_match = MagicMock(return_value=(None, 0))
 
     with patch('routes.library_route.abs_client', mock_client):
         yield mock_client

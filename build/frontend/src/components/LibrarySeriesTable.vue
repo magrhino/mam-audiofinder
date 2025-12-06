@@ -36,8 +36,13 @@ const columns = [
   {
     title: 'Books',
     key: 'book_count',
-    width: 80,
+    width: 120,
     align: 'center',
+    render: (row) => {
+      const absCount = row.abs_book_count ?? row.book_count
+      const seriesCount = row.series_book_count ?? row.book_count
+      return `${absCount ?? 0} / ${seriesCount ?? 0}`
+    },
   },
   {
     title: 'Source',

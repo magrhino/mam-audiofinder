@@ -34,6 +34,8 @@ class SeriesListItem(BaseModel):
     name_normalized: str
     author: Optional[str] = None
     book_count: int = 0
+    abs_book_count: int = 0
+    series_book_count: int = 0
     source: str = "abs"
     abs_series_id: Optional[str] = None
     hardcover_series_id: Optional[int] = None
@@ -97,23 +99,27 @@ async def list_series(
     logger.info(f"[LIBRARY] GET /api/library/series - source={source}, q={q!r}, page={page}, limit={limit}")
     results: List[SeriesInfo] = []
 
-    # Fetch from ABS
+    # Fetch from ABS (multi-series aware via cache)
     if source in ("abs", "both"):
         logger.info(f"[LIBRARY] Checking ABS: is_configured={abs_client.is_configured}")
         if abs_client.is_configured:
-            logger.info(f"[LIBRARY] Fetching series list from ABS...")
+            logger.info(f"[LIBRARY] Fetching series list from ABS cache...")
             abs_series = await abs_client.get_series_list()
             logger.info(f"[LIBRARY] ABS returned {len(abs_series)} series")
 
             for s in abs_series:
                 name = s.get("name", "")
+                author = s.get("author")
+                book_count = s.get("book_count", 0)
                 results.append(SeriesInfo(
-                    id=generate_series_id(name),
+                    id=generate_series_id(name, author or ""),
                     name=name,
                     name_normalized=normalize_series_name(name),
-                    book_count=len(s.get("books", [])),
+                    author=author,
+                    book_count=book_count,
+                    abs_book_count=book_count,
+                    series_book_count=book_count,
                     source=SeriesSource.ABS,
-                    abs_series_id=s.get("id"),
                 ))
 
     # Fetch from Hardcover (requires query)
@@ -128,12 +134,15 @@ async def list_series(
                 for s in hc_results:
                     name = s.get("series_name", "")
                     author = s.get("author_name", "")
+                    series_book_count = s.get("book_count", 0)
                     results.append(SeriesInfo(
                         id=generate_series_id(name, author),
                         name=name,
                         name_normalized=normalize_series_name(name),
                         author=author,
-                        book_count=s.get("book_count", 0),
+                        book_count=series_book_count,
+                        abs_book_count=0,
+                        series_book_count=series_book_count,
                         source=SeriesSource.HARDCOVER,
                         hardcover_series_id=s.get("series_id"),
                     ))
@@ -280,6 +289,34 @@ async def diff_series(
                 hardcover_books.append(book_or_books)
 
         logger.info(f"✅ Resolved to {len(hardcover_books)} English edition(s) from {len(hardcover_books_raw)} raw book(s)")
+
+    # Fallback: if Hardcover has books that ABS series mapping missed, try to find them in the library
+    if abs_client._library_cache and hardcover_books:
+        fallback_abs = []
+        existing_abs_ids = {b.id for b in abs_books}
+        for hc_book in hardcover_books:
+            title = hc_book.get("title", "")
+            hc_authors = hc_book.get("authors") or hc_book.get("author_names") or []
+            author = hc_authors[0] if hc_authors else ""
+            match, _score = abs_client._library_cache.find_best_match(title=title, author=author)
+            if not match or match.id in existing_abs_ids:
+                continue
+            fallback_abs.append(BookInSeries(
+                id=match.id,
+                title=match.title,
+                title_normalized=match.title_normalized or normalize_title(match.title),
+                author=match.author,
+                series_index=match.series_index,
+                asin=match.asin,
+                isbn=match.isbn,
+                source=SeriesSource.ABS,
+                abs_item_id=match.id,
+            ))
+            existing_abs_ids.add(match.id)
+
+        if fallback_abs:
+            logger.info(f"➕ Added {len(fallback_abs)} ABS library fallback match(es) not mapped to series")
+            abs_books.extend(fallback_abs)
 
     # Perform diff
     result = match_books_across_sources(abs_books, hardcover_books)
