@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # Import configuration first
-from config import LOG_MAX_MB, LOG_MAX_FILES, LOG_DIR
+from config import LOG_MAX_MB, LOG_MAX_FILES, LOG_DIR, DEBUG_MODE
 
 # ---------------------------- Logging Setup ----------------------------
 # Ensure log directory exists
@@ -21,14 +21,19 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Create logger
 logger = logging.getLogger("mam-audiofinder")
-logger.setLevel(logging.INFO)
+
+# Set log level based on DEBUG_MODE environment variable
+if DEBUG_MODE:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
 
 # Clear any existing handlers
 logger.handlers.clear()
 
 # Console handler for Docker (always active)
 console_handler = logging.StreamHandler(sys.stderr)
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
 console_formatter = logging.Formatter('%(message)s')
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
@@ -40,12 +45,14 @@ file_handler = RotatingFileHandler(
     maxBytes=LOG_MAX_MB * 1024 * 1024,  # Convert MB to bytes
     backupCount=LOG_MAX_FILES
 )
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
 file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
 logger.info(f"Logging initialized: {log_file} (max {LOG_MAX_MB}MB, {LOG_MAX_FILES} files)")
+if DEBUG_MODE:
+    logger.debug("🔍 Debug mode enabled")
 
 # ---------------------------- Database Initialization ----------------------------
 from db import initialize_databases

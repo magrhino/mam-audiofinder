@@ -57,6 +57,10 @@ _abs_fully_configured = bool(ABS_BASE_URL and ABS_API_KEY and ABS_LIBRARY_ID)
 ABS_CHECK_LIBRARY = os.getenv("ABS_CHECK_LIBRARY", str(_abs_fully_configured)).lower() in ("true", "1", "yes")
 ABS_LIBRARY_CACHE_TTL = int(os.getenv("ABS_LIBRARY_CACHE_TTL", "300"))  # Cache duration in seconds (default: 5 minutes)
 
+# ---------------------------- Debug Configuration ----------------------------
+DEBUG_MODE = os.getenv("DEBUG_MODE", "0") == "1"  # Enable debug logging globally
+DEBUG_MATCHING = os.getenv("DEBUG_MATCHING", "0") == "1"  # Enable verbose matching debug logs
+
 # ---------------------------- Hardcover API Configuration ----------------------------
 HARDCOVER_API_TOKEN = os.getenv("HARDCOVER_API_TOKEN", "")
 HARDCOVER_BASE_URL = "https://api.hardcover.app/v1/graphql"
