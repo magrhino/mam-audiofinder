@@ -9,7 +9,7 @@ from sqlalchemy import text
 from db.db import covers_engine
 from utils import normalize_title, normalize_author
 from abs.models import LibraryItem, LibrarySyncStatus
-from abs.matching import calculate_match_score, determine_verification_status
+from abs.matching import calculate_match_score
 
 logger = logging.getLogger("mam-audiofinder")
 
