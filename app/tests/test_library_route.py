@@ -63,7 +63,9 @@ class TestSeriesEndpoint:
             {"series_id": 123, "series_name": "Test"}
         ]
         mock_hardcover_client.list_series_books.return_value = {
-            "books": [{"book_id": 1, "title": "Book One"}]
+            "books": [
+                {"book_id": 1, "title": "Book One", "position": 1.0}
+            ]
         }
 
         response = client.get("/api/library/series/Test/diff")

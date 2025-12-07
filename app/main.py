@@ -78,7 +78,7 @@ except Exception as e:
 app = FastAPI(title="MAM Audiobook Finder", version="0.4.0")
 
 # Mount static files (including Vue build output at /static/dist)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 # Include all routes
 from routes import main_router
@@ -94,7 +94,7 @@ async def spa_fallback(full_path: str):
     Fallback route for Vue Router history mode.
     Serves the SPA index.html for any GET request not handled by API routes.
     """
-    return FileResponse("static/dist/index.html")
+    return FileResponse(Path(__file__).parent / "static" / "dist" / "index.html")
 
 # ---------------------------- Startup Event ----------------------------
 from abs_client import abs_client

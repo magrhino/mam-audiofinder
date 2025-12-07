@@ -13,6 +13,8 @@ logger = logging.getLogger("mam-audiofinder")
 # ---------------------------- Database Engines ----------------------------
 # Main history database
 engine = create_engine(f"sqlite:///{HISTORY_DB_PATH}", future=True)
+# Alias for backward compatibility
+history_engine = engine
 
 # Covers database - separate from history to cache covers before adding to qBittorrent
 # Configure connection pool to handle concurrent cover fetches better
@@ -110,7 +112,8 @@ def run_migrations():
             "create table history",
             "create table if not exists history",
             "insert into history",
-            "create index if not exists idx_history"
+            "create index if not exists idx_history",
+            "library_wishlist"
         ])
 
         targets_covers = any(pattern in sql_content for pattern in [
