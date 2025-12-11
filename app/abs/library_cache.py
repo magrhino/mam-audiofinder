@@ -4,7 +4,7 @@ import asyncio
 import logging
 import re
 from typing import List, Dict, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text, bindparam
 
 from db.db import covers_engine
@@ -39,8 +39,11 @@ class LibraryCache:
                 last_sync = row.last_full_sync
                 cache_age = 0
                 if last_sync:
+                    # SQLite datetime('now') returns naive timestamps, so parse and add UTC timezone
                     sync_time = datetime.fromisoformat(last_sync.replace("Z", "+00:00"))
-                    cache_age = (datetime.utcnow() - sync_time.replace(tzinfo=None)).total_seconds()
+                    if sync_time.tzinfo is None:
+                        sync_time = sync_time.replace(tzinfo=timezone.utc)
+                    cache_age = (datetime.now(timezone.utc) - sync_time).total_seconds()
 
                 return LibrarySyncStatus(
                     library_id=row.library_id,

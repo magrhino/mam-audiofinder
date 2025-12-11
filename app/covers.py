@@ -5,7 +5,7 @@ Handles cover caching, downloading, and serving.
 import logging
 import httpx
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text
 
 from config import COVERS_DIR, MAX_COVERS_SIZE_MB, ABS_BASE_URL, ABS_API_KEY
@@ -422,10 +422,10 @@ class CoverService:
                     "item_id": item_id,
                     "local_file": local_file,
                     "file_size": file_size,
-                    "fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                    "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
                     "description": description if description else None,
                     "metadata": metadata_json_str,
-                    "metadata_fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if metadata_json else None,
+                    "metadata_fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if metadata_json else None,
                     "has_audiobook": has_audiobook,
                     "duration": duration_minutes
                 })
@@ -462,7 +462,7 @@ class CoverService:
                         "mam_id": mam_id,
                         "cover_url": final_cover_url,  # Use local URL if available
                         "item_id": item_id,
-                        "cached_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                        "cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                     })
                     if result.rowcount > 0:
                         logger.info(f"✅ Updated {result.rowcount} history row(s) with cover for MAM ID {mam_id}")

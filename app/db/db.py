@@ -4,7 +4,7 @@ Handles database engine setup and migration execution.
 """
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
 from config import HISTORY_DB_PATH, COVERS_DB_PATH, SERIES_DB_PATH
 
@@ -221,7 +221,7 @@ def run_migrations():
             with target_engine.begin() as cx:
                 cx.execute(
                     text("INSERT INTO applied_migrations (filename, applied_at) VALUES (:filename, :applied_at)"),
-                    {"filename": migration_file.name, "applied_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}
+                    {"filename": migration_file.name, "applied_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")}
                 )
 
             logger.info(f"    ✓ {migration_file.name} completed")

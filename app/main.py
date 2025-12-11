@@ -5,6 +5,7 @@ adding them to qBittorrent, and importing to Audiobookshelf.
 """
 import logging
 import sys
+from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -74,8 +75,31 @@ except Exception as e:
     logger.error(f"📁 Data directory: {DATA_DIR}")
     raise
 
+# ---------------------------- Application Lifespan ----------------------------
+from abs_client import abs_client
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for application startup and shutdown.
+    Replaces deprecated @app.on_event("startup") and @app.on_event("shutdown").
+    """
+    # Startup
+    logger.info("🚀 Starting MAM Audiobook Finder v0.4.0")
+    await abs_client.test_connection()
+    logger.info("✅ Application startup complete")
+
+    yield
+
+    # Shutdown (if needed in the future)
+    logger.info("👋 Application shutdown")
+
 # ---------------------------- FastAPI Application ----------------------------
-app = FastAPI(title="MAM Audiobook Finder", version="0.4.0")
+app = FastAPI(
+    title="MAM Audiobook Finder",
+    version="0.4.0",
+    lifespan=lifespan
+)
 
 # Mount static files (including Vue build output at /static/dist)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -95,13 +119,3 @@ async def spa_fallback(full_path: str):
     Serves the SPA index.html for any GET request not handled by API routes.
     """
     return FileResponse(Path(__file__).parent / "static" / "dist" / "index.html")
-
-# ---------------------------- Startup Event ----------------------------
-from abs_client import abs_client
-
-@app.on_event("startup")
-async def startup_event():
-    """Run startup tests."""
-    logger.info("🚀 Starting MAM Audiobook Finder v0.4.0")
-    await abs_client.test_connection()
-    logger.info("✅ Application startup complete")

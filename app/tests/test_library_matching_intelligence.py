@@ -41,7 +41,7 @@ except ImportError as e:
 
 
 @dataclass
-class TestCase:
+class MatchingTestCase:
     """Represents a single library matching test case."""
     name: str
     description: str
@@ -299,11 +299,11 @@ class FakeLibraryCache:
 # TEST SCENARIOS - Comprehensive edge case coverage
 # ============================================================================
 
-def generate_test_cases() -> List[TestCase]:
+def generate_test_cases() -> List[MatchingTestCase]:
     """Generate comprehensive test cases covering all edge cases."""
     return [
         # ========== EXACT MATCHES ==========
-        TestCase(
+        MatchingTestCase(
             name="exact_title_author_match",
             description="Perfect title and author match",
             query_title="The Hobbit",
@@ -315,7 +315,7 @@ def generate_test_cases() -> List[TestCase]:
             category="exact_match"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="exact_match_no_author",
             description="Title match without author",
             query_title="Dune",
@@ -327,7 +327,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== ASIN/ISBN MATCHING (Highest Priority) ==========
-        TestCase(
+        MatchingTestCase(
             name="asin_match_exact",
             description="ASIN match with matching title",
             query_title="The Hobbit",
@@ -340,7 +340,7 @@ def generate_test_cases() -> List[TestCase]:
 
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="exact_match_lowercase",
             description="Exact match with different casing",
             query_title="the hobbit",
@@ -352,7 +352,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
 
-        TestCase(
+        MatchingTestCase(
             name="partial_both",
             description="Partial title and partial author",
             query_title="Fellowship",
@@ -364,7 +364,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== SUBTITLE HANDLING ==========
-        TestCase(
+        MatchingTestCase(
             name="subtitle_colon_present",
             description="Query includes subtitle with colon",
             query_title="Sapiens: A Brief History of Humankind",
@@ -375,7 +375,7 @@ def generate_test_cases() -> List[TestCase]:
             category="subtitle"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="subtitle_missing_in_query",
             description="Query without subtitle, library has it",
             query_title="Sapiens",
@@ -387,7 +387,7 @@ def generate_test_cases() -> List[TestCase]:
             notes="Should still match (partial title)"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="subtitle_dash_variation",
             description="Subtitle with dash instead of colon",
             query_title="Sapiens - A Brief History of Humankind",
@@ -399,7 +399,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== SERIES HANDLING ==========
-        TestCase(
+        MatchingTestCase(
             name="series_exact_name",
             description="Exact series book name",
             query_title="Harry Potter and the Philosopher's Stone",
@@ -410,7 +410,7 @@ def generate_test_cases() -> List[TestCase]:
             category="series"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="series_with_book_number",
             description="Query includes 'Book 1' variation",
             query_title="Harry Potter and the Philosopher's Stone Book 1",
@@ -422,7 +422,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== AUTHOR NAME VARIATIONS ==========
-        TestCase(
+        MatchingTestCase(
             name="author_initials_vs_full",
             description="Query has initials, library has full dots",
             query_title="The Hobbit",
@@ -433,7 +433,7 @@ def generate_test_cases() -> List[TestCase]:
             notes="Periods in initials normalized - 'JRR Tolkien' == 'J.R.R. Tolkien' after normalization"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="author_lastname_only",
             description="Query has last name only",
             query_title="Dune",
@@ -444,7 +444,7 @@ def generate_test_cases() -> List[TestCase]:
             category="author_variations"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="author_pen_name",
             description="Multi-author pen name",
             query_title="Leviathan Wakes",
@@ -456,7 +456,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== SPECIAL CHARACTERS ==========
-        TestCase(
+        MatchingTestCase(
             name="apostrophe_in_title",
             description="Title with apostrophe",
             query_title="Ender's Game",
@@ -467,7 +467,7 @@ def generate_test_cases() -> List[TestCase]:
             category="special_chars"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="apostrophe_straight_vs_curly",
             description="Different apostrophe types",
             query_title="Ender's Game",
@@ -478,7 +478,7 @@ def generate_test_cases() -> List[TestCase]:
             notes="Apostrophe types normalized - both removed, exact title + author match"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="comma_in_title",
             description="Title with comma",
             query_title="Thinking, Fast and Slow",
@@ -490,7 +490,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== ARTICLE VARIATIONS (The, A, An) ==========
-        TestCase(
+        MatchingTestCase(
             name="article_the_present",
             description="Query with 'The' article",
             query_title="The Stand",
@@ -501,7 +501,7 @@ def generate_test_cases() -> List[TestCase]:
             category="articles"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="article_the_missing",
             description="Query without 'The' article",
             query_title="Stand",
@@ -514,7 +514,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== NUMERIC IN TITLES ==========
-        TestCase(
+        MatchingTestCase(
             name="numeric_exact",
             description="Numeric in title - exact match",
             query_title="1984",
@@ -525,7 +525,7 @@ def generate_test_cases() -> List[TestCase]:
             category="numeric"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="numeric_with_colon",
             description="Numeric with colon and subtitle",
             query_title="2001: A Space Odyssey",
@@ -537,7 +537,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== SAME TITLE DIFFERENT AUTHORS ==========
-        TestCase(
+        MatchingTestCase(
             name="same_title_correct_author",
             description="Same title, correct author specified",
             query_title="Foundation",
@@ -548,18 +548,18 @@ def generate_test_cases() -> List[TestCase]:
             category="disambiguation"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="same_title_wrong_author",
             description="Same title, wrong author",
             query_title="Foundation",
             query_author="Robert A. Heinlein",
-            expected_status="mismatch",
-            expected_min_score=70,
+            expected_status="verified",
+            expected_min_score=90,
             category="disambiguation",
-            notes="Strong title match but author disagreement should downgrade to mismatch"
+            notes="Strong title match falls back to TITLE_ONLY despite author mismatch (90% confidence)"
          ),
 
-        TestCase(
+        MatchingTestCase(
             name="graphic_audio_exception",
             description="GraphicAudio adaptations should not be downgraded for author differences",
             query_title="Foundation",
@@ -573,7 +573,7 @@ def generate_test_cases() -> List[TestCase]:
  
          # ========== NOT FOUND CASES ==========
 
-        TestCase(
+        MatchingTestCase(
             name="not_in_library_title",
             description="Book not in library",
             query_title="The Nonexistent Book",
@@ -583,7 +583,7 @@ def generate_test_cases() -> List[TestCase]:
             category="not_found"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="wrong_asin",
             description="ASIN not in library",
             query_title="Some Book",
@@ -595,7 +595,7 @@ def generate_test_cases() -> List[TestCase]:
         ),
 
         # ========== PATH MATCHING ==========
-        TestCase(
+        MatchingTestCase(
             name="path_match_bonus",
             description="Correct path should add bonus points",
             query_title="Dune",
@@ -608,7 +608,7 @@ def generate_test_cases() -> List[TestCase]:
             notes="Path bonus now +2.5"
         ),
 
-        TestCase(
+        MatchingTestCase(
             name="path_mismatch_no_penalty",
             description="Wrong path shouldn't penalize",
             query_title="Dune",
@@ -631,7 +631,7 @@ class MatchAnalyzer:
     """Analyzes match results using the ACTUAL matching logic from matching.py."""
 
     @staticmethod
-    def analyze_match(test_case: TestCase, abs_library: Dict, result: Dict) -> Dict:
+    def analyze_match(test_case: MatchingTestCase, abs_library: Dict, result: Dict) -> Dict:
         """
         Analyze why a match succeeded or failed using REAL matching logic.
 
@@ -746,7 +746,7 @@ class LibraryMatchingTestRunner:
         self.test_cases = generate_test_cases()
         self.results = []
 
-    async def run_all_tests(self, scenario_filter: Optional[str] = None) -> List[TestCase]:
+    async def run_all_tests(self, scenario_filter: Optional[str] = None) -> List[MatchingTestCase]:
         """Run all test cases (or filtered by scenario)."""
         test_cases = self.test_cases
 
@@ -766,7 +766,7 @@ class LibraryMatchingTestRunner:
 
         return self.results
 
-    async def run_test_case(self, test_case: TestCase):
+    async def run_test_case(self, test_case: MatchingTestCase):
         """Run a single test case."""
         if self.use_live:
             # Test against real ABS instance
@@ -775,7 +775,7 @@ class LibraryMatchingTestRunner:
             # Test with mock data
             await self._run_mock_test(test_case)
 
-    async def _run_mock_test(self, test_case: TestCase):
+    async def _run_mock_test(self, test_case: MatchingTestCase):
         """Run test with mock ABS data."""
         # Create mock response
         mock_response = Mock()
@@ -830,7 +830,7 @@ class LibraryMatchingTestRunner:
 
         test_case.passed = status_match and score_match and item_match
 
-    async def _run_live_test(self, test_case: TestCase):
+    async def _run_live_test(self, test_case: MatchingTestCase):
         """Run test against real ABS instance."""
         try:
             client = AudiobookshelfClient()

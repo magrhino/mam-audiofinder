@@ -6,7 +6,7 @@ import logging
 import shutil
 import httpx
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -374,13 +374,13 @@ async def do_import(body: ImportBody):
         if body.history_id is not None:
             cx.execute(
                 text("UPDATE history SET qb_status='imported', imported_at=:ts WHERE id=:id"),
-                {"ts": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), "id": body.history_id},
+                {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), "id": body.history_id},
             )
         else:
             # Fallback: try by torrent hash if we have it
             cx.execute(
                 text("UPDATE history SET qb_status='imported', imported_at=:ts WHERE qb_hash=:h"),
-                {"ts": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), "h": body.hash},
+                {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), "h": body.hash},
             )
 
     # --- Read metadata.json if available (with retry for ABS scan) ---
@@ -789,7 +789,7 @@ async def do_multi_book_import(body: MultiBookImportBody):
         with engine.begin() as cx:
             cx.execute(
                 text("UPDATE history SET qb_status='imported', imported_at=:ts WHERE id=:id"),
-                {"ts": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), "id": body.history_id},
+                {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), "id": body.history_id},
             )
     except Exception as e:
         logger.error(f"❌ Failed to update history entry #{body.history_id}: {e}")

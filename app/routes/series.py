@@ -4,6 +4,7 @@ Handles series discovery and book listings.
 """
 import logging
 import asyncio
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -158,7 +159,7 @@ async def search_series(request: SeriesSearchRequest):
             },
             "hardcover_series": series_results,
             "cached": False,  # TODO: Detect cache hit from client
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         }
 
         logger.info(f"✅ Series search returned {len(series_results)} results")
@@ -589,7 +590,7 @@ async def get_series_books(
                     "series_id": series_id,
                     "enrichment_status": "not_found",
                     "message": "No enrichment job found for this series. Use enrich_mode=immediate to start one.",
-                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
                 })
 
             # Return enriched books (may be partial if in_progress)
@@ -608,7 +609,7 @@ async def get_series_books(
                 "enrichment_status": status_info["status"],
                 "enrichment_progress": status_info["progress"],
                 "total": len(enriched_books) if enriched_books else status_info["progress"]["total"],
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
             }
 
             logger.info(f"📊 Status: {status_info['status']}, {status_info['progress']['completed']}/{status_info['progress']['total']} books enriched")
@@ -728,7 +729,7 @@ async def get_series_books(
                 "enrichment_status": "pending" if abs_client.is_configured else "not_configured",
                 "enrichment_progress": job.get_progress(),
                 "total": len(result['books']),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
             }
 
             logger.info(f"✅ Returned {len(result['books'])} basic books, enrichment starting")
@@ -752,7 +753,7 @@ async def get_series_books(
                 "books": enriched_books,
                 "enrichment_status": "complete",
                 "total": len(enriched_books),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
             }
 
             logger.info(f"✅ Returned {len(enriched_books)} fully enriched books")
@@ -768,7 +769,7 @@ async def get_series_books(
                 "books": result['books'],
                 "enrichment_status": "not_configured",
                 "total": len(result['books']),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
             }
 
             logger.info(f"✅ Returned {len(result['books'])} basic books (ABS not configured)")

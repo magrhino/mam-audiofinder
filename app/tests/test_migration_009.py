@@ -6,6 +6,7 @@ Run this inside the container to verify migration 009 works correctly.
 import sqlite3
 import tempfile
 import json
+import pytest
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -30,7 +31,7 @@ def test_series_cache_migration():
 
     if not migration_file.exists():
         print(f"❌ Migration file not found: {migration_file}")
-        return False
+        pytest.fail(f"Migration file not found: {migration_file}")
 
     sql = migration_file.read_text()
 
@@ -52,7 +53,7 @@ def test_series_cache_migration():
             print(f"   ✗ Error: {e}")
             conn.close()
             Path(db_path).unlink()
-            return False
+            pytest.fail(f"SQL execution failed: {e}")
 
     conn.commit()
 
@@ -66,7 +67,7 @@ def test_series_cache_migration():
         print("❌ series_cache table was not created!")
         conn.close()
         Path(db_path).unlink()
-        return False
+        pytest.fail("series_cache table was not created")
 
     print("✓ series_cache table exists")
 
@@ -266,14 +267,18 @@ def test_series_cache_migration():
     if all_columns_ok:
         print("✅ Migration 009 test PASSED - All checks successful!")
         print("="*70)
-        return True
     else:
         print("❌ Migration 009 test FAILED - Some checks failed")
         print("="*70)
-        return False
+        pytest.fail("Migration 009 test FAILED - Some checks failed")
 
 
 if __name__ == '__main__':
     import sys
-    success = test_series_cache_migration()
-    sys.exit(0 if success else 1)
+    try:
+        test_series_cache_migration()
+        print("\n✅ Test passed!")
+        sys.exit(0)
+    except (AssertionError, Exception) as e:
+        print(f"\n❌ Test failed: {e}")
+        sys.exit(1)

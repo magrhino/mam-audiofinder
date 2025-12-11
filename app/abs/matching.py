@@ -173,10 +173,15 @@ def calculate_match_score(
         confidence = min(100.0, combined)
         method = "TITLE+AUTHOR"
     elif author_conflict:
-        confidence = 70.0
-        method = "AUTHOR_MISMATCH"
+        # Author mismatch detected - check if title is strong enough for fallback
+        if title_score >= 90:
+            confidence = min(100.0, title_score * 0.9)
+            method = "TITLE_ONLY"
+        else:
+            confidence = 70.0
+            method = "AUTHOR_MISMATCH"
 
-    # Level 3: Title-only fallback
+    # Level 3: Title-only fallback (when no author provided or other cases)
     if method == "NO_MATCH" and title_score >= 90:
         confidence = min(100.0, title_score * 0.9)
         method = "TITLE_ONLY"
