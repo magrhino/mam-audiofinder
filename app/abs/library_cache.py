@@ -10,7 +10,7 @@ from sqlalchemy import text, bindparam
 from db.db import covers_engine
 from utils import normalize_title, normalize_author
 from abs.models import LibraryItem, LibrarySyncStatus
-from abs.matching import calculate_match_score
+from abs.matching import MatchResult, calculate_match_score
 
 logger = logging.getLogger("mam-audiofinder")
 
@@ -305,8 +305,10 @@ class LibraryCache:
         asin: Optional[str] = None,
         isbn: Optional[str] = None,
         path: Optional[str] = None,
-    ) -> Tuple[Optional[LibraryItem], int]:
-        """Find best matching library item with score."""
+    ) -> Tuple[Optional[LibraryItem], MatchResult]:
+        """Find best matching library item with structured score."""
+
+        empty_result = MatchResult(confidence=0.0, method="NO_MATCH")
 
         with covers_engine.connect() as conn:
             # Priority 1: ASIN exact match
@@ -316,7 +318,7 @@ class LibraryCache:
                     WHERE library_id = :lib_id AND asin = :asin
                 """), {"lib_id": self.library_id, "asin": asin}).fetchone()
                 if row:
-                    return self._row_to_item(row), 200
+                    return self._row_to_item(row), MatchResult(confidence=100.0, method="ASIN")
 
             # Priority 2: ISBN exact match
             if isbn:
@@ -325,7 +327,7 @@ class LibraryCache:
                     WHERE library_id = :lib_id AND isbn = :isbn
                 """), {"lib_id": self.library_id, "isbn": isbn}).fetchone()
                 if row:
-                    return self._row_to_item(row), 200
+                    return self._row_to_item(row), MatchResult(confidence=100.0, method="ISBN")
 
             # Priority 3: Title/author fuzzy match
             title_norm = normalize_title(title)
@@ -343,15 +345,15 @@ class LibraryCache:
             }).fetchall()
 
             if not candidates:
-                return None, 0
+                return None, empty_result
 
             # Score candidates
-            best_item = None
-            best_score = 0
+            best_item: Optional[LibraryItem] = None
+            best_result: MatchResult = empty_result
 
             for row in candidates:
                 item = self._row_to_item(row)
-                score = calculate_match_score(
+                result = calculate_match_score(
                     query_title=title,
                     query_author=author,
                     candidate=item,
@@ -359,11 +361,11 @@ class LibraryCache:
                     query_isbn=isbn,
                     query_path=path,
                 )
-                if score > best_score:
-                    best_score = score
+                if result.confidence > best_result.confidence:
+                    best_result = result
                     best_item = item
 
-            return best_item, best_score
+            return best_item, best_result
 
     def get_series_books(self, series_name: str) -> List[LibraryItem]:
         """Get all books belonging to a series (multi-series aware)."""

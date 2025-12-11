@@ -167,7 +167,7 @@ class AbsClient:
         isbn = metadata.get("isbn") if metadata else None
 
         # Find best match
-        match, score = self._library_cache.find_best_match(
+        match, result = self._library_cache.find_best_match(
             title=title,
             author=author,
             asin=asin,
@@ -181,23 +181,23 @@ class AbsClient:
                 note="Not found in library",
             )
 
-        status = determine_verification_status(score)
+        status = determine_verification_status(result.confidence)
 
-        if status == "verified":
-            note = f"Found in library: '{match.title}' by '{match.author}'"
-            if score >= 200:
-                note = f"ASIN/ISBN match: '{match.title}' by '{match.author}'"
+        if result.method in {"ASIN", "ISBN"}:
+            note = f"{result.method} match: '{match.title}' by '{match.author}'"
+        elif status == "verified":
+            note = f"Strong match ({result.method}): '{match.title}' by '{match.author}' (score: {result.score})"
         elif status == "mismatch":
-            note = f"Partial match: '{match.title}' by '{match.author}' (score: {score})"
+            note = f"Partial match: '{match.title}' by '{match.author}' (score: {result.score})"
         else:
-            note = f"Weak match: '{match.title}' (score: {score})"
+            note = f"Weak match: '{match.title}' (score: {result.score})"
 
         return VerificationResult(
             status=status,
             note=note,
             abs_item_id=match.id,
             matched_title=match.title,
-            score=score,
+            score=result.score,
         )
 
     # --- Covers ---

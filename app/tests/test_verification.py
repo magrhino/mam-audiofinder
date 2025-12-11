@@ -12,6 +12,9 @@ import sys
 # Add app to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'app'))
 
+from abs.matching import calculate_match_score, determine_verification_status
+from abs.models import LibraryItem
+
 
 class TestAudiobookshelfClientInit:
     """Test AudiobookshelfClient initialization."""
@@ -64,96 +67,77 @@ class TestAudiobookshelfClientInit:
 
 
 class TestVerificationMatchingLogic:
-    """Test the matching logic used in verify_import."""
+    """Test the unified matching logic used in verify_import."""
 
-    def test_exact_title_match(self):
-        """Test exact title matching gives high score."""
-        title_lower = "the hobbit"
-        item_title = "the hobbit"
+    def _item(self, **overrides):
+        base = {
+            "id": "lib-item-1",
+            "library_id": "lib-123",
+            "title": "The Hobbit",
+            "author": "J.R.R. Tolkien",
+            "asin": "B001234567",
+            "isbn": "9781234567890",
+            "path": "/audiobooks/tolkien/the hobbit",
+        }
+        base.update(overrides)
+        return LibraryItem(**base)
 
-        score = 0
-        if item_title == title_lower:
-            score += 100
+    def test_identifier_match(self):
+        candidate = self._item()
+        result = calculate_match_score(
+            query_title="The Hobbit",
+            query_author="J.R.R. Tolkien",
+            candidate=candidate,
+            query_asin="B001234567",
+        )
+        assert result.method == "ASIN"
+        assert result.confidence == 100.0
 
-        assert score == 100
+    def test_title_author_exact_match(self):
+        candidate = self._item()
+        result = calculate_match_score(
+            query_title="The Hobbit",
+            query_author="J.R.R. Tolkien",
+            candidate=candidate,
+        )
+        assert result.method == "TITLE+AUTHOR"
+        assert result.confidence >= 90
 
-    def test_partial_title_match(self):
-        """Test partial title matching gives medium score."""
-        title_lower = "hobbit"
-        item_title = "the hobbit"
+    def test_title_only_match(self):
+        candidate = self._item(author="")
+        result = calculate_match_score(
+            query_title="The Hobbit",
+            query_author="",
+            candidate=candidate,
+        )
+        assert result.method == "TITLE_ONLY"
+        assert result.confidence >= 80
 
-        score = 0
-        if title_lower in item_title or item_title in title_lower:
-            score += 50
+    def test_author_mismatch_limits_confidence(self):
+        candidate = self._item(author="Different Author")
+        result = calculate_match_score(
+            query_title="The Hobbit",
+            query_author="J.R.R. Tolkien",
+            candidate=candidate,
+        )
+        assert result.method == "TITLE_ONLY"
+        assert result.confidence == 90.0
 
-        assert score == 50
+    def test_path_bonus_applied(self):
+        candidate = self._item()
+        result = calculate_match_score(
+            query_title="The Hobbit",
+            query_author="J.R.R. Tolkien",
+            candidate=candidate,
+            query_path="/media/Books/Audiobooks/Tolkien/The Hobbit",
+        )
+        assert result.path_bonus > 0
+        assert result.confidence >= result.title_score * 0.9
 
-    def test_exact_author_match(self):
-        """Test exact author matching."""
-        author_lower = "j.r.r. tolkien"
-        item_author = "j.r.r. tolkien"
-
-        score = 0
-        if item_author == author_lower:
-            score += 50
-
-        assert score == 50
-
-    def test_partial_author_match(self):
-        """Test partial author matching."""
-        author_lower = "tolkien"
-        item_author = "j.r.r. tolkien"
-
-        score = 0
-        if author_lower in item_author or item_author in author_lower:
-            score += 25
-
-        assert score == 25
-
-    def test_asin_match_highest_score(self):
-        """Test ASIN match gets highest score."""
-        metadata_asin = "B001234567"
-        item_asin = "b001234567"
-
-        score = 0
-        if metadata_asin and item_asin and metadata_asin.lower() == item_asin:
-            score += 200
-
-        assert score == 200
-
-    def test_isbn_match_highest_score(self):
-        """Test ISBN match gets highest score."""
-        metadata_isbn = "9781234567890"
-        item_isbn = "9781234567890"
-
-        score = 0
-        if metadata_isbn and item_isbn and metadata_isbn.lower() == item_isbn:
-            score += 200
-
-        assert score == 200
-
-    def test_path_matching_bonus(self):
-        """Test path matching adds bonus score."""
-        library_path = "/media/Books/Audiobooks/Tolkien/The Hobbit"
-        item_path = "/audiobooks/tolkien/the hobbit"
-
-        lib_path_norm = library_path.lower().replace("\\", "/").strip("/")
-        item_path_norm = item_path.lower().replace("\\", "/").strip("/")
-
-        score = 0
-        if lib_path_norm in item_path_norm or item_path_norm in lib_path_norm:
-            score += 25
-
-        assert score == 25
-
-    def test_combined_title_author_match_score(self):
-        """Test combined title and author match score."""
-        # Perfect title + author match should score 150
-        title_score = 100  # Exact title
-        author_score = 50  # Exact author
-        total = title_score + author_score
-
-        assert total == 150
+    def test_status_mapping(self):
+        assert determine_verification_status(90) == "verified"
+        assert determine_verification_status(80) == "mismatch"
+        assert determine_verification_status(60) == "not_found"
 
 
 @pytest.mark.asyncio

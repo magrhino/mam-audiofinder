@@ -1,20 +1,138 @@
-"""Title/author/ASIN matching logic for verification."""
+"""Book matching logic using rapidfuzz for title/author similarity."""
 
+from dataclasses import dataclass
+import re
+import unicodedata
 from typing import Optional
 
-from abs.models import LibraryItem
-from utils import normalize_title, normalize_author
+from rapidfuzz import fuzz
 
-# Scoring constants
-SCORE_ASIN_MATCH = 200
-SCORE_ISBN_MATCH = 200
-SCORE_TITLE_EXACT = 100
-SCORE_TITLE_PARTIAL = 50
-SCORE_AUTHOR_EXACT = 50
-SCORE_AUTHOR_PARTIAL = 25
-SCORE_PATH_MATCH = 25
-THRESHOLD_VERIFIED = 100
-THRESHOLD_MISMATCH = 50
+from abs.models import LibraryItem
+
+
+@dataclass
+class MatchResult:
+    """Structured result from a matching attempt."""
+
+    confidence: float
+    method: str
+    title_score: float = 0.0
+    author_score: float = 0.0
+    path_bonus: float = 0.0
+
+    @property
+    def score(self) -> int:
+        """Integer score for legacy consumers."""
+        return int(round(self.confidence))
+
+
+NOISE_WORDS = {"a", "an", "the", "novel", "book"}
+
+
+def _normalize_identifier(value: Optional[str]) -> str:
+    """Normalize ASIN/ISBN by stripping separators and uppercasing."""
+    if not value:
+        return ""
+    return re.sub(r"[^A-Za-z0-9]", "", value).upper()
+
+
+def _is_graphic_audio(author: Optional[str]) -> bool:
+    if not author:
+        return False
+    normalized = author.lower().replace(" ", "")
+    return "graphicaudio" in normalized
+
+
+def _normalize_path(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    return value.lower().replace("\\", "/").strip("/")
+
+
+def _strip_noise_words(text: str) -> str:
+    if not text:
+        return ""
+    pattern = r"\b(" + "|".join(NOISE_WORDS) + r")\b"
+    return re.sub(pattern, " ", text, flags=re.IGNORECASE)
+
+
+def _unicode_lower(text: str) -> str:
+    return unicodedata.normalize("NFKD", text).lower()
+
+
+def clean_title(title: Optional[str]) -> str:
+    """Clean title for fuzzy matching (lower, strip punctuation, drop subtitles/noise)."""
+    if not title:
+        return ""
+
+    text = _unicode_lower(title)
+    # Keep delimiters for subtitle split, strip other punctuation
+    text = re.sub(r"[^\w\s:–—-]", " ", text)
+    # Primary title before subtitle markers
+    text = re.split(r"[:–—-]", text)[0]
+    # Remove series markers like "(Series #1)"
+    text = re.sub(r"\([^)]*#\d+[^)]*\)", " ", text)
+    # Remove edition phrases
+    text = re.sub(r"\b\d+(st|nd|rd|th)\s+anniversary edition\b", " ", text)
+    text = re.sub(r"\bedition\b", " ", text)
+    # Drop common noise words and normalize whitespace
+    text = _strip_noise_words(text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def clean_author(author: Optional[str]) -> str:
+    """Clean author string, handling comma order and multi-author separators."""
+    if not author:
+        return ""
+
+    text = _unicode_lower(author)
+    text = text.replace(".", " ")
+
+    # Multi-author separators
+    multi_sep = r"\s+(?:&|and|;)\s+"
+    if re.search(multi_sep, text):
+        parts = re.split(multi_sep, text)
+    elif text.count(",") == 1:
+        # Handle "Last, First"
+        last, first = [p.strip() for p in text.split(",", 1)]
+        parts = [f"{first} {last}".strip()]
+    else:
+        parts = [text.replace(",", " ")]
+
+    cleaned_parts = []
+    for part in parts:
+        part = re.sub(r"[^\w\s]", " ", part)
+        part = re.sub(r"\s+", " ", part).strip()
+        if part:
+            cleaned_parts.append(part)
+
+    return " & ".join(cleaned_parts)
+
+
+def best_title_score(a: Optional[str], b: Optional[str]) -> float:
+    """Calculate best fuzzy score between two titles."""
+    clean_a = clean_title(a)
+    clean_b = clean_title(b)
+    if not clean_a or not clean_b:
+        return 0.0
+    return max(
+        fuzz.token_set_ratio(clean_a, clean_b),
+        fuzz.token_sort_ratio(clean_a, clean_b),
+        fuzz.ratio(clean_a, clean_b),
+    )
+
+
+def best_author_score(a: Optional[str], b: Optional[str]) -> float:
+    """Calculate best fuzzy score between authors (order-insensitive)."""
+    clean_a = clean_author(a)
+    clean_b = clean_author(b)
+    if not clean_a or not clean_b:
+        return 0.0
+    return max(
+        fuzz.token_sort_ratio(clean_a, clean_b),
+        fuzz.ratio(clean_a, clean_b),
+    )
 
 
 def calculate_match_score(
@@ -24,55 +142,66 @@ def calculate_match_score(
     query_asin: Optional[str] = None,
     query_isbn: Optional[str] = None,
     query_path: Optional[str] = None,
-) -> int:
-    """Calculate match score between query and library item."""
+) -> MatchResult:
+    """Calculate confidence and method for a candidate against a query."""
 
-    if query_asin and candidate.asin and query_asin.lower() == candidate.asin.lower():
-        return SCORE_ASIN_MATCH
+    query_asin_norm = _normalize_identifier(query_asin)
+    query_isbn_norm = _normalize_identifier(query_isbn)
+    candidate_asin = _normalize_identifier(candidate.asin)
+    candidate_isbn = _normalize_identifier(candidate.isbn)
 
-    if query_isbn and candidate.isbn and query_isbn.lower() == candidate.isbn.lower():
-        return SCORE_ISBN_MATCH
+    # Level 1: Identifier short-circuit
+    if query_asin_norm and candidate_asin and query_asin_norm == candidate_asin:
+        return MatchResult(confidence=100.0, method="ASIN")
+    if query_isbn_norm and candidate_isbn and query_isbn_norm == candidate_isbn:
+        return MatchResult(confidence=100.0, method="ISBN")
 
-    score = 0
+    # Level 2: Title + Author
+    title_score = best_title_score(query_title, candidate.title)
+    author_score = best_author_score(query_author, candidate.author or "") if query_author else 0.0
 
-    query_title_norm = normalize_title(query_title)
-    candidate_title_norm = candidate.title_normalized or normalize_title(candidate.title)
+    combined = (0.6 * title_score) + (0.4 * author_score)
+    confidence = 0.0
+    method = "NO_MATCH"
 
-    if query_title_norm == candidate_title_norm:
-        score += SCORE_TITLE_EXACT
-    elif query_title_norm in candidate_title_norm or candidate_title_norm in query_title_norm:
-        score += SCORE_TITLE_PARTIAL
-    else:
-        return 0
+    graphic_audio_override = _is_graphic_audio(query_author) or _is_graphic_audio(candidate.author)
+    author_conflict = False
+    if query_author and not graphic_audio_override:
+        author_conflict = author_score < 50 and title_score >= 85
 
-    if query_author:
-        query_author_norm = normalize_author(query_author)
-        candidate_author_norm = candidate.author_normalized or normalize_author(candidate.author or "")
+    if query_author and author_score and combined >= 85 and not author_conflict:
+        confidence = min(100.0, combined)
+        method = "TITLE+AUTHOR"
+    elif author_conflict:
+        confidence = 70.0
+        method = "AUTHOR_MISMATCH"
 
-        if query_author_norm == candidate_author_norm:
-            score += SCORE_AUTHOR_EXACT
-        elif query_author_norm in candidate_author_norm or candidate_author_norm in query_author_norm:
-            score += SCORE_AUTHOR_PARTIAL
-        else:
-            if score >= SCORE_TITLE_EXACT:
-                score = THRESHOLD_MISMATCH + 25
-    else:
-        score += 10
+    # Level 3: Title-only fallback
+    if method == "NO_MATCH" and title_score >= 90:
+        confidence = min(100.0, title_score * 0.9)
+        method = "TITLE_ONLY"
 
+    path_bonus = 0.0
     if query_path and candidate.path:
-        query_path_norm = query_path.lower().replace("\\", "/").strip("/")
-        candidate_path_norm = candidate.path.lower().replace("\\", "/").strip("/")
-        if query_path_norm in candidate_path_norm or candidate_path_norm in query_path_norm:
-            score += SCORE_PATH_MATCH
+        qp = _normalize_path(query_path)
+        cp = _normalize_path(candidate.path)
+        if qp and cp and (qp in cp or cp in qp):
+            path_bonus = 2.5
+            confidence = min(100.0, confidence + path_bonus)
 
-    return score
+    return MatchResult(
+        confidence=confidence,
+        method=method,
+        title_score=title_score,
+        author_score=author_score,
+        path_bonus=path_bonus,
+    )
 
 
-def determine_verification_status(score: int) -> str:
-    """Determine verification status from score."""
-    if score >= THRESHOLD_VERIFIED:
+def determine_verification_status(score: float) -> str:
+    """Determine verification status from confidence score."""
+    if score >= 85:
         return "verified"
-    elif score >= THRESHOLD_MISMATCH:
+    if score >= 70:
         return "mismatch"
-    else:
-        return "not_found"
+    return "not_found"
