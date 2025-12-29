@@ -68,13 +68,16 @@ async def search(payload: dict):
             r = await client.post(f"{MAM_BASE}/tor/js/loadSearchJSONbasic.php",
                                   headers=headers, params=params, json=body)
     except httpx.HTTPError as e:
+        logger.error(f"❌ MAM request failed: {type(e).__name__}: {e}")
         raise HTTPException(status_code=502, detail=f"MAM request failed: {e}")
 
     if r.status_code != 200:
+        logger.error(f"❌ MAM HTTP {r.status_code}: {r.text[:300]}")
         raise HTTPException(status_code=502, detail=f"MAM HTTP {r.status_code}: {r.text[:300]}")
     try:
         raw = r.json()
     except ValueError:
+        logger.error(f"❌ MAM returned non-JSON: {r.text[:300]}")
         raise HTTPException(status_code=502, detail=f"MAM returned non-JSON. Body: {r.text[:300]}")
 
     # Normalize all results using shared MAM result normalizer

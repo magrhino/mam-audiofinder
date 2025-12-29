@@ -13,7 +13,7 @@
 <script setup>
 import { computed } from 'vue'
 import { NSelect } from 'naive-ui'
-import { useBreakpoints } from '@vueuse/core'
+import { useBreakpoints } from '@/composables/useBreakpoints'
 
 const props = defineProps({
   options: {
@@ -38,12 +38,8 @@ const props = defineProps({
 const modelValue = defineModel()
 const emit = defineEmits(['update:modelValue'])
 
-// Responsive breakpoints
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024
-})
+// Centralized responsive breakpoints
+const { isMobile, isTablet, isDesktop } = useBreakpoints()
 
 // Computed width based on screen size
 const computedWidth = computed(() => {
@@ -52,9 +48,9 @@ const computedWidth = computed(() => {
   }
 
   // Auto-size based on breakpoints
-  if (breakpoints.greater('desktop').value) {
+  if (isDesktop.value) {
     return '160px'
-  } else if (breakpoints.greater('tablet').value) {
+  } else if (isTablet.value) {
     return '140px'
   } else {
     return '120px'

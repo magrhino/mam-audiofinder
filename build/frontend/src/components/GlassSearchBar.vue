@@ -16,9 +16,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { NInput } from 'naive-ui'
-import { useBreakpoints } from '@vueuse/core'
 
 const props = defineProps({
   placeholder: {
@@ -34,13 +32,6 @@ const props = defineProps({
 
 const modelValue = defineModel()
 const emit = defineEmits(['search', 'clear', 'update:modelValue'])
-
-// Responsive breakpoints
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024
-})
 
 const handleEnter = () => {
   emit('search', modelValue.value)
@@ -114,7 +105,7 @@ const handleClear = () => {
   min-width: 200px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .glass-search-bar {
     min-width: 150px;
   }

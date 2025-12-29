@@ -198,7 +198,8 @@
 <script setup>
 import { onMounted, onUnmounted, reactive, ref, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useBreakpoints } from '@vueuse/core'
+import { useBreakpoints } from '@/composables/useBreakpoints'
+import { useMediaQuery } from '@vueuse/core'
 import {
   NCard,
   NSpace,
@@ -224,19 +225,17 @@ const route = useRoute()
 const router = useRouter()
 const seriesCache = useSeriesCache()
 
-// Responsive breakpoints for dynamic input width
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024,
-  wide: 1400
-})
+// Centralized responsive breakpoints
+const { isMobile, isTablet, isDesktop } = useBreakpoints()
+
+// Component-specific wide breakpoint (1400px+)
+const isWide = useMediaQuery('(min-width: 1400px)')
 
 // Dynamic input width based on screen size
 const inputWidth = computed(() => {
-  if (breakpoints.greater('desktop').value) {
+  if (isDesktop.value) {
     return '400px'
-  } else if (breakpoints.greater('tablet').value) {
+  } else if (isTablet.value) {
     return '300px'
   } else {
     return '100%'
@@ -319,16 +318,16 @@ const currentDetailSeriesId = ref(null)
 
 // Responsive grid configuration
 const gridColumns = computed(() => {
-  if (breakpoints.greater('wide').value) return 6
-  if (breakpoints.greater('desktop').value) return 5
-  if (breakpoints.greater('tablet').value) return 4
+  if (isWide.value) return 6
+  if (isDesktop.value) return 5
+  if (isTablet.value) return 4
   return 2
 })
 
 const gridStyle = computed(() => ({
   display: 'grid',
   gridTemplateColumns: `repeat(${gridColumns.value}, 1fr)`,
-  gap: breakpoints.greater('desktop').value ? '1.5rem' : '1rem'
+  gap: isDesktop.value ? '1.5rem' : '1rem'
 }))
 
 // URL parameter handling helpers
@@ -932,7 +931,7 @@ watch(() => route.query.detail, async (newDetail, oldDetail) => {
   min-width: 200px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .search-input-wrapper,
   .author-input-wrapper {
     min-width: 150px;
@@ -973,8 +972,8 @@ watch(() => route.query.detail, async (newDetail, oldDetail) => {
   width: 100%;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
+/* Responsive - mobile breakpoint (0-767px) */
+@media (max-width: 767px) {
   .search-input-item {
     min-width: 100%;
   }
