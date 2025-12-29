@@ -34,7 +34,8 @@ def history():
         rows = cx.execute(text("""
             SELECT id, mam_id, title, author, narrator, dl, qb_hash, added_at, qb_status,
                    abs_cover_url, abs_item_id, imported_at,
-                   abs_verify_status, abs_verify_note
+                   abs_verify_status, abs_verify_note,
+                   auto_import_eligible, auto_imported
             FROM history
             ORDER BY id DESC
             LIMIT 200

@@ -101,7 +101,8 @@ const navLinks = [
   { path: '/history', icon: '📋', label: 'History' },
   { path: '/showcase', icon: '🎭', label: 'Showcase' },
   { path: '/series', icon: '📚', label: 'Series' },
-  { path: '/library', icon: '📚', label: 'Library' },
+  { path: '/library', icon: '📖', label: 'Library' },
+  { path: '/settings', icon: '⚙️', label: 'Settings' },
   { path: '/logs', icon: '📄', label: 'Logs' }
 ]
 

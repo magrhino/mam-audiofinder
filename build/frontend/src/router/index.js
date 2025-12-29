@@ -12,6 +12,7 @@ const ShowcaseView = () => import('@views/ShowcaseView.vue')
 const LogsView = () => import('@views/LogsView.vue')
 const SeriesView = () => import('@views/SeriesView.vue')
 const LibraryView = () => import('@views/LibraryView.vue')
+const SettingsView = () => import('@views/SettingsView.vue')
 
 const routes = [
   {
@@ -49,6 +50,12 @@ const routes = [
     name: 'library',
     component: LibraryView,
     meta: { title: 'Library - Audiobook Finder' }
+  },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: SettingsView,
+    meta: { title: 'Settings - Audiobook Finder' }
   },
   // Catch-all route for unmatched paths - redirect to home
   {

@@ -75,6 +75,12 @@ IMPORT_MODE = os.getenv("IMPORT_MODE", "link")  # link|copy|move
 FLATTEN_DISCS = os.getenv("FLATTEN_DISCS", "true").lower() in ("true", "1", "yes")  # flatten multi-disc to sequential files
 AUDIO_EXTS = None  # copy everything except .cue
 
+# ---------------------------- Auto-Import Configuration ----------------------------
+# These are default values that can be overridden at runtime via the Settings page
+AUTO_IMPORT_ENABLED = os.getenv("AUTO_IMPORT_ENABLED", "false").lower() in ("true", "1", "yes")
+AUTO_IMPORT_POLL_INTERVAL = int(os.getenv("AUTO_IMPORT_POLL_INTERVAL", "30"))  # Polling interval in seconds (15-300)
+AUTO_IMPORT_FLATTEN = os.getenv("AUTO_IMPORT_FLATTEN", "true").lower() in ("true", "1", "yes")  # Flatten multi-disc during auto-import
+
 # ---------------------------- Apply UMASK ----------------------------
 def apply_umask():
     """Apply UMASK if specified in environment."""

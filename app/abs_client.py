@@ -52,6 +52,11 @@ class AudiobookshelfClient:
         self.library_id = self._client.config.library_id
 
     @property
+    def config(self):
+        """Expose the inner client's config for routes that need direct access."""
+        return self._client.config
+
+    @property
     def is_configured(self) -> bool:
         """Check if Audiobookshelf is configured."""
         return self._client.is_configured
@@ -268,6 +273,37 @@ class AudiobookshelfClient:
         except Exception as e:
             logger.error(f"❌ Error fetching item details: {e}")
             return {}
+
+    async def _fetch_from_provider(
+        self,
+        provider: str,
+        item_id: str,
+        title: str,
+        author: str = "",
+        fallback_title_only: bool = True
+    ) -> dict:
+        """
+        Fetch enhanced metadata from external provider via ABS.
+
+        Args:
+            provider: Provider name (audible, google, openlibrary)
+            item_id: ABS library item ID (optional)
+            title: Book title
+            author: Author name (optional)
+            fallback_title_only: Use title-only search if author search fails
+
+        Returns:
+            Dict with enhanced metadata fields, or empty dict on error
+
+        Maps to: AbsClient.fetch_from_provider()
+        """
+        return await self._client.fetch_from_provider(
+            provider=provider,
+            title=title,
+            author=author,
+            item_id=item_id,
+            fallback_title_only=fallback_title_only,
+        )
 
     async def _update_description_after_verification(
         self,

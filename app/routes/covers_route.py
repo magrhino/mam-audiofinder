@@ -13,10 +13,40 @@ from config import COVERS_DIR
 from abs_client import abs_client
 from db import engine
 from covers import get_cover_service
+from abs.matching import best_title_score, best_author_score
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Minimum score thresholds for result validation
+MIN_TITLE_SCORE = 70
+MIN_COMBINED_SCORE = 60
+
+
+def validate_enrichment_result(result: dict, query_title: str, query_author: str) -> bool:
+    """
+    Check if a provider result reasonably matches the search query.
+
+    Uses fuzzy matching to prevent returning completely unrelated books
+    (e.g., "Embryonic Breathing" for a search of "The Breathing Method").
+    """
+    result_title = result.get('title', '')
+    result_author = result.get('author', '')
+
+    if not result_title:
+        return False
+
+    title_score = best_title_score(query_title, result_title)
+
+    # If we have author info from both query and result, use combined scoring
+    if query_author and result_author:
+        author_score = best_author_score(query_author, result_author)
+        combined = (0.6 * title_score) + (0.4 * author_score)
+        return combined >= MIN_COMBINED_SCORE
+
+    # Title-only matching requires higher threshold
+    return title_score >= MIN_TITLE_SCORE
 
 
 @router.get("/covers/{filename}")
@@ -135,15 +165,19 @@ async def enrich_metadata(request: EnrichRequest):
         # Execute all provider calls in parallel
         results = await asyncio.gather(*[fetch_provider(p) for p in providers])
 
-        # Find first successful result
+        # Find first VALID result (must match query to prevent wrong books)
         enriched_data = {}
         source_provider = "none"
         for provider, result in results:
             if result and result.get('title'):
-                enriched_data = result
-                source_provider = provider
-                logger.info(f"✅ Got enriched metadata from {provider}")
-                break
+                if validate_enrichment_result(result, request.title, request.author or ''):
+                    enriched_data = result
+                    source_provider = provider
+                    logger.info(f"✅ Got enriched metadata from {provider} (validated)")
+                    break
+                else:
+                    result_title = result.get('title', 'Unknown')
+                    logger.warning(f"⚠️  Rejected {provider} result '{result_title}' - doesn't match query '{request.title}'")
 
         # If no provider succeeded, return empty metadata
         if not enriched_data:

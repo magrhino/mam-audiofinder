@@ -298,3 +298,73 @@ class AbsClient:
                 "description": metadata.get("description", ""),
                 "metadata": metadata,
             }
+
+    # --- Provider Search ---
+
+    async def fetch_from_provider(
+        self,
+        provider: str,
+        title: str,
+        author: str = "",
+        item_id: str = "",
+        fallback_title_only: bool = True,
+    ) -> dict:
+        """
+        Fetch enhanced metadata from external provider via ABS.
+
+        Uses /api/search/books endpoint with provider parameter.
+
+        Args:
+            provider: Provider name (audible, google, openlibrary)
+            title: Book title
+            author: Author name (optional)
+            item_id: ABS library item ID (optional, for enrichment)
+            fallback_title_only: Use title-only search if author search fails
+
+        Returns:
+            Dict with enhanced metadata fields, or empty dict on error
+        """
+        if not self.is_configured:
+            return {}
+
+        try:
+            async with self._semaphore:
+                headers = {"Authorization": f"Bearer {self.config.api_key}"}
+
+                params = {
+                    "provider": provider,
+                    "fallbackTitleOnly": "1" if fallback_title_only else "0",
+                    "title": title,
+                }
+
+                if author:
+                    params["author"] = author
+                if item_id:
+                    params["id"] = item_id
+
+                logger.debug(f"🌐 Calling /api/search/books with provider={provider}")
+
+                r = await self._shared_client.get(
+                    f"{self.config.base_url}/api/search/books",
+                    headers=headers,
+                    params=params,
+                    timeout=6.0,
+                )
+
+                if r.status_code != 200:
+                    logger.warning(f"⚠️  Provider {provider} returned HTTP {r.status_code}")
+                    return {}
+
+                data = r.json()
+                results = data if isinstance(data, list) else data.get("results", [])
+
+                if not results:
+                    logger.debug(f"ℹ️  No results from provider {provider}")
+                    return {}
+
+                logger.debug(f"✅ Got result from {provider}: {results[0].get('title', 'Unknown')}")
+                return results[0]
+
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch from provider {provider}: {e}")
+            return {}

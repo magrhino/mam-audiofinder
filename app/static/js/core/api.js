@@ -364,5 +364,64 @@ export const api = {
       throw new Error(msg);
     }
     return resp.json();
+  },
+
+  // ======================== Settings API ========================
+
+  /**
+   * Get all application settings
+   * @returns {Promise<Object>}
+   */
+  async getSettings() {
+    const r = await fetch('/api/settings');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  },
+
+  /**
+   * Update application settings
+   * @param {Object} settings - Settings to update
+   * @param {boolean} settings.auto_import_enabled - Enable auto-import
+   * @param {boolean} settings.auto_import_flatten - Flatten during auto-import
+   * @param {number} settings.auto_import_poll_interval - Poll interval in seconds
+   * @returns {Promise<{ok: boolean, updated: Array}>}
+   */
+  async updateSettings(settings) {
+    const resp = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    if (!resp.ok) {
+      let msg = `HTTP ${resp.status}`;
+      try {
+        const j = await resp.json();
+        if (j?.detail) msg += ` — ${j.detail}`;
+      } catch {}
+      throw new Error(msg);
+    }
+    return resp.json();
+  },
+
+  /**
+   * Reset all settings to defaults
+   * @returns {Promise<{ok: boolean}>}
+   */
+  async resetSettings() {
+    const resp = await fetch('/api/settings/reset', {
+      method: 'POST'
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+  },
+
+  /**
+   * Get auto-import service status
+   * @returns {Promise<Object>}
+   */
+  async getAutoImportStatus() {
+    const r = await fetch('/api/settings/auto-import/status');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
   }
 };

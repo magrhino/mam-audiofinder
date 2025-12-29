@@ -77,6 +77,7 @@ except Exception as e:
 
 # ---------------------------- Application Lifespan ----------------------------
 from abs_client import abs_client
+from auto_import import get_auto_import_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -87,11 +88,17 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting MAM Audiobook Finder v0.4.0")
     await abs_client.test_connection()
+
+    # Start auto-import service
+    auto_import_service = get_auto_import_service()
+    await auto_import_service.start()
+
     logger.info("✅ Application startup complete")
 
     yield
 
-    # Shutdown (if needed in the future)
+    # Shutdown
+    await auto_import_service.stop()
     logger.info("👋 Application shutdown")
 
 # ---------------------------- FastAPI Application ----------------------------

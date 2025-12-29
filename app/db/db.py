@@ -113,7 +113,9 @@ def run_migrations():
             "create table if not exists history",
             "insert into history",
             "create index if not exists idx_history",
-            "library_wishlist"
+            "library_wishlist",
+            "app_settings",
+            "auto_import_tracking"
         ])
 
         targets_covers = any(pattern in sql_content for pattern in [
