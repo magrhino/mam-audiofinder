@@ -77,25 +77,31 @@ shelfarr/
 │       │   ├── main.js           # Vue app entry point
 │       │   ├── App.vue           # Root component
 │       │   ├── router/
-│       │   │   └── index.js      # Vue Router config (5 routes)
+│       │   │   └── index.js      # Vue Router config (6 routes)
 │       │   ├── views/            # Page-level components
-│       │   │   ├── SearchView.vue
+│       │   │   ├── DiscoverView.vue  # Unified search (cards + table modes)
 │       │   │   ├── HistoryView.vue
-│       │   │   ├── ShowcaseView.vue
-│       │   │   ├── LogsView.vue
-│       │   │   └── SeriesView.vue
-│       │   ├── components/       # Reusable components (~17 files)
+│       │   │   ├── LibraryView.vue
+│       │   │   ├── SeriesView.vue
+│       │   │   ├── SettingsView.vue
+│       │   │   └── LogsView.vue
+│       │   ├── components/       # Reusable components (~20 files)
 │       │   │   ├── NavBar.vue
+│       │   │   ├── GearMenu.vue      # Settings dropdown menu
+│       │   │   ├── ViewToggle.vue    # Cards/Table view switcher
 │       │   │   ├── HealthIndicator.vue
-│       │   │   ├── ResultRow.vue
-│       │   │   ├── HistoryRow.vue
 │       │   │   ├── ShowcaseCard.vue
 │       │   │   ├── GlassSearchBar.vue
+│       │   │   ├── GlassSelect.vue
+│       │   │   ├── GlassTitle.vue
 │       │   │   ├── CoverImage.vue
 │       │   │   └── icons/        # SVG icon components
 │       │   ├── composables/      # Vue composables
 │       │   │   ├── useApi.js
+│       │   │   ├── useDiscoverSearch.js  # Unified search state
+│       │   │   ├── useViewToggle.js      # Cards/Table mode toggle
 │       │   │   ├── useCoverLoader.js
+│       │   │   ├── useAddTorrentFlow.js
 │       │   │   ├── useHistoryLiveUpdates.js
 │       │   │   └── naive/        # NaiveUI table configs
 │       │   ├── styles/           # Global styles
@@ -132,8 +138,11 @@ shelfarr/
 
 ### Key Workflows
 
-**Search:**
-User Input → POST /search → MAM API (5-min cache) → ABS Cover Fetch → Library Check → Display Results
+**Discover Search (Unified):**
+User Input → GET /api/showcase → MAM API (5-min cache) → Group by Title → ABS Library Check → Display as Cards or Table
+- Single API call populates both view modes
+- Cards mode: grouped by normalized title with cover grid
+- Table mode: flattened versions list with sorting
 
 **Add to qBittorrent:**
 User Click → POST /add → Fetch .torrent file → qBittorrent API → Tag with MAM ID → Save to history.db
@@ -234,17 +243,25 @@ Vite dev server (:5173) with HMR → `npm run build` → outputs to `app/static/
 **Composition API:**
 All components use `<script setup>` syntax with reactive refs
 
-**Router (5 routes):**
-/, /history, /showcase, /logs, /series (lazy-loaded views)
+**Router (4 main routes + settings):**
+- `/` - DiscoverView (unified search with cards/table toggle)
+- `/history` - HistoryView
+- `/library` - LibraryView
+- `/series` - SeriesView
+- `/settings` - SettingsView
+- `/logs` - LogsView (accessed via gear menu)
 
 **Views:**
-SearchView, HistoryView, ShowcaseView, LogsView, SeriesView
+DiscoverView (unified search), HistoryView, LibraryView, SeriesView, SettingsView, LogsView
 
 **Components:**
-NavBar, HealthIndicator, ResultRow, HistoryRow, ShowcaseCard, SeriesTable, GlassSearchBar, CoverImage, ActionButton, StatusBadge, icon components
+NavBar, GearMenu, ViewToggle, HealthIndicator, ShowcaseCard, GlassSearchBar, GlassSelect, GlassTitle, CoverImage, ActionButton, StatusBadge, icon components
 
 **Composables:**
 - `useApi()` - API wrapper (reuses legacy `app/static/js/core/api.js`)
+- `useDiscoverSearch()` - **Unified search state** for Discover view (single API call populates cards + table)
+- `useViewToggle()` - Cards/Table mode toggle with localStorage persistence and URL sync
+- `useAddTorrentFlow()` - Torrent add workflow with loading states
 - `useCoverLoader()` - Lazy image loading with IntersectionObserver
 - `useHistoryLiveUpdates()` - Real-time history updates (auto-refresh)
 - `useMAMSearchDataTable()` - NaiveUI table configuration with responsive 3-column-set strategy, native expansion for mobile, no scroll-x
@@ -356,7 +373,7 @@ CREATE TABLE series_cache (
 - Manual re-verification via "🔄 Verify" button
 
 ### Library Visibility
-- Green checkmark badges on search/showcase for items already in library
+- Green checkmark badges on Discover view for items already in library
 - Batch checking with 5-minute cache (configurable via ABS_LIBRARY_CACHE_TTL)
 - Auto-enabled when ABS is configured (or set ABS_CHECK_LIBRARY explicitly)
 
@@ -364,15 +381,19 @@ CREATE TABLE series_cache (
 - Fetched from Audiobookshelf during verification (if match score ≥100)
 - Fallback to Hardcover API for additional metadata (optional)
 - Updates both history.db and covers.db
-- Displayed in showcase view with expand/collapse
+- Displayed in Discover view detail panel with expand/collapse
 - Source tracking: 'abs', 'hardcover', or 'none'
 
-### Showcase View
-- Groups search results by normalized title (removes articles "The", "A", "An" and punctuation)
-- Card-based grid layout with covers and descriptions
-- Detail view shows all versions/editions per title
-- URL state management (?detail=title-slug)
-- Responsive layout with @vueuse/core breakpoints
+### Discover View (Unified Search)
+- **Single API Architecture:** One `/api/showcase` call populates both view modes
+- **Cards Mode:** Groups results by normalized title, card grid with covers
+- **Table Mode:** Flattened list of all editions with sorting (seeders, date, size)
+- **Instant View Switching:** No re-fetch needed when toggling modes
+- **Unified Limits:** 25/50/100 results (MAM's supported values)
+- Detail view shows all versions/editions per title with metadata enrichment
+- URL state management (?view=cards|table, ?detail=title-slug)
+- View preference persisted to localStorage
+- Responsive layout with centralized breakpoints
 
 ### Multi-Disc Flattening
 - Auto-detects Disc/Disk/CD/Part patterns in folder structure

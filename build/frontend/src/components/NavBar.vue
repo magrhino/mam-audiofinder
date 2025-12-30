@@ -43,22 +43,25 @@
         </n-flex>
       </div>
 
-      <!-- Health Indicator -->
+      <!-- Right Section: Gear Menu + Health Indicator -->
       <div class="nav-section nav-right">
-        <n-popover trigger="hover" placement="bottom-end">
-          <template #trigger>
-            <div class="health-indicator glass-health" :class="healthClass">
-              <span v-if="health.checking" class="health-spinner"></span>
-              <span v-else-if="health.ok" class="health-dot"></span>
-              <span v-else class="health-x">✗</span>
-              <span v-if="!isMobile" class="health-label">{{ healthStatusText }}</span>
+        <n-flex :size="8" align="center">
+          <GearMenu />
+          <n-popover trigger="hover" placement="bottom-end">
+            <template #trigger>
+              <div class="health-indicator glass-health" :class="healthClass">
+                <span v-if="health.checking" class="health-spinner"></span>
+                <span v-else-if="health.ok" class="health-dot"></span>
+                <span v-else class="health-x">✗</span>
+                <span v-if="!isMobile" class="health-label">{{ healthStatusText }}</span>
+              </div>
+            </template>
+            <div class="health-popover glass-popover">
+              <strong>Application Health</strong>
+              <p>{{ healthText }}</p>
             </div>
-          </template>
-          <div class="health-popover glass-popover">
-            <strong>Application Health</strong>
-            <p>{{ healthText }}</p>
-          </div>
-        </n-popover>
+          </n-popover>
+        </n-flex>
       </div>
     </div>
   </n-layout-header>
@@ -74,6 +77,7 @@ import {
   NThing,
   NPopover
 } from 'naive-ui'
+import GearMenu from '@components/GearMenu.vue'
 
 const props = defineProps({
   health: {
@@ -95,15 +99,12 @@ const breakpoints = useBreakpoints({
 // Check if mobile (< 768px)
 const isMobile = computed(() => !breakpoints.greater('tablet').value)
 
-// Navigation links configuration
+// Navigation links configuration (Settings and Logs moved to GearMenu)
 const navLinks = [
-  { path: '/', icon: '🔍', label: 'Search' },
+  { path: '/', icon: '🔍', label: 'Discover' },
   { path: '/history', icon: '📋', label: 'History' },
-  { path: '/showcase', icon: '🎭', label: 'Showcase' },
   { path: '/series', icon: '📚', label: 'Series' },
-  { path: '/library', icon: '📖', label: 'Library' },
-  { path: '/settings', icon: '⚙️', label: 'Settings' },
-  { path: '/logs', icon: '📄', label: 'Logs' }
+  { path: '/library', icon: '📖', label: 'Library' }
 ]
 
 const brandLogoPrimary = '/static/favicon.svg'

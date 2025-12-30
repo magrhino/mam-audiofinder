@@ -6,9 +6,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 // Lazy load views for code splitting
-const SearchView = () => import('@views/SearchView.vue')
+const DiscoverView = () => import('@views/DiscoverView.vue')
 const HistoryView = () => import('@views/HistoryView.vue')
-const ShowcaseView = () => import('@views/ShowcaseView.vue')
 const LogsView = () => import('@views/LogsView.vue')
 const SeriesView = () => import('@views/SeriesView.vue')
 const LibraryView = () => import('@views/LibraryView.vue')
@@ -17,9 +16,9 @@ const SettingsView = () => import('@views/SettingsView.vue')
 const routes = [
   {
     path: '/',
-    name: 'search',
-    component: SearchView,
-    meta: { title: 'Search - Audiobook Finder' }
+    name: 'discover',
+    component: DiscoverView,
+    meta: { title: 'Discover - Audiobook Finder' }
   },
   {
     path: '/history',
@@ -27,11 +26,14 @@ const routes = [
     component: HistoryView,
     meta: { title: 'History - Audiobook Finder' }
   },
+  // Legacy route redirects for backwards compatibility
+  {
+    path: '/search',
+    redirect: to => ({ path: '/', query: { ...to.query, view: 'table' } })
+  },
   {
     path: '/showcase',
-    name: 'showcase',
-    component: ShowcaseView,
-    meta: { title: 'Showcase - Audiobook Finder' }
+    redirect: to => ({ path: '/', query: { ...to.query, view: 'cards' } })
   },
   {
     path: '/logs',

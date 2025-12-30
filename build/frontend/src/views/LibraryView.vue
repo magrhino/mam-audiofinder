@@ -73,10 +73,11 @@ function handleBookClick(book) {
     .replace(/[^\w-]/g, '')
 
   router.push({
-    name: 'showcase',
+    name: 'discover',
     query: {
       q: book.title,
-      limit: '25',
+      view: 'cards',
+      limit: '100',
       detail: normalizedTitle,
     },
   })

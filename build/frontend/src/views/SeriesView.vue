@@ -800,14 +800,15 @@ function loadPrevPage() {
   }
 }
 
-// Handle book card click - navigate to ShowcaseView with detail view open
+// Handle book card click - navigate to DiscoverView with detail view open
 function handleBookClick(book) {
   const normalizedTitle = book.display_title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '')
   router.push({
-    name: 'showcase',
+    name: 'discover',
     query: {
       q: book.display_title,
-      limit: '25',
+      view: 'cards',
+      limit: '100',
       detail: normalizedTitle  // Open detail view immediately
     }
   })
