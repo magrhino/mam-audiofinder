@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import text
 
 from db import engine
-from config import AUTO_IMPORT_ENABLED, AUTO_IMPORT_POLL_INTERVAL, AUTO_IMPORT_FLATTEN
+from config import AUTO_IMPORT_ENABLED, AUTO_IMPORT_POLL_INTERVAL, AUTO_IMPORT_FLATTEN, COVER_SOURCE_PRIORITY
 
 logger = logging.getLogger("mam-audiofinder")
 
@@ -17,6 +17,7 @@ DEFAULT_SETTINGS = {
     "auto_import_enabled": str(AUTO_IMPORT_ENABLED).lower(),
     "auto_import_flatten": str(AUTO_IMPORT_FLATTEN).lower(),
     "auto_import_poll_interval": str(AUTO_IMPORT_POLL_INTERVAL),
+    "cover_source_priority": COVER_SOURCE_PRIORITY,  # "shelfarr" or "torrent"
 }
 
 # Settings type definitions for proper casting
@@ -24,6 +25,7 @@ SETTINGS_TYPES = {
     "auto_import_enabled": bool,
     "auto_import_flatten": bool,
     "auto_import_poll_interval": int,
+    "cover_source_priority": str,  # "shelfarr" or "torrent"
 }
 
 

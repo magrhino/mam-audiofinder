@@ -63,6 +63,35 @@
       </n-alert>
     </section>
 
+    <!-- Import Settings Section -->
+    <section class="glass-panel p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-4">Import Settings</h3>
+      <p class="muted mb-4">
+        Configure how files are imported to your library.
+      </p>
+
+      <div class="settings-grid">
+        <div class="settings-row">
+          <div class="settings-label">
+            <label>Cover Source Priority</label>
+            <span class="settings-description">Which cover image to use when importing</span>
+          </div>
+          <n-select
+            v-model:value="settings.cover_source_priority"
+            :options="coverPriorityOptions"
+            :disabled="saving"
+            style="width: 180px"
+          />
+        </div>
+      </div>
+
+      <div class="settings-actions mt-4">
+        <n-button type="primary" @click="handleSave" :loading="saving" :disabled="loading">
+          Save Changes
+        </n-button>
+      </div>
+    </section>
+
     <!-- Service Status Section -->
     <section class="glass-panel p-6 mb-6">
       <div class="flex justify-between items-center mb-4">
@@ -162,7 +191,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, h } from 'vue'
-import { NSwitch, NInputNumber, NButton, NAlert, NDataTable, NTag } from 'naive-ui'
+import { NSwitch, NInputNumber, NButton, NAlert, NDataTable, NTag, NSelect, NTooltip } from 'naive-ui'
 import { useSettings } from '@composables/useSettings'
 import { useApi } from '@composables/useApi'
 
@@ -181,6 +210,12 @@ const {
   startStatusPolling,
   stopStatusPolling
 } = useSettings()
+
+// Cover source priority options
+const coverPriorityOptions = [
+  { label: 'Torrent (Default)', value: 'torrent' },
+  { label: 'Shelfarr Cache', value: 'shelfarr' }
+]
 
 // App config (read-only from /config endpoint)
 const config = reactive({
@@ -201,7 +236,7 @@ const activityColumns = [
   {
     title: 'Status',
     key: 'status',
-    width: 100,
+    width: 120,
     render: (row) => {
       const typeMap = {
         completed: 'success',
@@ -210,7 +245,40 @@ const activityColumns = [
         processing: 'info',
         pending: 'default'
       }
-      return h(NTag, { type: typeMap[row.status] || 'default', size: 'small' }, () => row.status)
+      const tagType = typeMap[row.status] || 'default'
+
+      // Show retry count for failed items
+      if (row.status === 'failed' && row.retry_count > 0) {
+        return h('div', { class: 'flex flex-col gap-1' }, [
+          h(NTag, { type: tagType, size: 'small' }, () => row.status),
+          h('span', { class: 'text-xs text-gray-400' }, `Retry ${row.retry_count}/5`)
+        ])
+      }
+
+      return h(NTag, { type: tagType, size: 'small' }, () => row.status)
+    }
+  },
+  {
+    title: 'Details',
+    key: 'last_error',
+    ellipsis: true,
+    render: (row) => {
+      // Show error message for failed items
+      if (row.status === 'failed' && (row.last_error || row.reason)) {
+        const errorMsg = row.last_error || row.reason
+        return h(NTooltip, { trigger: 'hover' }, {
+          default: () => errorMsg,
+          trigger: () => h('span', { class: 'text-red-400 text-sm truncate block max-w-[200px]' }, errorMsg)
+        })
+      }
+      // Show skip reason
+      if (row.status === 'skipped' && row.reason) {
+        return h(NTooltip, { trigger: 'hover' }, {
+          default: () => row.reason,
+          trigger: () => h('span', { class: 'text-yellow-400 text-sm truncate block max-w-[200px]' }, row.reason)
+        })
+      }
+      return '-'
     }
   },
   {

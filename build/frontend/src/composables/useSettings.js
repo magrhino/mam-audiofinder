@@ -17,7 +17,8 @@ export function useSettings() {
   const settings = reactive({
     auto_import_enabled: false,
     auto_import_flatten: true,
-    auto_import_poll_interval: 30
+    auto_import_poll_interval: 30,
+    cover_source_priority: 'torrent'  // 'torrent' or 'shelfarr'
   })
 
   const serviceStatus = reactive({
@@ -62,7 +63,8 @@ export function useSettings() {
       await api.updateSettings({
         auto_import_enabled: settings.auto_import_enabled,
         auto_import_flatten: settings.auto_import_flatten,
-        auto_import_poll_interval: settings.auto_import_poll_interval
+        auto_import_poll_interval: settings.auto_import_poll_interval,
+        cover_source_priority: settings.cover_source_priority
       })
       // Reload status after settings change
       await loadServiceStatus()

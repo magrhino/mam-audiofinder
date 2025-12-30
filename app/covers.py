@@ -211,6 +211,36 @@ class CoverService:
             logger.exception("Get cached cover traceback:")
             return {}
 
+    def get_local_cover_path(self, mam_id: str) -> Path | None:
+        """
+        Get the local file path for a cached cover by MAM ID.
+        Returns Path if exists, None otherwise.
+
+        This is primarily used for importing covers to the library.
+        """
+        if not mam_id:
+            return None
+
+        try:
+            with covers_engine.begin() as cx:
+                row = cx.execute(text("""
+                    SELECT local_file
+                    FROM covers
+                    WHERE mam_id = :mam_id
+                    LIMIT 1
+                """), {"mam_id": mam_id}).fetchone()
+
+                if row and row[0]:
+                    local_path = Path(row[0])
+                    if local_path.exists():
+                        logger.debug(f"📷 Found local cover for MAM ID {mam_id}: {local_path}")
+                        return local_path
+
+            return None
+        except Exception as e:
+            logger.error(f"❌ Failed to get local cover path for MAM ID {mam_id}: {e}")
+            return None
+
     def resolve_cover_url(self, mam_id: str, current_url: str = None) -> dict:
         """
         Unified cover URL resolution with healing detection.

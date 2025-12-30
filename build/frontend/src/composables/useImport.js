@@ -136,6 +136,7 @@ export function useImport(historyItem) {
         title: form.title.trim(),
         hash: form.selectedHash,
         history_id: historyItem?.id,
+        mam_id: historyItem?.mam_id,
         flatten: form.flatten
       })
 

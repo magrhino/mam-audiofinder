@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from config import (
-    DL_DIR, LIB_DIR, IMPORT_MODE, FLATTEN_DISCS, AUDIO_EXTS,
+    DL_DIR, LIB_DIR, IMPORT_MODE, FLATTEN_DISCS, AUDIO_EXTS, IMAGE_EXTS,
     QB_URL, QB_INNER_DL_PREFIX, QB_POSTIMPORT_CATEGORY
 )
 from db import engine
@@ -20,6 +20,8 @@ from qb_client import qb_login_sync
 from utils import sanitize, next_available, extract_disc_track, try_hardlink
 from abs_client import abs_client
 from dependencies.qb import map_qb_content_path
+from settings_service import settings_service
+from covers import CoverService
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -43,6 +45,96 @@ def copy_one(src: Path, dst: Path) -> str:
     else:  # copy
         shutil.copy2(src, dst)
         return "copied"
+
+
+def find_best_cover_image(image_files: list[Path]) -> Path | None:
+    """
+    Find the best cover image from a list of image files.
+    Priority: cover.jpg > cover.png > folder.jpg > folder.png > first image
+    """
+    if not image_files:
+        return None
+
+    PREFERRED_NAMES = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png']
+
+    for preferred in PREFERRED_NAMES:
+        for img in image_files:
+            if img.name.lower() == preferred:
+                return img
+
+    return image_files[0]
+
+
+def copy_cover_image(
+    mam_id: str | None,
+    title: str,
+    torrent_images: list[Path],
+    dest_dir: Path
+) -> bool:
+    """
+    Copy cover image to destination based on cover source priority setting.
+
+    Args:
+        mam_id: MAM ID for Shelfarr cover lookup
+        title: Book title (used for cover filename)
+        torrent_images: List of image file paths from torrent
+        dest_dir: Destination directory
+
+    Returns:
+        True if a cover was copied, False otherwise
+    """
+    cover_priority = settings_service.get("cover_source_priority") or "torrent"
+    cover_service = CoverService()
+
+    shelfarr_cover = None
+    torrent_cover = find_best_cover_image(torrent_images)
+
+    # Try to get Shelfarr cached cover if we have a MAM ID
+    if mam_id:
+        try:
+            shelfarr_cover = cover_service.get_local_cover_path(mam_id)
+            if shelfarr_cover and not shelfarr_cover.exists():
+                shelfarr_cover = None
+        except Exception as e:
+            logger.debug(f"Could not get Shelfarr cover for mam_id={mam_id}: {e}")
+            shelfarr_cover = None
+
+    # Determine which cover to use based on priority
+    cover_to_use = None
+    cover_source = None
+
+    if cover_priority == "shelfarr":
+        if shelfarr_cover:
+            cover_to_use = shelfarr_cover
+            cover_source = "shelfarr"
+        elif torrent_cover:
+            cover_to_use = torrent_cover
+            cover_source = "torrent"
+    else:
+        # Torrent first (default)
+        if torrent_cover:
+            cover_to_use = torrent_cover
+            cover_source = "torrent"
+        elif shelfarr_cover:
+            cover_to_use = shelfarr_cover
+            cover_source = "shelfarr"
+
+    if not cover_to_use:
+        logger.debug(f"No cover image available for '{title}'")
+        return False
+
+    # Copy cover to destination using "{title}.{ext}" format for ABS
+    dest_name = f"{sanitize(title)}{cover_to_use.suffix.lower()}"
+    dest_path = dest_dir / dest_name
+
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(cover_to_use, dest_path)
+        logger.info(f"📷 Copied cover from {cover_source}: {cover_to_use.name} → {dest_name}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to copy cover image: {e}")
+        return False
 
 
 def read_metadata_json(directory: Path) -> dict:
@@ -166,6 +258,7 @@ class ImportBody(BaseModel):
     title: str
     hash: str
     history_id: int | None = None
+    mam_id: str | None = None  # MAM ID for Shelfarr cover lookup
     flatten: bool | None = None  # If None, uses global FLATTEN_DISCS setting
 
 
@@ -176,12 +269,14 @@ class BookPayload(BaseModel):
     subdirectory: str  # Relative path within torrent root (e.g., "Book 1 - Title")
     position: int | None = None  # Book position in series (optional)
     series_name: str | None = None  # Series name if applicable
+    mam_id: str | None = None  # MAM ID for Shelfarr cover lookup
 
 
 class MultiBookImportBody(BaseModel):
     """Request body for importing multiple books from single torrent."""
     torrent_hash: str
     history_id: int  # Primary history entry for the torrent
+    mam_id: str | None = None  # MAM ID for Shelfarr cover lookup (used if books don't have individual mam_ids)
     books: list[BookPayload]  # List of books to import
     flatten: bool | None = None  # If None, uses global FLATTEN_DISCS setting
 
@@ -298,14 +393,20 @@ async def do_import(body: ImportBody):
         elif action == "moved":
             files_moved = 1
     else:
-        # Collect all audio files
+        # Collect audio and image files separately
         audio_files = []
+        image_files = []
         for p in src_root.rglob("*"):
             if not p.is_file():
                 continue
             if p.suffix.lower() == ".cue":
                 continue
-            audio_files.append(p)
+
+            ext = p.suffix.lower()
+            if ext in IMAGE_EXTS:
+                image_files.append(p)
+            elif AUDIO_EXTS is None or ext in AUDIO_EXTS:
+                audio_files.append(p)
 
         # If flatten is enabled, sort by disc/track and rename sequentially
         if use_flatten and audio_files:
@@ -341,6 +442,9 @@ async def do_import(body: ImportBody):
                     files_linked += 1
                 elif action == "moved":
                     files_moved += 1
+
+        # Copy cover image with priority setting
+        copy_cover_image(body.mam_id, title, image_files, dest_dir)
 
     # Validate that we actually copied something
     if files_copied == 0:
@@ -645,14 +749,20 @@ async def do_multi_book_import(body: MultiBookImportBody):
                     elif action == "moved":
                         files_moved = 1
             else:
-                # Directory case: collect audio files
+                # Directory case: collect audio and image files separately
                 audio_files = []
+                image_files = []
                 for p in src_root.rglob("*"):
                     if not p.is_file():
                         continue
                     if p.suffix.lower() == ".cue":
                         continue
-                    audio_files.append(p)
+
+                    ext = p.suffix.lower()
+                    if ext in IMAGE_EXTS:
+                        image_files.append(p)
+                    elif AUDIO_EXTS is None or ext in AUDIO_EXTS:
+                        audio_files.append(p)
 
                 # Apply disc flattening WITHIN this book's directory
                 if use_flatten and audio_files:
@@ -683,6 +793,10 @@ async def do_multi_book_import(body: MultiBookImportBody):
                             files_linked += 1
                         elif action == "moved":
                             files_moved += 1
+
+                # Copy cover image with priority setting (use book's mam_id or fallback to torrent's)
+                book_mam_id = book.mam_id or body.mam_id
+                copy_cover_image(book_mam_id, title, image_files, dest_dir)
 
             if files_copied == 0:
                 book_result["error"] = "No audio files found in subdirectory"

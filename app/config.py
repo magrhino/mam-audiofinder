@@ -74,6 +74,10 @@ LIB_DIR = os.getenv("LIB_DIR", "/media/Books/Audiobooks")
 IMPORT_MODE = os.getenv("IMPORT_MODE", "link")  # link|copy|move
 FLATTEN_DISCS = os.getenv("FLATTEN_DISCS", "true").lower() in ("true", "1", "yes")  # flatten multi-disc to sequential files
 AUDIO_EXTS = None  # copy everything except .cue
+IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'}  # Image file extensions (preserved, not renamed)
+# Cover source priority: "shelfarr" (use Shelfarr cache first) or "torrent" (use torrent image first)
+# Falls back to the other source if preferred is unavailable
+COVER_SOURCE_PRIORITY = os.getenv("COVER_SOURCE_PRIORITY", "torrent").lower()  # shelfarr|torrent
 
 # ---------------------------- Auto-Import Configuration ----------------------------
 # These are default values that can be overridden at runtime via the Settings page
