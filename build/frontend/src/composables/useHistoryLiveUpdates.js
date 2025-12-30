@@ -25,6 +25,7 @@
  */
 
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useMessage } from 'naive-ui'
 import { useApi } from './useApi'
 
 /**
@@ -38,11 +39,17 @@ export function useHistoryLiveUpdates(options = {}) {
   const { interval = 5000 } = options
 
   const api = useApi()
+  const message = useMessage()
   const history = ref([])
   const isActive = ref(false)
   let refreshInterval = null
+  let autoImportInterval = null
   let torrentAddedHandler = null
   let importCompletedHandler = null
+
+  // Track previously seen auto-import activity IDs to avoid duplicate notifications
+  const seenActivityIds = new Set()
+  let isInitialLoad = true
 
   /**
    * Load history data from API
@@ -55,6 +62,39 @@ export function useHistoryLiveUpdates(options = {}) {
       console.log(`[useHistoryLiveUpdates] Loaded ${history.value.length} items`)
     } catch (err) {
       console.error('[useHistoryLiveUpdates] Failed to load history:', err)
+    }
+  }
+
+  /**
+   * Check auto-import status and show notifications for new completions/failures
+   */
+  const checkAutoImportActivity = async () => {
+    try {
+      const status = await api.getAutoImportStatus()
+      const activities = status.recent_activity || []
+
+      for (const activity of activities) {
+        // Skip if already seen
+        if (seenActivityIds.has(activity.id)) continue
+        seenActivityIds.add(activity.id)
+
+        // Skip notifications on initial load (don't notify for old items)
+        if (isInitialLoad) continue
+
+        // Show notifications based on status
+        if (activity.status === 'completed') {
+          message.success(`🤖 Auto-imported: "${activity.title}"`)
+          // Reload history to reflect the change
+          loadHistory()
+        } else if (activity.status === 'failed') {
+          message.error(`❌ Auto-import failed: "${activity.title}" - ${activity.reason || 'Unknown error'}`)
+        }
+      }
+
+      // After first check, clear initial load flag
+      isInitialLoad = false
+    } catch (err) {
+      console.error('[useHistoryLiveUpdates] Failed to check auto-import status:', err)
     }
   }
 
@@ -138,6 +178,16 @@ export function useHistoryLiveUpdates(options = {}) {
     importCompletedHandler = handleImportCompleted
     window.addEventListener('importCompleted', importCompletedHandler)
 
+    // Initial check for auto-import activity (populates seenActivityIds)
+    checkAutoImportActivity()
+
+    // Set up auto-import status polling (every 10s)
+    autoImportInterval = setInterval(() => {
+      if (isActive.value) {
+        checkAutoImportActivity()
+      }
+    }, 10000)
+
     console.log('[useHistoryLiveUpdates] Auto-refresh started (interval:', interval, 'ms)')
   }
 
@@ -148,11 +198,18 @@ export function useHistoryLiveUpdates(options = {}) {
     console.log('[useHistoryLiveUpdates] Stopping auto-refresh...')
     isActive.value = false
 
-    // Clear interval
+    // Clear history refresh interval
     if (refreshInterval) {
       clearInterval(refreshInterval)
       refreshInterval = null
       console.log('[useHistoryLiveUpdates] Interval cleared')
+    }
+
+    // Clear auto-import status polling interval
+    if (autoImportInterval) {
+      clearInterval(autoImportInterval)
+      autoImportInterval = null
+      console.log('[useHistoryLiveUpdates] Auto-import interval cleared')
     }
 
     // Remove torrentAdded event listener

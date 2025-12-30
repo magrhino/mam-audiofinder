@@ -435,7 +435,7 @@ class AutoImportService:
                     continue
                 if p.suffix.lower() == ".cue":
                     continue
-                if p.suffix.lower() in AUDIO_EXTS:
+                if AUDIO_EXTS is None or p.suffix.lower() in AUDIO_EXTS:
                     audio_files.append(p)
 
             # Apply disc flattening if enabled
