@@ -1,68 +1,45 @@
-# ShelfArr
+<p align="center">
+  <img src="app/static/icon.png" width="180" alt="ShelfArr logo" />
+</p>
 
-ShelfArr is an audiobook first management application for searching MyAnonamouse, adding torrents to qBittorrent, and importing completed downloads into Audiobookshelf, with asperations to become a full fledge management tool.
+<h1 align="center">ShelfArr</h1>
 
-Orginally forked from raygan/mam-audiofinder and theoretically compatible for upgrading to. Thank you Raygan for the original idea.
+<p align="center">
+  Audiobook-first automation for MyAnonamouse → qBittorrent → Audiobookshelf.
+</p>
 
-![Search](docs/documentation/screenshots/search.jpg)
-![History](docs/documentation/screenshots/history.jpg)
-![Showcase](docs/documentation/screenshots/showcase.jpg)
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#configuration">Configuration</a> •
+  <a href="#how-to-use">How to Use</a> •
+  <a href="#troubleshooting">Troubleshooting</a> •
+  <a href="docs/">Docs</a>
+</p>
 
-Screenshots above reflect the Vue 3 + Naive UI SPA views.
+ShelfArr is an audiobook-first management app for searching MyAnonamouse (MAM), sending torrents to qBittorrent, and importing completed downloads into Audiobookshelf.
+
+Originally forked from `raygan/mam-audiofinder` and intended to remain upgrade-compatible where practical.
 
 ## Table of Contents
-- [Architecture Overview](#architecture-overview)
 - [Features](#features)
 - [Quick Start](#quick-start)
-  - [Repository Layout](#repository-layout)
-  - [1. Clone & Configure](#1-clone--configure)
-  - [2. Edit `.env` File](#2-edit-env-file)
-  - [3. Frontend Build Workflow](#3-frontend-build-workflow)
-  - [4. Start Container](#4-start-container)
-  - [5. Open Browser](#5-open-browser)
 - [Configuration](#configuration)
-  - [Required Environment Variables](#required-environment-variables)
-  - [Optional - Audiobookshelf Integration](#optional---audiobookshelf-integration)
-  - [Optional - Behavior](#optional---behavior)
-  - [Optional - Container Settings](#optional---container-settings)
 - [How to Use](#how-to-use)
-  - [Search for Audiobooks](#search-for-audiobooks)
-  - [Add to qBittorrent](#add-to-qbittorrent)
-  - [Import to Audiobookshelf](#import-to-audiobookshelf)
-  - [Browse with Showcase View](#browse-with-showcase-view)
-- [Important Notes](#important-notes)
-  - [Security](#security)
-  - [Path Mapping](#path-mapping)
-  - [Multi-Disc Audiobooks](#multi-disc-audiobooks)
-  - [Import Verification](#import-verification)
+- [Architecture Overview](#architecture-overview)
 - [Troubleshooting](#troubleshooting)
 - [Logs](#logs)
 - [Technical Documentation](#technical-documentation)
 - [Requirements](#requirements)
 - [License](#license)
 
-## Architecture Overview
-- **SPA entrypoint:** Vite builds land in `app/static/dist/` with `index.html` served for all non-API routes. FastAPI mounts `/static` and provides the SPA fallback in `app/main.py`.
-- **Backend role:** FastAPI exposes API routes under `app/routes/` (`/search`, `/history`, `/import`, `/qb`, `/logs`, `/series`, `/covers`, `/config`, `/health`) and defers HTML to the SPA index.
-- **Routing:** Vue Router runs in history mode with a catch-all redirect for unknown paths. Deep links and refreshes resolve through the FastAPI fallback.
-- **Styling system:** UnoCSS atomic utilities with custom shortcuts (uno.config.js), global CSS custom properties in `build/frontend/src/styles/global.css`, component-scoped styles in Vue `<style>` blocks, and Naive UI theme overrides in `build/frontend/src/theme/naive.js`.
-
 ## Features
-- **Vue SPA views:** Search, History (imports + verification), Showcase, Logs, and Series all run as Vue Router pages with Naive UI components.
-- **Search MAM:** Find audiobooks by title, author, or narrator with inline cover loading and “already in library” indicators.
-- **Add to qBittorrent:** One-click torrent submissions with configurable category and optional post-import category change.
-- **Import to Audiobookshelf:** Link/copy/move completed downloads, flatten multi-disc layouts, and verify imports automatically.
-- **Showcase grid:** Browse grouped editions in a visual grid with quick add actions.
-- **Series discovery:** Explore series metadata via Hardcover with sortable data tables.
-- **Automatic verification:** ABS-backed verification badges and logs to track import health.
+- **Vue 3 SPA:** Search, History (imports + verification), Showcase, Logs, and Series.
+- **Search MAM:** Find audiobooks by title/author/narrator with rich results.
+- **Add to qBittorrent:** One-click torrent submissions with category support.
+- **Import to Audiobookshelf:** Link/copy/move downloads, optional disc flattening, and verification.
+- **Series discovery:** Explore series metadata via Hardcover.
 
 ## Quick Start
-
-### Repository Layout
-- `app/` – FastAPI backend, static asset mount, SPA fallback, API routers.
-- `build/frontend/` – Vue 3 + Vite workspace (scripts in `package.json`).
-- `docs/` – Technical docs, migration notes, screenshots.
-- `data/` – Runtime volume for databases, logs, covers (mounted in Docker).
 
 ### 1. Clone & Configure
 ```bash
@@ -71,142 +48,144 @@ cd shelfarr
 cp env.example .env
 ```
 
-### 2. Edit `.env` File
+### 2. Edit `.env`
 
-**Required settings:**
+At minimum, set your port, user/permissions, MAM + qBittorrent details, and host mount paths:
+
 ```bash
-# MAM session cookie (get from browser DevTools)
-MAM_COOKIE=mam_id=your_cookie_here
+APP_PORT=8008
 
-# qBittorrent WebUI
+PUID=1000
+PGID=1000
+UMASK=0002
+
+# --- MAM and qBittorrent credentials ---
+MAM_COOKIE=mam_id=your_cookie_here
 QB_URL=http://qbittorrent:8080
 QB_USER=youruser
 QB_PASS=yourpass
 
-# Storage paths (host paths)
+# Recommended
+QB_CATEGORY=shelfarr
+
+# --- host mounts (adjust to your system) ---
 MEDIA_ROOT=/path/to/media
-DATA_DIR=/path/to/appdata/shelfarr
+DATA_DIR=/path/to/appdata/shelfarr/data
 ```
 
-**Optional - Enable Audiobookshelf features:**
+Tip: you can paste the full Cookie header, a `mam_id=...` cookie, or a single token; ShelfArr normalizes it.
+
+### 3. Create the Docker Network (if needed)
+
+`docker-compose.yml` references an external network named `nginx-network`. If you don’t use it, either create it:
+
 ```bash
-ABS_BASE_URL=http://audiobookshelf:13378
-ABS_API_KEY=your_api_key_here
+docker network create nginx-network
 ```
 
-### 3. Start Container
+…or edit `docker-compose.yml` to remove the `networks:` section.
+
+### 4. Start the Container
 ```bash
 docker compose up -d --build
 ```
 
-### 4. Open Browser
-Visit [http://localhost:8008](http://localhost:8008). All non-API routes render the Vue SPA; Vue Router handles client-side navigation.
+### 5. Open the Web UI
+Visit `http://127.0.0.1:8008` (or whatever you set in `APP_PORT`).
+
+If you set `ABS_BASE_URL`, ShelfArr will prompt you to log in with your Audiobookshelf credentials to enable covers, library checks, and verification.
 
 ## Configuration
 
-### Required Environment Variables
+All configuration is done via environment variables (see `env.example`). Common ones are listed here.
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `MAM_COOKIE` | Your MAM session cookie (use ASN-locked cookie) | `mam_id=abc123...` |
-| `QB_URL` | qBittorrent WebUI URL | `http://qbittorrent:8080` |
-| `QB_USER` | qBittorrent username | `admin` |
-| `QB_PASS` | qBittorrent password | `password123` |
-| `MEDIA_ROOT` | Host path containing both torrents and library | `/mnt/storage` |
-| `DATA_DIR` | Host path for app data (databases, logs, covers) | `/path/to/appdata/shelfarr` |
+### Required
 
-### Optional - Audiobookshelf Integration
+| Variable | Description |
+|----------|-------------|
+| `APP_PORT` | Host port to expose the web UI on (maps to container port 8080) |
+| `PUID` | Host user ID to run the container as |
+| `PGID` | Host group ID to run the container as |
+| `UMASK` | File creation mask (octal string, e.g. `0002`) |
+| `MEDIA_ROOT` | Host path mounted to `/media` in the container (should include your downloads + library paths or hardlinks will not work)|
+| `DATA_DIR` | Host path mounted to `/data` (databases, logs, cover cache) |
+| `QB_URL` | qBittorrent WebUI URL |
+| `QB_USER` | qBittorrent username |
+| `QB_PASS` | qBittorrent password |
+| `MAM_COOKIE` | MAM cookie/token used for searching (`mam_id=...` or full cookie header) |
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ABS_BASE_URL` | *(none)* | Audiobookshelf URL for cover images and verification |
-| `ABS_API_KEY` | *(none)* | Audiobookshelf API token |
-| `ABS_LIBRARY_ID` | *(none)* | Specific library ID to search (optional) |
-| `ABS_CHECK_LIBRARY` | `true` | Show "already in library" indicators on search results |
-| `MAX_COVERS_SIZE_MB` | `500` | Max disk space for cover cache (0 = no cache) |
-
-**When ABS is configured, you get:** cover images, automatic import verification, library indicators, and description display pulled from Audiobookshelf metadata.
-
-### Optional - Behavior
+### Audiobookshelf (Optional)
+While optional it is recommended to configure ABS_BASE_URL and ABS_ADMIN_USER for full functionality.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `IMPORT_MODE` | `link` | Import method: `link` (hardlink), `copy`, or `move` |
-| `FLATTEN_DISCS` | `true` | Flatten multi-disc audiobooks to sequential files |
+| `ABS_BASE_URL` | *(none)* | Base URL for Audiobookshelf (enables login + covers + verification) |
+| `ABS_ADMIN_USER` | *(none)* | ABS username treated as “admin” for library-management actions |
+| `MAX_COVERS_SIZE_MB` | `500` | Max disk space for cached covers (0 = no limit; direct-fetch-only is not recommended) |
+| `ABS_VERIFY_TIMEOUT` | `10` | Timeout (seconds) for import verification |
+| `ABS_CHECK_LIBRARY` | `true` when ABS configured | Show “already in library” indicators |
+| `ABS_LIBRARY_CACHE_TTL` | `300` | Cache TTL (seconds) for library presence checks |
+
+### Import Behavior (Optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `IMPORT_MODE` | `link` | `link` (hardlink), `copy`, or `move` |
+| `FLATTEN_DISCS` | `true` | Flatten multi-disc audiobooks into a single sequence |
+| `DL_DIR` | `/media/torrents` | In-container downloads path |
+| `LIB_DIR` | `/media/Books/Audiobooks` | In-container library path |
 | `QB_CATEGORY` | `shelfarr` | Category assigned to new torrents |
-| `QB_POSTIMPORT_CATEGORY` | *(none)* | Category to set after import (empty = remove category) |
-| `APP_PORT` | `8008` | Host port for web interface |
+| `QB_POSTIMPORT_CATEGORY` | *(empty)* | Category to set after import (empty = none/clear) |
 
-### Optional - Container Settings
+
+### Hardcover (Optional)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DL_DIR` | `/media/torrents` | In-container path for qBittorrent downloads |
-| `LIB_DIR` | `/media/Books/Audiobooks` | In-container path for Audiobookshelf library |
-| `PUID` | `1000` | Container user ID (for file permissions) |
-| `PGID` | `1000` | Container group ID (for file permissions) |
-| `UMASK` | `0002` | File creation mask |
-| `LOG_MAX_MB` | `5` | Max log file size before rotation (MB) |
-| `LOG_MAX_FILES` | `5` | Number of rotated log files to keep |
-
-See `env.example` for full configuration with comments.
-
+| `HARDCOVER_API_TOKEN` | *(none)* | Hardcover GraphQL token for series discovery |
+| `HARDCOVER_CACHE_TTL` | `300` | Cache TTL (seconds) for series lookups |
+| `HARDCOVER_RATE_LIMIT` | `60` | Requests per minute (Hardcover API limit: 60/min) |
+| `HARDCOVER_SERIES_LIMIT` | `20` | Default number of series results to fetch |
+A hardcover api key can be obtained by creating a [free hardcover account](https://hardcover.app/account/api).
 ## How to Use
 
 ### Search for Audiobooks
-1. Open the **Search** view in the Vue SPA.
-2. Enter title, author, or narrator then run the search.
-3. Results stream in with covers and “already in library” indicators (ABS).
-4. Use action buttons to add torrents or view details.
-
-### Add to qBittorrent
-1. From **Search** or **Showcase**, click **Add** on a result.
-2. Torrent is added to qBittorrent with the configured category.
-3. Entry appears in the **History** view with status badges.
+1. Open the **Discover** view.
+2. Enter title, author, or narrator.
+3. Add results to qBittorrent or open details.
 
 ### Import to Audiobookshelf
+#### You can either anually import or auto import
+a) Auto import
+1. Go to Gear Icon and toggle auto import feature on.
+
+b) Manual Import
 1. Open the **History** view.
-2. Wait for the download status to reach completed (qBittorrent).
-3. Click **Import**, choose destination, and confirm flattening if multi-disc.
-4. Import links/copies/moves files as configured, then verification runs.
-5. Status badges reflect verification state (Verified, Mismatch, Not Found, Unreachable).
+2. Wait for qBittorrent to finish the download.
+3. Click **Import** and confirm.
+4. If ABS is configured and you’re logged in, ShelfArr verifies the import automatically and when you click verify.
 
-### Browse with Showcase View
-1. Open **Showcase** to see grouped editions in a grid.
-2. Filter or search within the Vue view; navigation stays in-app (no full reloads).
-3. Click a card for versions and add any release to qBittorrent.
-
-## Important Notes
-
-### Security
-ShelfArr has no built-in authentication. Run on a private network, behind a VPN, or behind an authenticated proxy.
-
-### Path Mapping
-The app and qBittorrent run in separate containers. `MEDIA_ROOT` must be mounted to both containers at consistent paths so imports can find completed downloads.
-
-### Multi-Disc Audiobooks
-When `FLATTEN_DISCS=true`, imports reorganize multi-disc structures into a single flat sequence suitable for Audiobookshelf. Disable to preserve original layout.
-
-### Import Verification
-With ABS configured, imports trigger verification and display badges in the **History** view. Retry via the **Verify** action if ABS scans lag.
+## Architecture Overview
+- **SPA entrypoint:** Vite builds land in `app/static/dist/` with `index.html` served for all non-API routes. FastAPI mounts `/static` and provides the SPA fallback in `app/main.py`.
+- **Backend role:** FastAPI exposes API routes under `app/routes/` (`/search`, `/history`, `/import`, `/qb`, `/logs`, `/series`, `/covers`, `/config`, `/health`) and defers HTML to the SPA index.
+- **Routing:** Vue Router runs in history mode with a catch-all redirect for unknown paths. Deep links and refreshes resolve through the FastAPI fallback.
+- **Styling system:** UnoCSS atomic utilities with custom shortcuts (`build/frontend/uno.config.js`), global CSS variables in `build/frontend/src/styles/global.css`, and Naive UI theme overrides in `build/frontend/src/theme/naive.js`.
 
 ## Troubleshooting
-- **Import fails with "path not found":** Confirm `MEDIA_ROOT` mounts match between containers and that `DL_DIR`/`LIB_DIR` align with qBittorrent and Audiobookshelf paths.
-- **Permission errors:** Ensure `PUID`, `PGID`, and `UMASK` match your host user/group; rebuild the container after changes.
-- **Covers not loading:** Verify `ABS_BASE_URL` and `ABS_API_KEY`, check reachability from the container, and tail application logs.
-- **Verification always "not_found":** Allow ABS time to rescan after imports, then use **Verify** in **History**.
+- **Docker compose fails with “network nginx-network declared as external, but could not be found”:** Run `docker network create nginx-network` or remove the external network from `docker-compose.yml`.
+- **Import fails with “path not found”:** Confirm your `/media` mount contains both the downloads and library directories and that `DL_DIR`/`LIB_DIR` match your structure.
+- **Permission errors:** Set `PUID`, `PGID`, and `UMASK` to match your host and rebuild the container.
 - **MAM searches fail:** Refresh your MAM cookie and restart the container.
+- **ABS features disabled:** Set `ABS_BASE_URL`, restart, then log in via the UI.
 
 ## Logs
 - In-app: open the SPA **Logs** view at `/logs` (rendered by Vue, fed by API).
-- CLI: `docker compose logs -f` or tail log files in the mounted `DATA_DIR`.
+- CLI: `docker compose logs -f` or view log files inside the mounted `DATA_DIR`.
 
 ## Technical Documentation
 - `docs/BACKEND.md` – FastAPI architecture, routing, dependencies, and SPA fallback behavior.
 - `docs/FRONTEND.md` – Vue SPA architecture, routing map, components, styling, and Naive UI theme.
 - `docs/TESTING.md` – Testing guide: local and container-based testing, Selenium integration.
-- `docs/jinja_migration_changes.md` – SPA migration notes and fallback routing details.
-- `docs/css_refactoring_summary.md` – CSS architecture (main.css, legacy.css, global.css, scoped styles, Naive UI theme).
 
 ## Requirements
 - Docker & Docker Compose
