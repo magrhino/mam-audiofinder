@@ -1,5 +1,6 @@
 <script setup>
 import { NCard, NText, NImage } from 'naive-ui'
+import { useAuth } from '@composables/useAuth'
 
 const props = defineProps({
   books: { type: Array, required: true },
@@ -7,12 +8,10 @@ const props = defineProps({
 
 const emit = defineEmits(['bookClick'])
 
+const { absCoverProxyUrl } = useAuth()
+
 const getCoverUrl = (book) => {
-  // Use the cover proxy endpoint with the book's ABS item ID
-  if (book.id) {
-    return `/api/library/cover/${book.id}`
-  }
-  return null
+  return absCoverProxyUrl(book?.id)
 }
 
 const handleBookClick = (book) => {

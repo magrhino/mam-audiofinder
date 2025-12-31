@@ -2,8 +2,9 @@
 Settings service for MAM Audiobook Finder.
 Manages runtime-configurable application settings with database persistence.
 """
+import json
 import logging
-from typing import Any
+from typing import Any, List
 from sqlalchemy import text
 
 from db import engine
@@ -203,6 +204,118 @@ class SettingsService:
 
         except Exception as e:
             logger.error(f"Failed to reset settings: {e}")
+            return False
+
+    # --- Library Settings ---
+
+    def get_enabled_libraries(self) -> List[str]:
+        """
+        Get list of enabled library IDs.
+
+        Returns:
+            List of library ID strings
+        """
+        try:
+            value = self.get("enabled_library_ids")
+            if value and isinstance(value, str):
+                return json.loads(value)
+            return []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_enabled_libraries(self, library_ids: List[str]) -> bool:
+        """
+        Set the list of enabled library IDs.
+
+        Args:
+            library_ids: List of library ID strings
+
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.set("enabled_library_ids", json.dumps(library_ids))
+
+    def get_cached_libraries(self) -> List[dict]:
+        """
+        Get cached library metadata for display.
+
+        Returns:
+            List of library dicts with id, name, media_type, etc.
+        """
+        try:
+            value = self.get("cached_libraries")
+            if value and isinstance(value, str):
+                return json.loads(value)
+            return []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_cached_libraries(self, libraries: List[dict]) -> bool:
+        """
+        Cache library metadata from ABS.
+
+        Args:
+            libraries: List of library dicts
+
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.set("cached_libraries", json.dumps(libraries))
+
+    def is_libraries_initialized(self) -> bool:
+        """
+        Check if libraries have been initialized from ABS.
+
+        Returns:
+            True if initialized, False otherwise
+        """
+        value = self.get("libraries_initialized")
+        if isinstance(value, str):
+            return value.lower() in ("true", "1", "yes")
+        return bool(value)
+
+    def set_libraries_initialized(self, initialized: bool) -> bool:
+        """
+        Set the libraries initialized flag.
+
+        Args:
+            initialized: Whether libraries are initialized
+
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.set("libraries_initialized", "true" if initialized else "false")
+
+    def initialize_libraries(self, libraries: List[dict]) -> bool:
+        """
+        Initialize library settings from ABS library list.
+
+        Auto-enables libraries with mediaType='book'.
+
+        Args:
+            libraries: List of library dicts from ABS API
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Cache the full library list
+            self.set_cached_libraries(libraries)
+
+            # Auto-enable audiobook libraries (mediaType='book')
+            audiobook_ids = [
+                lib.get("id") for lib in libraries
+                if lib.get("media_type") == "book" or lib.get("mediaType") == "book"
+            ]
+
+            self.set_enabled_libraries(audiobook_ids)
+            self.set_libraries_initialized(True)
+
+            logger.info(f"📚 Initialized {len(audiobook_ids)} audiobook libraries out of {len(libraries)} total")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to initialize libraries: {e}")
             return False
 
 

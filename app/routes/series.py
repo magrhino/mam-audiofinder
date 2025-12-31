@@ -5,13 +5,13 @@ Handles series discovery and book listings.
 import logging
 import asyncio
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Literal
 
 from hardcover_client import hardcover_client
-from abs_client import abs_client
+from abs_client import get_abs_client
 from utils import normalize_title, normalize_author
 from enrichment_tracker import get_tracker
 from covers import CoverService
@@ -243,7 +243,8 @@ async def get_book_series_info(series_id: int) -> Optional[dict]:
 async def enrich_books_with_abs(
     books: List[dict],
     series_author: str,
-    include_audio_meta: bool = False
+    include_audio_meta: bool = False,
+    user_token: Optional[str] = None
 ) -> List[dict]:
     """
     Translation layer: Enrich Hardcover books with ABS cover data.
@@ -256,12 +257,16 @@ async def enrich_books_with_abs(
         books: Hardcover-enriched books from get_book_series_info()
         series_author: Series author for ABS lookups
         include_audio_meta: If True, fetch audiobook metadata from Hardcover (slower)
+        user_token: User authentication token for ABS API calls
 
     Returns:
         List of ShowcaseCard-compatible book objects with covers and library status
     """
     audio_meta_msg = " (including audiobook metadata)" if include_audio_meta else ""
     logger.info(f"📚 Enriching {len(books)} books with ABS data{audio_meta_msg}")
+
+    # Create token-authenticated ABS client
+    abs_client = get_abs_client(user_token=user_token)
 
     # Enrich each book with ABS data (10 concurrent requests max)
     semaphore = asyncio.Semaphore(10)
@@ -290,7 +295,7 @@ async def enrich_books_with_abs(
             # Define concurrent tasks for parallel execution
             async def fetch_cover_task():
                 """Fetch cover from ABS."""
-                if not abs_client.is_configured:
+                if not abs_client.is_configured or not abs_client.has_token:
                     return {}
                 try:
                     logger.debug(f"📸 Fetching cover for '{book_title}'")
@@ -306,7 +311,7 @@ async def enrich_books_with_abs(
 
             async def check_library_task():
                 """Check if book is in ABS library."""
-                if not (abs_client.is_configured and abs_client.library_id):
+                if not (abs_client.is_configured and abs_client.has_token):
                     return {}
                 try:
                     return await abs_client.check_library_items([
@@ -433,7 +438,8 @@ async def _background_enrich_books(
     series_id: str,
     books: List[dict],
     series_author: str,
-    include_audio_meta: bool = False
+    include_audio_meta: bool = False,
+    user_token: Optional[str] = None
 ):
     """
     Background task to enrich books concurrently and update enrichment tracker.
@@ -443,6 +449,7 @@ async def _background_enrich_books(
         books: List of basic book data from Hardcover
         series_author: Series author name
         include_audio_meta: If True, fetch audiobook metadata from Hardcover
+        user_token: User authentication token for ABS API calls
     """
     tracker = get_tracker()
 
@@ -453,7 +460,8 @@ async def _background_enrich_books(
         enriched_books = await enrich_books_with_abs(
             books=books,
             series_author=series_author,
-            include_audio_meta=include_audio_meta
+            include_audio_meta=include_audio_meta,
+            user_token=user_token
         )
 
         # Update tracker with enriched books (one at a time for progress tracking)
@@ -486,7 +494,8 @@ async def get_series_books(
         description="If True, return all editions including non-English versions. "
                     "If False (default), return only canonical English primary editions. "
                     "Each book will have an 'is_canonical' field indicating canonical status."
-    )
+    ),
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
 ):
     """
     Get books in a series from Hardcover with progressive enrichment support.
@@ -703,6 +712,10 @@ async def get_series_books(
         # END RESOLUTION
         # ==================================================================
 
+        # Create token-authenticated ABS client for this request
+        abs_client = get_abs_client(user_token=x_abs_token)
+        abs_ready = abs_client.is_configured and abs_client.has_token
+
         # MODE: "immediate" - Return basic data, start background enrichment
         if enrich_mode == "immediate":
             logger.info(f"⚡ Returning immediate response with basic data ({len(result['books'])} books)")
@@ -711,12 +724,13 @@ async def get_series_books(
             job = await tracker.start_job(series_id_str, len(result['books']))
 
             # Launch background enrichment task (non-blocking)
-            if abs_client.is_configured:
+            if abs_ready:
                 asyncio.create_task(_background_enrich_books(
                     series_id=series_id_str,
                     books=result['books'],
                     series_author=result['author_name'],
-                    include_audio_meta=include_audio_meta
+                    include_audio_meta=include_audio_meta,
+                    user_token=x_abs_token
                 ))
                 audio_msg = " (with audiobook metadata)" if include_audio_meta else ""
                 logger.info(f"🚀 Launched background enrichment task for series {series_id}{audio_msg}")
@@ -726,7 +740,7 @@ async def get_series_books(
                 "series_name": result['series_name'],
                 "author_name": result['author_name'],
                 "books": result['books'],  # Basic data with positions
-                "enrichment_status": "pending" if abs_client.is_configured else "not_configured",
+                "enrichment_status": "pending" if abs_ready else "not_configured",
                 "enrichment_progress": job.get_progress(),
                 "total": len(result['books']),
                 "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
@@ -736,14 +750,15 @@ async def get_series_books(
             return JSONResponse(response)
 
         # MODE: "wait" - Blocking enrichment
-        if abs_client.is_configured:
+        if abs_ready:
             audio_msg = " (with audiobook metadata)" if include_audio_meta else ""
             logger.info(f"⏳ Applying blocking enrichment to {len(result['books'])} books{audio_msg}")
 
             enriched_books = await enrich_books_with_abs(
                 books=result['books'],
                 series_author=result['author_name'],
-                include_audio_meta=include_audio_meta
+                include_audio_meta=include_audio_meta,
+                user_token=x_abs_token
             )
 
             response = {

@@ -1,9 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { NTabs, NTabPane, NSpin, NEmpty, NPagination } from 'naive-ui'
 import GlassSearchBar from '@/components/GlassSearchBar.vue'
-import SourceToggle from '@/components/SourceToggle.vue'
+import LibrarySelector from '@/components/LibrarySelector.vue'
 import LibraryBookGrid from '@/components/LibraryBookGrid.vue'
 import LibrarySeriesTable from '@/components/LibrarySeriesTable.vue'
 import SeriesDiffModal from '@/components/SeriesDiffModal.vue'
@@ -15,23 +15,32 @@ const api = useApi()
 const activeTab = ref('series')
 const router = useRouter()
 
-// Config state
-const config = ref({ abs_configured: false, hardcover_configured: false })
+// Libraries state
+const libraries = ref([])
+const librariesLoading = ref(false)
+const selectedLibraryId = ref(null) // null = all libraries
 
 onMounted(async () => {
+  await fetchLibraries()
+})
+
+async function fetchLibraries() {
+  librariesLoading.value = true
   try {
-    const cfg = await api.get('/config')
-    config.value = {
-      abs_configured: !!cfg.abs_configured,
-      hardcover_configured: !!cfg.hardcover_configured,
+    const response = await api.get('/api/abs/libraries')
+    if (response.ok) {
+      libraries.value = response.libraries || []
     }
   } catch (e) {
-    console.error('Failed to load config:', e)
+    console.error('Failed to load libraries:', e)
+  } finally {
+    librariesLoading.value = false
   }
-})
+}
 
 // Books tab state
 const {
+  libraryId: booksLibraryId,
   books,
   loading: booksLoading,
   error: booksError,
@@ -44,6 +53,7 @@ const {
 
 // Series tab state
 const {
+  libraryId: seriesLibraryId,
   series,
   loading: seriesLoading,
   error: seriesError,
@@ -51,9 +61,14 @@ const {
   page: seriesPage,
   total: seriesTotal,
   pages: seriesPages,
-  source: seriesSource,
   fetchSeries,
 } = useLibrarySeries()
+
+// Sync library selection across both composables
+watch(selectedLibraryId, (newId) => {
+  booksLibraryId.value = newId
+  seriesLibraryId.value = newId
+})
 
 // Diff modal state
 const diffModalVisible = ref(false)
@@ -88,10 +103,10 @@ function handleBookClick(book) {
   <div class="library-view p-4 w-full max-w-full overflow-x-hidden">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">Library</h1>
-      <SourceToggle
-        v-model="seriesSource"
-        :abs-configured="config.abs_configured"
-        :hardcover-configured="config.hardcover_configured"
+      <LibrarySelector
+        v-model="selectedLibraryId"
+        :libraries="libraries"
+        :loading="librariesLoading"
       />
     </div>
 

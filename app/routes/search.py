@@ -5,11 +5,12 @@ import asyncio
 import logging
 import random
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 
-from config import MAM_BASE, MAM_COOKIE, ABS_BASE_URL, ABS_API_KEY, ABS_CHECK_LIBRARY
-from abs_client import abs_client
+from config import MAM_BASE, MAM_COOKIE, ABS_BASE_URL, ABS_CHECK_LIBRARY
+from abs_client import get_abs_client
 from mam_cache import get_cached_mam_search, cache_mam_search
 from dependencies.mam import normalize_mam_result, flatten, detect_format
 from utils import normalize_title, normalize_author
@@ -19,7 +20,10 @@ logger = logging.getLogger("mam-audiofinder")
 
 
 @router.post("/search")
-async def search(payload: dict):
+async def search(
+    payload: dict,
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+):
     """Search MAM for audiobooks with 5-minute caching."""
     if not MAM_COOKIE:
         raise HTTPException(status_code=500, detail="MAM_COOKIE not set on server")
@@ -83,14 +87,17 @@ async def search(payload: dict):
     # Normalize all results using shared MAM result normalizer
     out = [normalize_mam_result(item) for item in raw.get("data", [])]
 
-    # Check which items exist in ABS library (if feature enabled)
-    if ABS_CHECK_LIBRARY and out:
+    # Check which items exist in ABS library (if feature enabled and token available)
+    if ABS_CHECK_LIBRARY and out and x_abs_token:
         try:
+            # Create token-authenticated client
+            client = get_abs_client(user_token=x_abs_token)
+
             # Extract (title, author) pairs from results
             items_to_check = [(result["title"] or "", result["author_info"] or "") for result in out]
 
             # Call library check
-            library_results = await abs_client.check_library_items(items_to_check)
+            library_results = await client.check_library_items(items_to_check)
 
             # Update results with library status
             for result in out:
@@ -123,13 +130,14 @@ async def fetch_cover(
     mam_id: str = Query(..., description="MAM torrent ID"),
     title: str = Query("", description="Book title"),
     author: str = Query("", description="Book author"),
-    max_retries: int = Query(2, description="Maximum number of retries")
+    max_retries: int = Query(2, description="Maximum number of retries"),
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
 ):
     """
     Fetch cover for a specific MAM ID with retry logic.
     Returns immediately with cover URL or error.
     """
-    if not ABS_BASE_URL or not ABS_API_KEY:
+    if not ABS_BASE_URL:
         return JSONResponse({
             "mam_id": mam_id,
             "cover_url": None,
@@ -145,6 +153,17 @@ async def fetch_cover(
             "error": "No title provided"
         })
 
+    if not x_abs_token:
+        return JSONResponse({
+            "mam_id": mam_id,
+            "cover_url": None,
+            "item_id": None,
+            "error": "Authentication required for cover fetching"
+        })
+
+    # Create token-authenticated client
+    client = get_abs_client(user_token=x_abs_token)
+
     # Retry logic with exponential backoff and jitter
     last_error = None
     for attempt in range(max_retries + 1):
@@ -157,7 +176,7 @@ async def fetch_cover(
                 logger.info(f"🔄 Retry {attempt}/{max_retries} for '{title}' after {wait_time:.2f}s...")
                 await asyncio.sleep(wait_time)
 
-            result = await abs_client.fetch_cover(title, author, mam_id)
+            result = await client.fetch_cover(title, author, mam_id)
 
             if result and result.get("cover_url"):
                 logger.info(f"✅ Cover fetch succeeded for '{title}' on attempt {attempt + 1}")

@@ -2,6 +2,9 @@
 Audiobookshelf verification, config guards, and library check dependencies.
 
 Provides:
+- get_abs_token: Extract X-ABS-Token from request headers
+- get_current_user: Validate token and get user info from ABS
+- require_admin: Verify user is admin (matches ABS_ADMIN_USER)
 - require_abs_config: Fail fast when ABS not configured
 - abs_library_check: Batch library presence checker with caching
 - abs_import_verifier: Wraps verify_import with metadata/title fallback
@@ -13,24 +16,165 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import asyncio
 import json
-from fastapi import HTTPException
+import logging
+from fastapi import HTTPException, Header, Depends
+import httpx
 
-from config import ABS_BASE_URL, ABS_API_KEY
+from config import ABS_BASE_URL, ABS_ADMIN_USER
 from abs_client import abs_client
 from utils import sanitize, next_available
 
+logger = logging.getLogger("mam-audiofinder")
+
+
+# --- Token and Auth Dependencies ---
+
+async def get_abs_token(
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+) -> Optional[str]:
+    """
+    Extract X-ABS-Token from request headers.
+
+    Returns:
+        Token string if present, None otherwise
+    """
+    return x_abs_token
+
+
+async def require_abs_token(
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+) -> str:
+    """
+    Require X-ABS-Token header.
+
+    Returns:
+        Token string
+
+    Raises:
+        HTTPException: 401 if token not provided
+    """
+    if not x_abs_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please login."
+        )
+    return x_abs_token
+
+
+async def get_current_user(
+    token: str = Depends(require_abs_token)
+) -> Dict[str, Any]:
+    """
+    Validate token against ABS and get user info.
+
+    Returns:
+        User info dict with 'username', 'type', 'isActive', 'token'
+
+    Raises:
+        HTTPException: 401 if token invalid
+        HTTPException: 503 if ABS not configured
+    """
+    if not ABS_BASE_URL:
+        raise HTTPException(
+            status_code=503,
+            detail="Audiobookshelf is not configured."
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(
+                f"{ABS_BASE_URL}/api/authorize",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+            if resp.status_code != 200:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid or expired token. Please login again."
+                )
+
+            data = resp.json()
+            user = data.get("user", {})
+
+            return {
+                "username": user.get("username"),
+                "type": user.get("type"),
+                "isActive": user.get("isActive", True),
+                "token": token
+            }
+
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=503,
+            detail="ABS server not responding"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Token validation failed: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Token validation failed"
+        )
+
+
+async def require_admin(
+    user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Verify user is admin (username matches ABS_ADMIN_USER).
+
+    Returns:
+        User info dict if admin
+
+    Raises:
+        HTTPException: 403 if not admin
+    """
+    username = user.get("username", "")
+
+    # Check if user matches configured admin
+    if not ABS_ADMIN_USER:
+        # No admin configured - allow all authenticated users
+        logger.warning("⚠️ ABS_ADMIN_USER not set - all users have admin access")
+        return user
+
+    if username.lower() != ABS_ADMIN_USER.lower():
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    return user
+
+
+def is_admin_user(username: str) -> bool:
+    """
+    Check if username is the configured admin user.
+
+    Args:
+        username: Username to check
+
+    Returns:
+        True if admin, False otherwise
+    """
+    if not ABS_ADMIN_USER:
+        return True  # No admin configured - all users are admin
+    return username.lower() == ABS_ADMIN_USER.lower()
+
+
+# --- ABS Config Guards ---
 
 def require_abs_config() -> None:
     """
     Validates that Audiobookshelf is configured.
 
     Raises:
-        HTTPException: 503 if ABS_BASE_URL or ABS_API_KEY not set
+        HTTPException: 503 if ABS_BASE_URL not set
     """
-    if not ABS_BASE_URL or not ABS_API_KEY:
+    if not ABS_BASE_URL:
         raise HTTPException(
             status_code=503,
-            detail="Audiobookshelf is not configured. Set ABS_BASE_URL and ABS_API_KEY."
+            detail="Audiobookshelf is not configured. Set ABS_BASE_URL."
         )
 
 
@@ -101,7 +245,7 @@ async def abs_import_verifier(
         HTTPException: Only for critical errors (not for verification failures)
     """
     # Check if ABS is configured
-    if not ABS_BASE_URL or not ABS_API_KEY:
+    if not ABS_BASE_URL:
         return {
             "status": "not_configured",
             "note": "Audiobookshelf not configured",

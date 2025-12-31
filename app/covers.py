@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from sqlalchemy import text
 
-from config import COVERS_DIR, MAX_COVERS_SIZE_MB, ABS_BASE_URL, ABS_API_KEY
+from config import COVERS_DIR, MAX_COVERS_SIZE_MB
 from db import covers_engine, engine
 
 logger = logging.getLogger("mam-audiofinder")
@@ -90,12 +90,9 @@ class CoverService:
             logger.info(f"⬇️  Downloading cover from: {url}")
 
             async with httpx.AsyncClient(timeout=30) as client:
-                # Add auth header if it's an ABS URL
-                headers = {}
-                if ABS_BASE_URL and url.startswith(ABS_BASE_URL):
-                    headers["Authorization"] = f"Bearer {ABS_API_KEY}"
-
-                r = await client.get(url, headers=headers, follow_redirects=True)
+                # Note: Cover URLs from ABS should be accessible without auth
+                # If auth is needed, the caller should use a signed URL or proxy endpoint
+                r = await client.get(url, follow_redirects=True)
 
                 if r.status_code != 200:
                     logger.warning(f"⚠️  Failed to download cover: HTTP {r.status_code}")

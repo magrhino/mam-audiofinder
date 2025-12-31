@@ -92,6 +92,51 @@
       </div>
     </section>
 
+    <!-- Libraries Section (Admin Only) -->
+    <section v-if="isAdmin" class="glass-panel p-6 mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">Libraries</h3>
+        <n-button size="small" @click="refreshLibraries" :loading="librariesLoading">
+          Refresh
+        </n-button>
+      </div>
+      <p class="muted mb-4">
+        Select which Audiobookshelf libraries to search. Only audiobook libraries (mediaType: book) are shown.
+      </p>
+
+      <n-alert v-if="!config.abs_configured" type="warning" class="mb-4">
+        Audiobookshelf is not configured. Set ABS_BASE_URL environment variable.
+      </n-alert>
+
+      <div v-else-if="librariesLoading && libraries.length === 0" class="text-gray-400">
+        Loading libraries...
+      </div>
+
+      <div v-else-if="libraries.length === 0" class="text-gray-400">
+        No libraries found. Make sure you have access to libraries in Audiobookshelf.
+      </div>
+
+      <div v-else class="settings-grid">
+        <div v-for="lib in libraries" :key="lib.id" class="settings-row">
+          <div class="settings-label">
+            <label>{{ lib.name }}</label>
+            <span class="settings-description">
+              {{ lib.media_type === 'book' ? 'Audiobooks' : lib.media_type }}
+            </span>
+          </div>
+          <n-switch
+            :value="lib.enabled"
+            @update:value="(val) => toggleLibrary(lib.id, val)"
+            :disabled="librariesSaving"
+          />
+        </div>
+      </div>
+
+      <n-alert v-if="librariesError" type="error" class="mt-4" closable @close="librariesError = null">
+        {{ librariesError }}
+      </n-alert>
+    </section>
+
     <!-- Service Status Section -->
     <section class="glass-panel p-6 mb-6">
       <div class="flex justify-between items-center mb-4">
@@ -194,8 +239,10 @@ import { ref, reactive, onMounted, onUnmounted, h } from 'vue'
 import { NSwitch, NInputNumber, NButton, NAlert, NDataTable, NTag, NSelect, NTooltip } from 'naive-ui'
 import { useSettings } from '@composables/useSettings'
 import { useApi } from '@composables/useApi'
+import { useAuth } from '@composables/useAuth'
 
 const api = useApi()
+const { isAdmin, absAuthHeaders } = useAuth()
 const {
   settings,
   serviceStatus,
@@ -216,6 +263,12 @@ const coverPriorityOptions = [
   { label: 'Torrent (Default)', value: 'torrent' },
   { label: 'Shelfarr Cache', value: 'shelfarr' }
 ]
+
+// Libraries state (Admin only)
+const libraries = ref([])
+const librariesLoading = ref(false)
+const librariesSaving = ref(false)
+const librariesError = ref(null)
 
 // App config (read-only from /config endpoint)
 const config = reactive({
@@ -298,13 +351,103 @@ const loadConfig = async () => {
   }
 }
 
-const handleSave = async () => {
-  const success = await saveSettings()
-  if (success) {
-    // Could show a success notification here
-    console.log('[SettingsView] Settings saved successfully')
+// Load libraries from ABS
+const loadLibraries = async () => {
+  if (!isAdmin.value) return
+
+  librariesLoading.value = true
+  librariesError.value = null
+
+  try {
+    const resp = await fetch('/api/abs/libraries', {
+      headers: absAuthHeaders()
+    })
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`)
+    }
+
+    const data = await resp.json()
+    libraries.value = data.libraries || []
+  } catch (e) {
+    console.error('[SettingsView] Failed to load libraries:', e)
+    librariesError.value = e.message
+  } finally {
+    librariesLoading.value = false
   }
 }
+
+// Refresh libraries from ABS
+const refreshLibraries = async () => {
+  librariesLoading.value = true
+  librariesError.value = null
+
+  try {
+    // First refresh from ABS
+    const refreshResp = await fetch('/api/abs/libraries/refresh', {
+      method: 'POST',
+      headers: absAuthHeaders()
+    })
+
+    if (!refreshResp.ok) {
+      throw new Error(`HTTP ${refreshResp.status}`)
+    }
+
+    // Then reload the list
+    await loadLibraries()
+  } catch (e) {
+    console.error('[SettingsView] Failed to refresh libraries:', e)
+    librariesError.value = e.message
+    librariesLoading.value = false
+  }
+}
+
+// Toggle library enabled state
+const toggleLibrary = async (libraryId, enabled) => {
+  librariesSaving.value = true
+  librariesError.value = null
+
+  try {
+    // Get current enabled IDs and update
+    const currentEnabled = libraries.value
+      .filter(lib => lib.enabled)
+      .map(lib => lib.id)
+
+    let newEnabled
+    if (enabled) {
+      newEnabled = [...currentEnabled, libraryId]
+    } else {
+      newEnabled = currentEnabled.filter(id => id !== libraryId)
+    }
+
+    const resp = await fetch('/api/abs/libraries', {
+      method: 'PUT',
+      headers: absAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ enabled_library_ids: newEnabled })
+    })
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`)
+    }
+
+    // Update local state
+    const lib = libraries.value.find(l => l.id === libraryId)
+    if (lib) {
+      lib.enabled = enabled
+    }
+
+  } catch (e) {
+    console.error('[SettingsView] Failed to toggle library:', e)
+    librariesError.value = e.message
+  } finally {
+    librariesSaving.value = false
+  }
+}
+
+const handleSave = async () => {
+  await saveSettings()
+}
+
 
 const handleReset = async () => {
   if (confirm('Reset all settings to their default values?')) {
@@ -331,7 +474,8 @@ onMounted(async () => {
   await Promise.all([
     loadSettings(),
     loadConfig(),
-    loadServiceStatus()
+    loadServiceStatus(),
+    loadLibraries()  // Load libraries if admin
   ])
   // Start polling status every 10 seconds
   startStatusPolling(10000)

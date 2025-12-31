@@ -2,13 +2,16 @@
 Authentication routes for ABS-based login.
 Validates credentials against Audiobookshelf server.
 """
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 import httpx
 import logging
 
-from config import ABS_BASE_URL
+from config import ABS_BASE_URL, ABS_ADMIN_USER
+from dependencies.abs import is_admin_user
+from abs_client import get_abs_client
+from settings_service import settings_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("mam-audiofinder")
@@ -25,6 +28,7 @@ class LoginResponse(BaseModel):
     ok: bool
     token: Optional[str] = None
     user: Optional[dict] = None
+    isAdmin: bool = False
     error: Optional[str] = None
 
 
@@ -134,16 +138,23 @@ async def login(request: LoginRequest) -> LoginResponse:
                 logger.error("❌ No token in ABS login response")
                 return LoginResponse(ok=False, error="No token in response")
 
-            logger.info(f"✅ User '{request.username}' authenticated against ABS")
+            username = user.get("username", "")
+            user_is_admin = is_admin_user(username)
+
+            logger.info(f"✅ User '{username}' authenticated against ABS (admin: {user_is_admin})")
+
+            # Auto-initialize libraries on first login (non-blocking)
+            await _initialize_libraries_if_needed(token)
 
             return LoginResponse(
                 ok=True,
                 token=token,
                 user={
-                    "username": user.get("username"),
+                    "username": username,
                     "type": user.get("type"),
                     "isActive": user.get("isActive")
-                }
+                },
+                isAdmin=user_is_admin
             )
 
     except httpx.TimeoutException:
@@ -191,3 +202,39 @@ async def _validate_token(abs_url: str, token: str) -> bool:
     except Exception as e:
         logger.debug(f"🔍 Token validation failed: {e}")
         return False
+
+
+async def _initialize_libraries_if_needed(token: str) -> None:
+    """
+    Initialize libraries if not already done.
+
+    Called after successful login to auto-enable audiobook libraries.
+    This ensures library checks and cover fetching work immediately
+    without requiring the user to visit Settings first.
+    """
+    try:
+        # Check if already initialized
+        if settings_service.is_libraries_initialized():
+            logger.debug("📚 Libraries already initialized, skipping")
+            return
+
+        # Fetch libraries from ABS
+        client = get_abs_client(user_token=token)
+        libraries = await client.get_all_libraries()
+
+        if not libraries:
+            logger.warning("⚠️ No libraries found in ABS")
+            return
+
+        # Convert to dicts and initialize (auto-enables 'book' type libraries)
+        lib_dicts = [
+            {"id": lib.id, "name": lib.name, "media_type": lib.media_type, "icon": lib.icon}
+            for lib in libraries
+        ]
+        settings_service.initialize_libraries(lib_dicts)
+
+        enabled_ids = settings_service.get_enabled_libraries()
+        logger.info(f"📚 Auto-initialized {len(enabled_ids)} audiobook libraries")
+
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to auto-initialize libraries: {e}")

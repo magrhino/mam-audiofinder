@@ -4,7 +4,7 @@ import { useApi } from './useApi'
 export function useLibrarySeries() {
   const api = useApi()
 
-  const source = ref('abs')
+  const libraryId = ref(null) // null = all libraries
   const series = ref([])
   const loading = ref(false)
   const error = ref(null)
@@ -19,13 +19,16 @@ export function useLibrarySeries() {
 
     try {
       const params = new URLSearchParams({
-        source: source.value,
         page: page.value.toString(),
         limit: '50',
       })
 
       if (searchQuery.value) {
         params.set('q', searchQuery.value)
+      }
+
+      if (libraryId.value) {
+        params.set('library_id', libraryId.value)
       }
 
       const response = await api.get(`/api/library/series?${params}`)
@@ -40,8 +43,8 @@ export function useLibrarySeries() {
     }
   }
 
-  // Refetch on source/page change
-  watch([source, page], fetchSeries, { immediate: true })
+  // Refetch on libraryId/page change
+  watch([libraryId, page], fetchSeries, { immediate: true })
 
   // Debounced search
   let timeout = null
@@ -54,7 +57,7 @@ export function useLibrarySeries() {
   })
 
   return {
-    source,
+    libraryId,
     series,
     loading,
     error,

@@ -11,6 +11,7 @@ import { ref, computed, readonly } from 'vue'
 // Module-level singleton state (shared across all component instances)
 const token = ref(localStorage.getItem('abs_token') || null)
 const user = ref(JSON.parse(localStorage.getItem('abs_user') || 'null'))
+const isAdminUser = ref(localStorage.getItem('abs_is_admin') === 'true')
 const authStatus = ref({
   requires_auth: false,
   abs_configured: false,
@@ -37,6 +38,29 @@ export function useAuth() {
   const requiresAuth = computed(() => authStatus.value.requires_auth)
   const absConfigured = computed(() => authStatus.value.abs_configured)
   const absUrl = computed(() => authStatus.value.abs_url)
+  const isAdmin = computed(() => isAdminUser.value)
+
+  /**
+   * Build request headers, injecting `X-ABS-Token` when available.
+   */
+  function absAuthHeaders(extra = {}) {
+    const headers = { ...extra }
+    if (token.value) {
+      headers['X-ABS-Token'] = token.value
+    }
+    return headers
+  }
+
+  /**
+   * Build the library cover proxy URL.
+   * Images can't send auth headers, so the token is appended as a query param.
+   */
+  function absCoverProxyUrl(absItemId) {
+    if (!absItemId) return null
+    const base = `/api/library/cover/${encodeURIComponent(absItemId)}`
+    if (!token.value) return base
+    return `${base}?token=${encodeURIComponent(token.value)}`
+  }
 
   /**
    * Check authentication status on app initialization
@@ -47,12 +71,7 @@ export function useAuth() {
     error.value = null
 
     try {
-      const headers = {}
-      if (token.value) {
-        headers['X-ABS-Token'] = token.value
-      }
-
-      const resp = await fetch('/api/auth/status', { headers })
+      const resp = await fetch('/api/auth/status', { headers: absAuthHeaders() })
 
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}`)
@@ -63,7 +82,6 @@ export function useAuth() {
 
       // If auth required but not authenticated, clear any stale token
       if (status.requires_auth && !status.authenticated && token.value) {
-        console.log('[useAuth] Token invalid, clearing')
         clearAuth()
       }
 
@@ -108,13 +126,14 @@ export function useAuth() {
       // Store token and user info
       token.value = data.token
       user.value = data.user
+      isAdminUser.value = data.isAdmin || false
       localStorage.setItem('abs_token', data.token)
       localStorage.setItem('abs_user', JSON.stringify(data.user))
+      localStorage.setItem('abs_is_admin', data.isAdmin ? 'true' : 'false')
 
       // Update auth status
       authStatus.value.authenticated = true
 
-      console.log('[useAuth] Login successful')
       return true
     } catch (e) {
       console.error('[useAuth] Login error:', e)
@@ -144,8 +163,10 @@ export function useAuth() {
   function clearAuth() {
     token.value = null
     user.value = null
+    isAdminUser.value = false
     localStorage.removeItem('abs_token')
     localStorage.removeItem('abs_user')
+    localStorage.removeItem('abs_is_admin')
     authStatus.value.authenticated = false
   }
 
@@ -179,6 +200,7 @@ export function useAuth() {
     requiresAuth,
     absConfigured,
     absUrl,
+    isAdmin,
 
     // Methods
     checkAuthStatus,
@@ -186,6 +208,8 @@ export function useAuth() {
     logout,
     clearAuth,
     skipAuth,
-    getToken
+    getToken,
+    absAuthHeaders,
+    absCoverProxyUrl
   }
 }

@@ -1,13 +1,14 @@
 """Library browsing and series diff endpoints."""
 
 import logging
-from typing import Optional, Literal, List
-from fastapi import APIRouter, Query, HTTPException
+from typing import Optional, List
+from fastapi import APIRouter, Query, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 
-from abs.client import AbsClient
+from abs_client import get_abs_client
+from settings_service import settings_service
 from hardcover_client import hardcover_client
 from series_resolver import (
     SeriesSource, SeriesInfo, BookInSeries, SeriesDiffResult,
@@ -15,13 +16,11 @@ from series_resolver import (
 )
 from edition_resolver import resolve_english_primary_edition
 from utils import normalize_title
+from config import ABS_BASE_URL
 
 logger = logging.getLogger("mam-audiofinder")
 
 router = APIRouter(prefix="/api/library", tags=["library"])
-
-# Initialize ABS client
-abs_client = AbsClient.from_env()
 
 
 # ============================================================================
@@ -84,72 +83,62 @@ class WishlistAddRequest(BaseModel):
 
 @router.get("/series", response_model=SeriesListResponse)
 async def list_series(
-    source: Literal["abs", "hardcover", "both"] = "abs",
-    q: Optional[str] = Query(None, description="Search query"),
+    q: Optional[str] = Query(None, description="Search query to filter series"),
+    library_id: Optional[str] = Query(None, description="Filter by specific library ID"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
 ):
     """
-    List series from configured source(s).
+    List series from ABS library.
 
-    - **abs**: Series from ABS library (fast, shows what you own)
-    - **hardcover**: Search Hardcover catalog (requires query)
-    - **both**: Merge results with cross-matching
+    Returns series from your Audiobookshelf library, optionally filtered by
+    search query or specific library ID.
     """
-    logger.info(f"[LIBRARY] GET /api/library/series - source={source}, q={q!r}, page={page}, limit={limit}")
+    logger.info(f"[LIBRARY] GET /api/library/series - q={q!r}, library_id={library_id}, page={page}, limit={limit}")
     results: List[SeriesInfo] = []
 
-    # Fetch from ABS (multi-series aware via cache)
-    if source in ("abs", "both"):
-        logger.info(f"[LIBRARY] Checking ABS: is_configured={abs_client.is_configured}")
-        if abs_client.is_configured:
-            logger.info(f"[LIBRARY] Fetching series list from ABS cache...")
-            abs_series = await abs_client.get_series_list()
-            logger.info(f"[LIBRARY] ABS returned {len(abs_series)} series")
+    # Get library IDs to query
+    if library_id:
+        library_ids = [library_id]
+    else:
+        library_ids = settings_service.get_enabled_libraries()
 
-            for s in abs_series:
-                name = s.get("name", "")
-                author = s.get("author")
-                book_count = s.get("book_count", 0)
-                results.append(SeriesInfo(
-                    id=generate_series_id(name, author or ""),
-                    name=name,
-                    name_normalized=normalize_series_name(name),
-                    author=author,
-                    book_count=book_count,
-                    abs_book_count=book_count,
-                    series_book_count=book_count,
-                    source=SeriesSource.ABS,
-                ))
+    if not ABS_BASE_URL or not x_abs_token or not library_ids:
+        logger.warning("[LIBRARY] ABS not configured or no libraries enabled")
+        return SeriesListResponse(
+            series=[],
+            source="abs",
+            total=0,
+            page=page,
+            pages=0,
+        )
 
-    # Fetch from Hardcover (requires query)
-    if source in ("hardcover", "both") and q:
-        logger.info(f"[LIBRARY] Checking Hardcover: is_configured={hardcover_client.is_configured}")
-        if hardcover_client.is_configured:
-            logger.info(f"[LIBRARY] Searching Hardcover for query: {q!r}")
-            hc_results = await hardcover_client.search_series(title=q, limit=20)
-            logger.info(f"[LIBRARY] Hardcover returned {len(hc_results) if hc_results else 0} series")
+    abs_client = get_abs_client(user_token=x_abs_token)
 
-            if hc_results:
-                for s in hc_results:
-                    name = s.get("series_name", "")
-                    author = s.get("author_name", "")
-                    series_book_count = s.get("book_count", 0)
-                    results.append(SeriesInfo(
-                        id=generate_series_id(name, author),
-                        name=name,
-                        name_normalized=normalize_series_name(name),
-                        author=author,
-                        book_count=series_book_count,
-                        abs_book_count=0,
-                        series_book_count=series_book_count,
-                        source=SeriesSource.HARDCOVER,
-                        hardcover_series_id=s.get("series_id"),
-                    ))
+    # Fetch series from ABS library cache
+    logger.info(f"[LIBRARY] Fetching series list from ABS cache (libraries: {library_ids})...")
+    abs_series = await abs_client.get_series_list(library_ids)
+    logger.info(f"[LIBRARY] ABS returned {len(abs_series)} series")
 
-    # Filter ABS results by query
-    if q and source == "abs":
-        logger.info(f"[LIBRARY] Filtering {len(results)} ABS series by query: {q!r}")
+    for s in abs_series:
+        name = s.get("name", "")
+        author = s.get("author")
+        book_count = s.get("book_count", 0)
+        results.append(SeriesInfo(
+            id=generate_series_id(name, author or ""),
+            name=name,
+            name_normalized=normalize_series_name(name),
+            author=author,
+            book_count=book_count,
+            abs_book_count=book_count,
+            series_book_count=book_count,
+            source=SeriesSource.ABS,
+        ))
+
+    # Filter by search query if provided
+    if q:
+        logger.info(f"[LIBRARY] Filtering {len(results)} series by query: {q!r}")
         q_norm = normalize_series_name(q)
         results = [s for s in results if q_norm in s.name_normalized]
         logger.info(f"[LIBRARY] After filtering: {len(results)} series")
@@ -161,7 +150,7 @@ async def list_series(
     paginated = results[start:start + limit]
     logger.info(f"[LIBRARY] Returning {len(paginated)} series (page {page}/{pages}, total={total})")
 
-    # Convert SeriesInfo to SeriesListItem, avoiding duplicate 'source' kwarg
+    # Convert SeriesInfo to SeriesListItem
     series_items = []
     for s in paginated:
         item_dict = {k: v for k, v in s.__dict__.items() if k != 'source'}
@@ -170,7 +159,7 @@ async def list_series(
 
     return SeriesListResponse(
         series=series_items,
-        source=source,
+        source="abs",
         total=total,
         page=page,
         pages=pages,
@@ -178,16 +167,22 @@ async def list_series(
 
 
 @router.get("/series/{series_name}/books")
-async def get_series_books(series_name: str):
+async def get_series_books(
+    series_name: str,
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+):
     """Get all ABS library books in a specific series."""
     logger.info(f"[LIBRARY] GET /api/library/series/{series_name}/books")
 
-    if not abs_client.is_configured:
+    library_ids = settings_service.get_enabled_libraries()
+    if not ABS_BASE_URL or not x_abs_token or not library_ids:
         logger.warning(f"[LIBRARY] ABS not configured, returning 503")
         raise HTTPException(503, "ABS not configured")
 
+    abs_client = get_abs_client(user_token=x_abs_token)
+
     logger.info(f"[LIBRARY] Fetching books for series: {series_name}")
-    books = await abs_client.get_books_in_series(series_name)
+    books = await abs_client.get_books_in_series(series_name, library_ids)
     logger.info(f"[LIBRARY] Found {len(books)} books in series")
 
     return {
@@ -201,6 +196,7 @@ async def get_series_books(series_name: str):
 async def diff_series(
     series_name: str,
     hardcover_series_id: Optional[int] = Query(None, description="Hardcover series ID if known"),
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
 ):
     """
     Compare series between ABS library and Hardcover.
@@ -211,13 +207,16 @@ async def diff_series(
     - **abs_only**: In ABS but not Hardcover
     - **uncertain**: Ambiguous matches needing confirmation
     """
-    if not abs_client.is_configured:
+    library_ids = settings_service.get_enabled_libraries()
+    if not ABS_BASE_URL or not x_abs_token or not library_ids:
         raise HTTPException(503, "ABS not configured")
     if not hardcover_client.is_configured:
         raise HTTPException(503, "Hardcover not configured")
 
+    abs_client = get_abs_client(user_token=x_abs_token)
+
     # Get ABS books
-    abs_books_raw = await abs_client.get_books_in_series(series_name)
+    abs_books_raw = await abs_client.get_books_in_series(series_name, library_ids)
     abs_books = [
         BookInSeries(
             id=b.id,
@@ -291,14 +290,26 @@ async def diff_series(
         logger.info(f"✅ Resolved to {len(hardcover_books)} English edition(s) from {len(hardcover_books_raw)} raw book(s)")
 
     # Fallback: if Hardcover has books that ABS series mapping missed, try to find them in the library
-    if abs_client._library_cache and hardcover_books:
+    # Check if we have any library caches with data
+    has_caches = bool(abs_client._client._library_caches)
+    if has_caches and hardcover_books and library_ids:
         fallback_abs = []
         existing_abs_ids = {b.id for b in abs_books}
         for hc_book in hardcover_books:
             title = hc_book.get("title", "")
             hc_authors = hc_book.get("authors") or hc_book.get("author_names") or []
             author = hc_authors[0] if hc_authors else ""
-            match, _score = abs_client._library_cache.find_best_match(title=title, author=author)
+
+            # Search across all library caches
+            match = None
+            for lib_id in library_ids:
+                if lib_id in abs_client._client._library_caches:
+                    cache = abs_client._client._library_caches[lib_id]
+                    found_match, _score = cache.find_best_match(title=title, author=author)
+                    if found_match:
+                        match = found_match
+                        break
+
             if not match or match.id in existing_abs_ids:
                 continue
             fallback_abs.append(BookInSeries(
@@ -330,28 +341,38 @@ async def diff_series(
 async def list_books(
     q: Optional[str] = Query(None, description="Search title/author"),
     series: Optional[str] = Query(None, description="Filter by series name"),
+    library_id: Optional[str] = Query(None, description="Filter by specific library ID"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
 ):
     """Paginated book browser from ABS library cache."""
-    logger.info(f"[LIBRARY] GET /api/library/books - q={q!r}, series={series!r}, page={page}, limit={limit}")
+    logger.info(f"[LIBRARY] GET /api/library/books - q={q!r}, series={series!r}, library_id={library_id}, page={page}, limit={limit}")
 
-    if not abs_client.is_configured:
-        logger.warning(f"[LIBRARY] ABS not configured, returning 503")
+    # Get library IDs to query
+    if library_id:
+        library_ids = [library_id]
+    else:
+        library_ids = settings_service.get_enabled_libraries()
+
+    if not ABS_BASE_URL or not x_abs_token or not library_ids:
+        logger.warning("[LIBRARY] ABS not configured, returning 503")
         raise HTTPException(503, "ABS not configured")
 
-    if not abs_client._library_cache:
-        logger.warning(f"[LIBRARY] Library cache not initialized, returning 503")
-        raise HTTPException(503, "Library cache not initialized")
+    abs_client = get_abs_client(user_token=x_abs_token)
 
-    await abs_client._library_cache.ensure_fresh(abs_client.get_library_items)
+    # Ensure caches are fresh for all enabled libraries
+    for lib_id in library_ids:
+        cache = abs_client._client._get_library_cache(lib_id)
+        await cache.ensure_fresh(lambda lid=lib_id: abs_client._client.get_library_items(lid))
 
     # Build query
     from sqlalchemy import text
     from db.db import covers_engine
 
-    conditions = ["library_id = :lib_id"]
-    params = {"lib_id": abs_client.config.library_id}
+    # Query across all enabled libraries
+    conditions = [f"library_id IN ({','.join(':lib_' + str(i) for i in range(len(library_ids)))})"]
+    params = {f"lib_{i}": lib_id for i, lib_id in enumerate(library_ids)}
 
     if q:
         q_norm = normalize_title(q)
@@ -483,13 +504,21 @@ async def list_wishlist(
 
 
 @router.get("/cover/{item_id}")
-async def get_library_item_cover(item_id: str):
-    """Proxy ABS item cover to avoid CORS issues."""
-    if not abs_client.is_configured:
-        raise HTTPException(503, "ABS not configured")
+async def get_library_item_cover(
+    item_id: str,
+    token: Optional[str] = Query(None),
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+):
+    """Proxy ABS item cover to avoid CORS issues.
 
-    cover_url = f"{abs_client.config.base_url}/api/items/{item_id}/cover"
-    headers = {"Authorization": f"Bearer {abs_client.config.api_key}"}
+    Accepts token via query param (for img src) or header (for fetch requests).
+    """
+    auth_token = token or x_abs_token
+    if not ABS_BASE_URL or not auth_token:
+        raise HTTPException(503, "ABS not configured or missing token")
+
+    cover_url = f"{ABS_BASE_URL}/api/items/{item_id}/cover"
+    headers = {"Authorization": f"Bearer {auth_token}"}
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:

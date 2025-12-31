@@ -4,6 +4,7 @@
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuth } from '@composables/useAuth'
 
 // Lazy load views for code splitting
 const DiscoverView = () => import('@views/DiscoverView.vue')
@@ -81,8 +82,6 @@ const router = createRouter({
 
 // Navigation guard for authentication
 router.beforeEach(async (to, from, next) => {
-  // Import useAuth dynamically to avoid circular dependency
-  const { useAuth } = await import('@composables/useAuth')
   const auth = useAuth()
 
   // Check auth status if not already checked

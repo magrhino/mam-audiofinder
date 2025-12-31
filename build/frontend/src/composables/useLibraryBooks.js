@@ -4,6 +4,7 @@ import { useApi } from './useApi'
 export function useLibraryBooks() {
   const api = useApi()
 
+  const libraryId = ref(null) // null = all libraries
   const books = ref([])
   const loading = ref(false)
   const error = ref(null)
@@ -31,6 +32,10 @@ export function useLibraryBooks() {
         params.set('series', seriesFilter.value)
       }
 
+      if (libraryId.value) {
+        params.set('library_id', libraryId.value)
+      }
+
       const response = await api.get(`/api/library/books?${params}`)
       books.value = response.books
       total.value = response.total
@@ -43,7 +48,7 @@ export function useLibraryBooks() {
     }
   }
 
-  watch([page, seriesFilter], fetchBooks, { immediate: true })
+  watch([page, seriesFilter, libraryId], fetchBooks, { immediate: true })
 
   let timeout = null
   watch(searchQuery, () => {
@@ -55,6 +60,7 @@ export function useLibraryBooks() {
   })
 
   return {
+    libraryId,
     books,
     loading,
     error,
