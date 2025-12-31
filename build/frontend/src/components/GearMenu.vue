@@ -17,17 +17,19 @@
 import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NDropdown, NButton } from 'naive-ui'
+import { useAuth } from '@composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
+const { requiresAuth, logout, user } = useAuth()
 
 // Check if current route is one of the menu items
 const isActive = computed(() => {
   return ['/settings', '/logs'].includes(route.path)
 })
 
-// Menu options with icons
-const menuOptions = [
+// Base menu options
+const baseOptions = [
   {
     label: 'Settings',
     key: '/settings',
@@ -40,7 +42,30 @@ const menuOptions = [
   }
 ]
 
-const handleSelect = (key) => {
+// Menu options with conditional logout
+const menuOptions = computed(() => {
+  if (!requiresAuth.value) {
+    return baseOptions
+  }
+
+  // Add divider and logout when auth is required
+  return [
+    ...baseOptions,
+    { type: 'divider', key: 'd1' },
+    {
+      label: user.value?.username ? `Logout (${user.value.username})` : 'Logout',
+      key: 'logout',
+      icon: () => h('span', { style: { marginRight: '8px' } }, '🚪')
+    }
+  ]
+})
+
+const handleSelect = async (key) => {
+  if (key === 'logout') {
+    await logout()
+    router.push('/login')
+    return
+  }
   router.push(key)
 }
 </script>

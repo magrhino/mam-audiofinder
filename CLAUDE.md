@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**MAM Audiobook Finder** is a lightweight web application for searching MyAnonamouse audiobooks, adding them to qBittorrent, and importing completed downloads into Audiobookshelf. Personal use tool with zero authentication - Docker-first deployment, Vue 3 SPA with FastAPI backend.
+**MAM Audiobook Finder** is a lightweight web application for searching MyAnonamouse audiobooks, adding them to qBittorrent, and importing completed downloads into Audiobookshelf. Personal use tool with optional ABS-based authentication - Docker-first deployment, Vue 3 SPA with FastAPI backend.
 
 **Repository Name:** shelfarr (historical name, project is MAM Audiobook Finder)
 
@@ -39,6 +39,7 @@ shelfarr/
 │   ├── utils.py                  # Filesystem utilities (sanitize, hardlink, etc.)
 │   ├── routes/                   # API endpoints
 │   │   ├── __init__.py
+│   │   ├── auth_route.py         # ABS-based authentication
 │   │   ├── basic.py              # Health, config, SPA serving
 │   │   ├── search.py             # MAM search integration
 │   │   ├── history.py            # History CRUD operations
@@ -77,8 +78,9 @@ shelfarr/
 │       │   ├── main.js           # Vue app entry point
 │       │   ├── App.vue           # Root component
 │       │   ├── router/
-│       │   │   └── index.js      # Vue Router config (6 routes)
+│       │   │   └── index.js      # Vue Router config (7 routes + auth guards)
 │       │   ├── views/            # Page-level components
+│       │   │   ├── LoginView.vue     # ABS authentication login page
 │       │   │   ├── DiscoverView.vue  # Unified search (cards + table modes)
 │       │   │   ├── HistoryView.vue
 │       │   │   ├── LibraryView.vue
@@ -98,6 +100,7 @@ shelfarr/
 │       │   │   └── icons/        # SVG icon components
 │       │   ├── composables/      # Vue composables
 │       │   │   ├── useApi.js
+│       │   │   ├── useAuth.js            # ABS authentication state & methods
 │       │   │   ├── useDiscoverSearch.js  # Unified search state
 │       │   │   ├── useViewToggle.js      # Cards/Table mode toggle
 │       │   │   ├── useCoverLoader.js
@@ -221,6 +224,7 @@ In-memory MAM search result caching with 5-minute TTL
 
 All routes are `async def` endpoints:
 
+- `auth_route.py` - GET /api/auth/status, POST /api/auth/login, POST /api/auth/validate, POST /api/auth/logout (ABS-based authentication)
 - `basic.py` - GET / (serves Vue SPA index.html), /health, /config
 - `search.py` - POST /search (MAM API integration with caching)
 - `history.py` - GET /api/history, DELETE /api/history/{id}, POST /api/history/{id}/verify
@@ -243,7 +247,8 @@ Vite dev server (:5173) with HMR → `npm run build` → outputs to `app/static/
 **Composition API:**
 All components use `<script setup>` syntax with reactive refs
 
-**Router (4 main routes + settings):**
+**Router (6 routes + auth guards):**
+- `/login` - LoginView (ABS authentication, public route)
 - `/` - DiscoverView (unified search with cards/table toggle)
 - `/history` - HistoryView
 - `/library` - LibraryView
@@ -252,13 +257,14 @@ All components use `<script setup>` syntax with reactive refs
 - `/logs` - LogsView (accessed via gear menu)
 
 **Views:**
-DiscoverView (unified search), HistoryView, LibraryView, SeriesView, SettingsView, LogsView
+LoginView (ABS authentication), DiscoverView (unified search), HistoryView, LibraryView, SeriesView, SettingsView, LogsView
 
 **Components:**
 NavBar, GearMenu, ViewToggle, HealthIndicator, ShowcaseCard, GlassSearchBar, GlassSelect, GlassTitle, CoverImage, ActionButton, StatusBadge, icon components
 
 **Composables:**
 - `useApi()` - API wrapper (reuses legacy `app/static/js/core/api.js`)
+- `useAuth()` - ABS authentication state (module-level singleton), login/logout, token management
 - `useDiscoverSearch()` - **Unified search state** for Discover view (single API call populates cards + table)
 - `useViewToggle()` - Cards/Table mode toggle with localStorage persistence and URL sync
 - `useAddTorrentFlow()` - Torrent add workflow with loading states
@@ -763,13 +769,19 @@ DevTools (F12) → Console for errors, Network tab for API calls, Vue DevTools e
 
 ## Security
 
-**⚠️ WARNING: ZERO AUTHENTICATION**
+**Optional ABS-Based Authentication:**
+- When `ABS_BASE_URL` is configured, login is required using Audiobookshelf credentials
+- Credentials validated against ABS server (POST /login), tokens stored in localStorage
+- All routes protected via Vue Router navigation guards
+- If ABS not configured, app shows setup message with option to continue without auth
+
+**⚠️ WARNING: Still intended for trusted networks**
 
 **Safe Usage Only:**
 - Behind VPN (Tailscale, WireGuard, Headscale)
 - Behind authenticated reverse proxy (Authelia, Authentik, Caddy with auth)
 - Trusted local network only (with firewall rules)
-- **NEVER exposed to public internet**
+- **NEVER exposed to public internet** (ABS auth is convenience, not security hardening)
 
 **Credentials:** MAM_COOKIE, qBittorrent credentials, API keys stored in env vars only (never committed to git)
 

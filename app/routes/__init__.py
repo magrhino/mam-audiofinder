@@ -13,9 +13,11 @@ from .series import router as series_router
 from .abs_route import router as abs_router
 from .library_route import router as library_router
 from .settings import router as settings_router
+from .auth_route import router as auth_router
 
 # Create main router that includes all sub-routers
 main_router = APIRouter()
+main_router.include_router(auth_router)  # Auth routes first (public endpoints)
 main_router.include_router(basic_router)
 main_router.include_router(search_router)
 main_router.include_router(history_router)

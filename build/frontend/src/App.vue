@@ -19,7 +19,7 @@
 
         <!-- Main app content -->
         <div id="app">
-          <NavBar :health="healthStatus" />
+          <NavBar v-if="showNavBar" :health="healthStatus" />
           <RouterView />
         </div>
       </n-message-provider>
@@ -28,15 +28,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { RouterView } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import { darkTheme, NConfigProvider, NGlobalStyle, NDialogProvider, NMessageProvider } from 'naive-ui'
 import { customTheme } from './theme/naive'
 import NavBar from '@components/NavBar.vue'
 import { useApi } from '@composables/useApi'
+import { useAuth } from '@composables/useAuth'
 
+const route = useRoute()
 const healthStatus = ref({ ok: false, checking: true })
 const api = useApi()
+const { isAuthenticated, requiresAuth } = useAuth()
+
+// Show navbar when not on login page and either authenticated or auth not required
+const showNavBar = computed(() => {
+  // Don't show on login page
+  if (route.name === 'login') return false
+  // Show if authenticated or auth not required
+  return isAuthenticated.value || !requiresAuth.value
+})
 
 const checkHealth = async () => {
   try {
