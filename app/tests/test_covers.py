@@ -283,40 +283,9 @@ class TestCoverDownload:
         assert local_file is None
         assert file_size == 0
 
-    @pytest.mark.asyncio
-    async def test_download_cover_adds_abs_auth_header(self, temp_dir, monkeypatch):
-        """Test that ABS auth header is added for ABS URLs."""
-        covers_dir = temp_dir / "covers"
-        covers_dir.mkdir()
-
-        # Mock httpx response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.content = b"fake_image"
-        mock_response.headers = {"Content-Type": "image/jpeg"}
-
-        mock_client = AsyncMock()
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.__aexit__.return_value = None
-        mock_client.get = AsyncMock(return_value=mock_response)
-
-        monkeypatch.setattr("covers.COVERS_DIR", covers_dir)
-        monkeypatch.setattr("covers.MAX_COVERS_SIZE_MB", 10)
-        monkeypatch.setattr("covers.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("covers.ABS_API_KEY", "test-token")
-        monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: mock_client)
-
-        from covers import CoverService
-        service = CoverService()
-
-        await service.download_cover("https://abs.example.com/api/items/123/cover", "12345")
-
-        # Verify that get was called with auth header
-        call_args = mock_client.get.call_args
-        assert call_args is not None
-        headers = call_args.kwargs.get("headers", {})
-        assert "Authorization" in headers
-        assert headers["Authorization"] == "Bearer test-token"
+    # NOTE: test_download_cover_adds_abs_auth_header was removed.
+    # With token-based auth, cover authentication is now handled via proxy routes
+    # (covers_route.py) that add the user's token, not in the CoverService directly.
 
 
 class TestCoverCacheLookup:

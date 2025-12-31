@@ -21,49 +21,42 @@ class TestAudiobookshelfClientInit:
 
     def test_init_with_config(self, monkeypatch):
         """Test client initialization with configuration."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "test-key")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "lib-123")
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
 
         from abs_client import AudiobookshelfClient
-        client = AudiobookshelfClient()
+        client = AudiobookshelfClient(user_token="test-token")
 
         assert client.base_url == "https://abs.example.com"
-        assert client.api_key == "test-key"
-        assert client.library_id == "lib-123"
+        assert client.is_configured is True
+        assert client.has_token is True
 
     def test_is_configured_property(self, monkeypatch):
         """Test is_configured property logic."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "test-key")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "lib-123")
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
 
         from abs_client import AudiobookshelfClient
-        client = AudiobookshelfClient()
+        client = AudiobookshelfClient(user_token="test-token")
 
         assert client.is_configured is True
 
     def test_is_configured_false_when_missing_url(self, monkeypatch):
         """Test is_configured returns False when URL missing."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "test-key")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "lib-123")
+        monkeypatch.setattr("config.ABS_BASE_URL", "")
 
         from abs_client import AudiobookshelfClient
-        client = AudiobookshelfClient()
+        client = AudiobookshelfClient(user_token="test-token")
 
         assert client.is_configured is False
 
-    def test_is_configured_false_when_missing_key(self, monkeypatch):
-        """Test is_configured returns False when API key missing."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "lib-123")
+    def test_has_token_false_when_no_token(self, monkeypatch):
+        """Test has_token returns False when no token provided."""
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
 
         from abs_client import AudiobookshelfClient
-        client = AudiobookshelfClient()
+        client = AudiobookshelfClient()  # No token
 
-        assert client.is_configured is False
+        assert client.is_configured is True
+        assert client.has_token is False
 
 
 class TestVerificationMatchingLogic:
@@ -147,19 +140,17 @@ class TestVerifyImport:
     @pytest.fixture
     def mock_abs_client(self, monkeypatch):
         """Create a mock ABS client with proper configuration."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "test-key")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "lib-123")
-        monkeypatch.setattr("abs_client.ABS_VERIFY_TIMEOUT", 10)
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
+        monkeypatch.setattr("config.ABS_VERIFY_TIMEOUT", 10)
+        # Mock get_enabled_library_ids to return test library
+        monkeypatch.setattr("abs_client.get_enabled_library_ids", lambda: ["lib-123"])
 
         from abs_client import AudiobookshelfClient
-        return AudiobookshelfClient()
+        return AudiobookshelfClient(user_token="test-token")
 
     async def test_verify_import_not_configured(self, monkeypatch):
         """Test verification when ABS not configured."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "")
+        monkeypatch.setattr("config.ABS_BASE_URL", "")
 
         from abs_client import AudiobookshelfClient
         client = AudiobookshelfClient()
@@ -169,19 +160,18 @@ class TestVerifyImport:
         assert result["status"] == "not_configured"
         assert result["abs_item_id"] is None
 
-    async def test_verify_import_missing_library_id(self, monkeypatch):
-        """Test verification when library ID not configured."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "test-key")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "")
+    async def test_verify_import_no_token(self, monkeypatch):
+        """Test verification when no token provided."""
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
+        monkeypatch.setattr("abs_client.get_enabled_library_ids", lambda: ["lib-123"])
 
         from abs_client import AudiobookshelfClient
-        client = AudiobookshelfClient()
+        client = AudiobookshelfClient()  # No token
 
         result = await client.verify_import("Test Book", "Test Author")
 
         assert result["status"] == "not_configured"
-        assert "ABS_LIBRARY_ID" in result["note"]
+        assert "token" in result["note"].lower()
 
     async def test_verify_import_no_title(self, mock_abs_client):
         """Test verification with no title provided."""
@@ -346,9 +336,7 @@ class TestConnectionTest:
 
     async def test_connection_success(self, monkeypatch):
         """Test successful connection to ABS."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "test-key")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "lib-123")
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
 
         # Mock successful response
         mock_response = Mock()
@@ -361,7 +349,7 @@ class TestConnectionTest:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         from abs_client import AudiobookshelfClient
-        client = AudiobookshelfClient()
+        client = AudiobookshelfClient(user_token="test-token")
 
         with patch("httpx.AsyncClient", return_value=mock_client):
             result = await client.test_connection()
@@ -371,9 +359,7 @@ class TestConnectionTest:
     @pytest.mark.requires_live
     async def test_connection_failure(self, monkeypatch):
         """Test connection failure."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "https://abs.example.com")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "test-key")
-        monkeypatch.setattr("abs_client.ABS_LIBRARY_ID", "lib-123")
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
 
         # Mock failed response
         mock_response = Mock()
@@ -386,7 +372,7 @@ class TestConnectionTest:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         from abs_client import AudiobookshelfClient
-        client = AudiobookshelfClient()
+        client = AudiobookshelfClient(user_token="test-token")
 
         with patch("httpx.AsyncClient", return_value=mock_client):
             result = await client.test_connection()
@@ -395,11 +381,21 @@ class TestConnectionTest:
 
     async def test_connection_not_configured(self, monkeypatch):
         """Test connection when not configured."""
-        monkeypatch.setattr("abs_client.ABS_BASE_URL", "")
-        monkeypatch.setattr("abs_client.ABS_API_KEY", "")
+        monkeypatch.setattr("config.ABS_BASE_URL", "")
 
         from abs_client import AudiobookshelfClient
         client = AudiobookshelfClient()
+
+        result = await client.test_connection()
+
+        assert result is False
+
+    async def test_connection_no_token(self, monkeypatch):
+        """Test connection when no token provided."""
+        monkeypatch.setattr("config.ABS_BASE_URL", "https://abs.example.com")
+
+        from abs_client import AudiobookshelfClient
+        client = AudiobookshelfClient()  # No token
 
         result = await client.test_connection()
 

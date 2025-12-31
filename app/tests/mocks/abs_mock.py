@@ -25,25 +25,30 @@ class FixtureNotFoundError(Exception):
 
 
 class MockABSClient:
-    """Mock implementation of AudiobookshelfClient that uses fixture data."""
+    """Mock implementation of AudiobookshelfClient that uses fixture data.
+
+    Updated to match new token-based auth interface (no more static API keys).
+    """
 
     # Class-level counters (shared across instances, like real client)
     _request_count: int = 0
     _cache_hit_count: int = 0
 
-    def __init__(self):
-        """Initialize mock ABS client."""
-        # Try to read from abs_client module to respect monkeypatched values
+    def __init__(self, user_token: Optional[str] = None):
+        """Initialize mock ABS client with optional user token."""
+        # Read base_url from config module attribute (supports monkeypatching)
         try:
-            import abs_client
-            self.base_url = abs_client.ABS_BASE_URL if hasattr(abs_client, 'ABS_BASE_URL') else "http://mock-abs:13378"
-            self.api_key = abs_client.ABS_API_KEY if hasattr(abs_client, 'ABS_API_KEY') else "mock-abs-api-key"
-            self.library_id = abs_client.ABS_LIBRARY_ID if hasattr(abs_client, 'ABS_LIBRARY_ID') else "mock-library-id"
-        except (ImportError, AttributeError):
-            # Fallback to defaults if abs_client not available
+            import config
+            # Use getattr to get current module attribute value (respects monkeypatch)
+            base_url = getattr(config, 'ABS_BASE_URL', None)
+            # Respect empty string as "not configured" - only fallback if module missing
+            self.base_url = base_url if base_url is not None else "http://mock-abs:13378"
+        except ImportError:
             self.base_url = "http://mock-abs:13378"
-            self.api_key = "mock-abs-api-key"
-            self.library_id = "mock-library-id"
+
+        # Token-based auth (replaces static API key)
+        # Keep as None if not provided to allow testing "no token" scenarios
+        self.user_token = user_token
 
         # In-memory cache for library items (same as real client)
         self._library_cache: Dict[str, Tuple[bool, float]] = {}
@@ -55,12 +60,21 @@ class MockABSClient:
         if not self.fixtures_dir.exists():
             logger.warning(f"⚠️  ABS fixtures directory not found: {self.fixtures_dir}")
 
-        logger.info("🔧 Initialized MOCK ABS client (fixture-based)")
+        logger.info("🔧 Initialized MOCK ABS client (fixture-based, token-auth)")
 
     @property
     def is_configured(self) -> bool:
-        """Check if ABS is configured (respects monkeypatched values)."""
-        return bool(self.base_url and self.api_key)
+        """Check if ABS is configured (base URL set)."""
+        return bool(self.base_url)
+
+    @property
+    def has_token(self) -> bool:
+        """Check if a user token is available."""
+        return bool(self.user_token)
+
+    def with_token(self, token: str) -> "MockABSClient":
+        """Create a new client instance with the given token."""
+        return MockABSClient(user_token=token)
 
     @classmethod
     def get_request_count(cls) -> int:
@@ -164,6 +178,11 @@ class MockABSClient:
             logger.info("ℹ️  MOCK ABS not configured, returning False")
             return False
 
+        # Check if token is available (required for auth)
+        if not self.has_token:
+            logger.info("ℹ️  MOCK ABS no token available, returning False")
+            return False
+
         try:
             fixture = self._load_fixture("test_connection")
             success = fixture.get("success", True)
@@ -258,7 +277,7 @@ class MockABSClient:
             logger.warning(f"⚠️  No cover fixture found for '{title}'")
             return {}
 
-    async def verify_import(self, title: str, author: str = "", library_path: str = "", metadata: dict = None) -> dict:
+    async def verify_import(self, title: str, author: str = "", library_path: str = "", metadata: dict = None, library_ids: Optional[List[str]] = None) -> dict:
         """
         Mock import verification in ABS.
 
@@ -267,6 +286,7 @@ class MockABSClient:
             author: Author name
             library_path: Path where book was imported
             metadata: Optional metadata dict
+            library_ids: Optional list of library IDs to search
 
         Returns:
             Dict with:
@@ -282,10 +302,10 @@ class MockABSClient:
                 "abs_item_id": None
             }
 
-        if not self.library_id:
+        if not self.has_token:
             return {
                 "status": "not_configured",
-                "note": "ABS_LIBRARY_ID not configured",
+                "note": "No authentication token available",
                 "abs_item_id": None
             }
 

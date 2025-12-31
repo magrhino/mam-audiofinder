@@ -10,17 +10,23 @@ def mock_abs_client():
     """Mock ABS client for testing."""
     mock_client = MagicMock()
     mock_client.is_configured = True
+    mock_client.has_token = True
     mock_client.config = MagicMock()
-    mock_client.config.library_id = "test_library"
     mock_client.config.base_url = "http://abs.test"
-    mock_client.config.api_key = "test_key"
     mock_client.get_series_list = AsyncMock(return_value=[])
     mock_client.get_books_in_series = AsyncMock(return_value=[])
-    mock_client._library_cache = MagicMock()
-    mock_client._library_cache.ensure_fresh = AsyncMock()
-    mock_client._library_cache.find_best_match = MagicMock(return_value=(None, 0))
 
-    with patch('routes.library_route.abs_client', mock_client):
+    # Mock inner client for cache access
+    mock_inner_client = MagicMock()
+    mock_inner_client._library_caches = {}
+    mock_inner_client._get_library_cache = MagicMock()
+    mock_client._client = mock_inner_client
+
+    # Patch all ABS-related imports at the route level
+    with patch('routes.library_route.get_abs_client', return_value=mock_client), \
+         patch('routes.library_route.ABS_BASE_URL', 'http://abs.test'), \
+         patch('routes.library_route.settings_service') as mock_settings:
+        mock_settings.get_enabled_libraries.return_value = ['test_library']
         yield mock_client
 
 
@@ -43,7 +49,8 @@ class TestSeriesEndpoint:
             {"id": "s1", "name": "Test Series", "books": [{"id": "b1"}]}
         ]
 
-        response = client.get("/api/library/series?source=abs")
+        # Include X-ABS-Token header for authentication
+        response = client.get("/api/library/series?source=abs", headers={"X-ABS-Token": "test-token"})
 
         assert response.status_code == 200
         data = response.json()
@@ -68,7 +75,8 @@ class TestSeriesEndpoint:
             ]
         }
 
-        response = client.get("/api/library/series/Test/diff")
+        # Include X-ABS-Token header for authentication
+        response = client.get("/api/library/series/Test/diff", headers={"X-ABS-Token": "test-token"})
 
         assert response.status_code == 200
         data = response.json()
