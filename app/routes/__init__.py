@@ -11,9 +11,13 @@ from .logs_route import router as logs_router
 from .showcase import router as showcase_router
 from .series import router as series_router
 from .abs_route import router as abs_router
+from .library_route import router as library_router
+from .settings import router as settings_router
+from .auth_route import router as auth_router
 
 # Create main router that includes all sub-routers
 main_router = APIRouter()
+main_router.include_router(auth_router)  # Auth routes first (public endpoints)
 main_router.include_router(basic_router)
 main_router.include_router(search_router)
 main_router.include_router(history_router)
@@ -24,5 +28,7 @@ main_router.include_router(logs_router)
 main_router.include_router(showcase_router)
 main_router.include_router(series_router)
 main_router.include_router(abs_router)
+main_router.include_router(library_router)
+main_router.include_router(settings_router)
 
 __all__ = ["main_router"]

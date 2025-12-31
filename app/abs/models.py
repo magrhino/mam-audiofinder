@@ -1,7 +1,17 @@
 """Pydantic models for ABS API responses."""
 
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic import BaseModel, Field
+
+
+class Library(BaseModel):
+    """ABS library definition."""
+
+    id: str
+    name: str
+    media_type: str  # "book" or "podcast"
+    icon: Optional[str] = None
+    folders: List[dict] = Field(default_factory=list)
 
 
 class LibraryItem(BaseModel):
@@ -13,6 +23,7 @@ class LibraryItem(BaseModel):
     author: Optional[str] = None
     narrator: Optional[str] = None
     series_name: Optional[str] = None
+    series_index: Optional[float] = None
     asin: Optional[str] = None
     isbn: Optional[str] = None
     cover_path: Optional[str] = None

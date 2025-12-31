@@ -4,7 +4,7 @@ Handles database engine setup and migration execution.
 """
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
 from config import HISTORY_DB_PATH, COVERS_DB_PATH, SERIES_DB_PATH
 
@@ -13,6 +13,8 @@ logger = logging.getLogger("mam-audiofinder")
 # ---------------------------- Database Engines ----------------------------
 # Main history database
 engine = create_engine(f"sqlite:///{HISTORY_DB_PATH}", future=True)
+# Alias for backward compatibility
+history_engine = engine
 
 # Covers database - separate from history to cache covers before adding to qBittorrent
 # Configure connection pool to handle concurrent cover fetches better
@@ -110,7 +112,10 @@ def run_migrations():
             "create table history",
             "create table if not exists history",
             "insert into history",
-            "create index if not exists idx_history"
+            "create index if not exists idx_history",
+            "library_wishlist",
+            "app_settings",
+            "auto_import_tracking"
         ])
 
         targets_covers = any(pattern in sql_content for pattern in [
@@ -218,7 +223,7 @@ def run_migrations():
             with target_engine.begin() as cx:
                 cx.execute(
                     text("INSERT INTO applied_migrations (filename, applied_at) VALUES (:filename, :applied_at)"),
-                    {"filename": migration_file.name, "applied_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}
+                    {"filename": migration_file.name, "applied_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")}
                 )
 
             logger.info(f"    ✓ {migration_file.name} completed")

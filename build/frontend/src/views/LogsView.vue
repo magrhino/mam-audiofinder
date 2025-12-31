@@ -150,8 +150,8 @@ watch(highlightedLogs, async () => {
   color: var(--error);
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
+/* Responsive adjustments - mobile breakpoint (0-767px) */
+@media (max-width: 767px) {
   .logs-header {
     flex-direction: column;
     align-items: flex-start;

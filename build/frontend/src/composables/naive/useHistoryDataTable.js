@@ -211,6 +211,18 @@ function createColumns(config) {
           )
         }
 
+        // Add auto-import indicator
+        if (row.auto_imported) {
+          badges.push(
+            h(NTooltip, {}, {
+              trigger: () => h('span', {
+                style: 'cursor: help; font-size: 0.9em; margin-left: 2px;'
+              }, '🤖'),
+              default: () => 'Auto-imported'
+            })
+          )
+        }
+
         return h('div', { style: 'display: flex; gap: 4px; align-items: center; flex-wrap: wrap;' }, badges)
       }
     },

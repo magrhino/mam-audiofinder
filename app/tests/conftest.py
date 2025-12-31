@@ -44,7 +44,9 @@ import tempfile
 import logging
 from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
+
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
 logger = logging.getLogger("mam-audiofinder")
@@ -70,6 +72,15 @@ def temp_dir():
     """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
+
+
+@pytest.fixture
+def client():
+    """Provide FastAPI TestClient for API endpoint tests."""
+    from main import app
+
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 @pytest.fixture
@@ -422,6 +433,7 @@ def reset_test_cache():
 # ============================================================================
 # DUAL-MODE TESTING INFRASTRUCTURE
 # ============================================================================
+
 
 def pytest_configure(config):
     """Register custom markers for dual-mode testing."""

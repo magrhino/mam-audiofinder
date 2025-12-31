@@ -1,5 +1,6 @@
 {
-  "status": "not_found",
-  "note": "Not found in library",
-  "abs_item_id": "test-item-389"
+  "status": "verified",
+  "note": "Matched Foundation by Isaac Asimov",
+  "abs_item_id": "item-003-foundation-asimov",
+  "score": 95
 }

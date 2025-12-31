@@ -5,15 +5,16 @@ Displays audiobooks in a grouped grid view similar to Audible.
 import re
 import logging
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from typing import Dict, List, Optional
+from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 from collections import defaultdict
-from typing import Dict, List
 
 from config import MAM_BASE, MAM_COOKIE, ABS_CHECK_LIBRARY
-from abs_client import abs_client
+from abs_client import get_abs_client
 from mam_cache import get_cached_mam_search, cache_mam_search
 from dependencies.mam import normalize_mam_result
+from utils import normalize_title as normalize_title_match, normalize_author as normalize_author_match
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -47,7 +48,8 @@ def normalize_title(title: str) -> str:
 @router.get("/api/showcase")
 async def showcase(
     query: str = Query("", description="Search query (optional, defaults to recent audiobooks)"),
-    limit: int = Query(100, description="Maximum number of results to fetch", ge=1, le=500)
+    limit: int = Query(100, description="Maximum number of results to fetch", ge=1, le=500),
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
 ):
     """
     Search MAM and return results grouped by normalized title for showcase grid view.
@@ -178,18 +180,21 @@ async def showcase(
     # Sort groups by total versions (descending) to show popular titles first
     groups.sort(key=lambda x: x["total_versions"], reverse=True)
 
-    # Check which groups have items in ABS library (if feature enabled)
-    if ABS_CHECK_LIBRARY and groups:
+    # Check which groups have items in ABS library (if feature enabled and token available)
+    if ABS_CHECK_LIBRARY and groups and x_abs_token:
         try:
+            # Create token-authenticated client
+            client = get_abs_client(user_token=x_abs_token)
+
             # For showcase, check the display title and author for each group
             items_to_check = [(group["display_title"] or "", group["author"] or "") for group in groups]
 
             # Call library check
-            library_results = await abs_client.check_library_items(items_to_check)
+            library_results = await client.check_library_items(items_to_check)
 
             # Update groups with library status
             for group in groups:
-                cache_key = f"{(group['display_title'] or '').lower().strip()}||{(group['author'] or '').lower().strip()}"
+                cache_key = f"{normalize_title_match(group.get('display_title') or '')}||{normalize_author_match(group.get('author') or '')}"
                 group["in_abs_library"] = library_results.get(cache_key, False)
 
             logger.info(f"📚 Showcase library check: {sum(g['in_abs_library'] for g in groups)}/{len(groups)} groups found in ABS")

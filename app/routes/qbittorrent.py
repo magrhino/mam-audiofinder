@@ -4,7 +4,7 @@ qBittorrent routes for MAM Audiobook Finder.
 import logging
 import httpx
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -149,10 +149,10 @@ async def add_to_qb(body: AddBody, client: httpx.AsyncClient = Depends(get_qb_as
                 """), {
                     "mam_id": mam_id, "title": title, "author": author, "narrator": narrator,
                     "dl": dl, "qb_status": "added", "qb_hash": qb_hash,
-                    "added_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                    "added_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
                     "abs_cover_url": body.abs_cover_url,
                     "abs_item_id": body.abs_item_id,
-                    "abs_cover_cached_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if body.abs_cover_url else None,
+                    "abs_cover_cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if body.abs_cover_url else None,
                 })
             return {"ok": True}
         # else: fall through to cookie fetch
@@ -219,10 +219,10 @@ async def add_to_qb(body: AddBody, client: httpx.AsyncClient = Depends(get_qb_as
         """), {
             "mam_id": mam_id, "title": title, "author": author, "narrator": narrator,
             "dl": dl, "qb_status": "added", "qb_hash": qb_hash,
-            "added_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "added_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             "abs_cover_url": body.abs_cover_url,
             "abs_item_id": body.abs_item_id,
-            "abs_cover_cached_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if body.abs_cover_url else None,
+            "abs_cover_cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if body.abs_cover_url else None,
         })
 
     return {"ok": True}

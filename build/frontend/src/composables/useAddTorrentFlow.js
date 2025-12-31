@@ -5,13 +5,14 @@
 
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDialog } from 'naive-ui'
+import { useDialog, useMessage } from 'naive-ui'
 import { useApi } from './useApi'
 
 export function useAddTorrentFlow() {
   const api = useApi()
   const router = useRouter()
   const dialog = useDialog()
+  const message = useMessage()
 
   const loading = ref(false)
   const loadingItems = ref(new Set()) // Track individual items being added
@@ -43,6 +44,9 @@ export function useAddTorrentFlow() {
       // Dispatch event for live updates
       window.dispatchEvent(new CustomEvent('torrentAdded'))
 
+      // Show toast notification
+      message.success(`✓ "${rowState.title}" added to qBittorrent`)
+
       const successMessage = `✓ Added "${rowState.title}" to qBittorrent`
 
       // Show confirmation dialog if requested
@@ -61,6 +65,9 @@ export function useAddTorrentFlow() {
       return { success: true, message: successMessage }
     } catch (err) {
       const errorMessage = `Add failed: ${err.message}`
+
+      // Show toast notification
+      message.error(`Failed to add "${rowState.title}"`)
 
       // Show error dialog
       dialog.error({

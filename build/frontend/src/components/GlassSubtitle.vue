@@ -15,20 +15,16 @@
 <script setup>
 import { computed } from 'vue'
 import { NGradientText } from 'naive-ui'
-import { useBreakpoints } from '@vueuse/core'
+import { useBreakpoints } from '@/composables/useBreakpoints'
 
-// Responsive breakpoints
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024
-})
+// Centralized responsive breakpoints
+const { isMobile, isTablet, isDesktop } = useBreakpoints()
 
 // Dynamic size based on screen size
 const size = computed(() => {
-  if (breakpoints.greater('desktop').value) {
+  if (isDesktop.value) {
     return 16 // Desktop: 16px
-  } else if (breakpoints.greater('tablet').value) {
+  } else if (isTablet.value) {
     return 14 // Tablet: 14px
   } else {
     return 13 // Mobile: 13px

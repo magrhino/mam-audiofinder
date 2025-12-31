@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**MAM Audiobook Finder** is a lightweight web application for searching MyAnonamouse audiobooks, adding them to qBittorrent, and importing completed downloads into Audiobookshelf. Personal use tool with zero authentication - Docker-first deployment, Vue 3 SPA with FastAPI backend.
+**MAM Audiobook Finder** is a lightweight web application for searching MyAnonamouse audiobooks, adding them to qBittorrent, and importing completed downloads into Audiobookshelf. Personal use tool with optional ABS-based authentication - Docker-first deployment, Vue 3 SPA with FastAPI backend.
 
 **Repository Name:** shelfarr (historical name, project is MAM Audiobook Finder)
 
@@ -39,6 +39,7 @@ shelfarr/
 │   ├── utils.py                  # Filesystem utilities (sanitize, hardlink, etc.)
 │   ├── routes/                   # API endpoints
 │   │   ├── __init__.py
+│   │   ├── auth_route.py         # ABS-based authentication
 │   │   ├── basic.py              # Health, config, SPA serving
 │   │   ├── search.py             # MAM search integration
 │   │   ├── history.py            # History CRUD operations
@@ -77,25 +78,33 @@ shelfarr/
 │       │   ├── main.js           # Vue app entry point
 │       │   ├── App.vue           # Root component
 │       │   ├── router/
-│       │   │   └── index.js      # Vue Router config (5 routes)
+│       │   │   └── index.js      # Vue Router config (7 routes + auth guards)
 │       │   ├── views/            # Page-level components
-│       │   │   ├── SearchView.vue
+│       │   │   ├── LoginView.vue     # ABS authentication login page
+│       │   │   ├── DiscoverView.vue  # Unified search (cards + table modes)
 │       │   │   ├── HistoryView.vue
-│       │   │   ├── ShowcaseView.vue
-│       │   │   ├── LogsView.vue
-│       │   │   └── SeriesView.vue
-│       │   ├── components/       # Reusable components (~17 files)
+│       │   │   ├── LibraryView.vue
+│       │   │   ├── SeriesView.vue
+│       │   │   ├── SettingsView.vue
+│       │   │   └── LogsView.vue
+│       │   ├── components/       # Reusable components (~20 files)
 │       │   │   ├── NavBar.vue
+│       │   │   ├── GearMenu.vue      # Settings dropdown menu
+│       │   │   ├── ViewToggle.vue    # Cards/Table view switcher
 │       │   │   ├── HealthIndicator.vue
-│       │   │   ├── ResultRow.vue
-│       │   │   ├── HistoryRow.vue
 │       │   │   ├── ShowcaseCard.vue
 │       │   │   ├── GlassSearchBar.vue
+│       │   │   ├── GlassSelect.vue
+│       │   │   ├── GlassTitle.vue
 │       │   │   ├── CoverImage.vue
 │       │   │   └── icons/        # SVG icon components
 │       │   ├── composables/      # Vue composables
 │       │   │   ├── useApi.js
+│       │   │   ├── useAuth.js            # ABS authentication state & methods
+│       │   │   ├── useDiscoverSearch.js  # Unified search state
+│       │   │   ├── useViewToggle.js      # Cards/Table mode toggle
 │       │   │   ├── useCoverLoader.js
+│       │   │   ├── useAddTorrentFlow.js
 │       │   │   ├── useHistoryLiveUpdates.js
 │       │   │   └── naive/        # NaiveUI table configs
 │       │   ├── styles/           # Global styles
@@ -132,8 +141,11 @@ shelfarr/
 
 ### Key Workflows
 
-**Search:**
-User Input → POST /search → MAM API (5-min cache) → ABS Cover Fetch → Library Check → Display Results
+**Discover Search (Unified):**
+User Input → GET /api/showcase → MAM API (5-min cache) → Group by Title → ABS Library Check → Display as Cards or Table
+- Single API call populates both view modes
+- Cards mode: grouped by normalized title with cover grid
+- Table mode: flattened versions list with sorting
 
 **Add to qBittorrent:**
 User Click → POST /add → Fetch .torrent file → qBittorrent API → Tag with MAM ID → Save to history.db
@@ -212,6 +224,7 @@ In-memory MAM search result caching with 5-minute TTL
 
 All routes are `async def` endpoints:
 
+- `auth_route.py` - GET /api/auth/status, POST /api/auth/login, POST /api/auth/validate, POST /api/auth/logout (ABS-based authentication)
 - `basic.py` - GET / (serves Vue SPA index.html), /health, /config
 - `search.py` - POST /search (MAM API integration with caching)
 - `history.py` - GET /api/history, DELETE /api/history/{id}, POST /api/history/{id}/verify
@@ -234,17 +247,27 @@ Vite dev server (:5173) with HMR → `npm run build` → outputs to `app/static/
 **Composition API:**
 All components use `<script setup>` syntax with reactive refs
 
-**Router (5 routes):**
-/, /history, /showcase, /logs, /series (lazy-loaded views)
+**Router (6 routes + auth guards):**
+- `/login` - LoginView (ABS authentication, public route)
+- `/` - DiscoverView (unified search with cards/table toggle)
+- `/history` - HistoryView
+- `/library` - LibraryView
+- `/series` - SeriesView
+- `/settings` - SettingsView
+- `/logs` - LogsView (accessed via gear menu)
 
 **Views:**
-SearchView, HistoryView, ShowcaseView, LogsView, SeriesView
+LoginView (ABS authentication), DiscoverView (unified search), HistoryView, LibraryView, SeriesView, SettingsView, LogsView
 
 **Components:**
-NavBar, HealthIndicator, ResultRow, HistoryRow, ShowcaseCard, SeriesTable, GlassSearchBar, CoverImage, ActionButton, StatusBadge, icon components
+NavBar, GearMenu, ViewToggle, HealthIndicator, ShowcaseCard, GlassSearchBar, GlassSelect, GlassTitle, CoverImage, ActionButton, StatusBadge, icon components
 
 **Composables:**
 - `useApi()` - API wrapper (reuses legacy `app/static/js/core/api.js`)
+- `useAuth()` - ABS authentication state (module-level singleton), login/logout, token management
+- `useDiscoverSearch()` - **Unified search state** for Discover view (single API call populates cards + table)
+- `useViewToggle()` - Cards/Table mode toggle with localStorage persistence and URL sync
+- `useAddTorrentFlow()` - Torrent add workflow with loading states
 - `useCoverLoader()` - Lazy image loading with IntersectionObserver
 - `useHistoryLiveUpdates()` - Real-time history updates (auto-refresh)
 - `useMAMSearchDataTable()` - NaiveUI table configuration with responsive 3-column-set strategy, native expansion for mobile, no scroll-x
@@ -356,7 +379,7 @@ CREATE TABLE series_cache (
 - Manual re-verification via "🔄 Verify" button
 
 ### Library Visibility
-- Green checkmark badges on search/showcase for items already in library
+- Green checkmark badges on Discover view for items already in library
 - Batch checking with 5-minute cache (configurable via ABS_LIBRARY_CACHE_TTL)
 - Auto-enabled when ABS is configured (or set ABS_CHECK_LIBRARY explicitly)
 
@@ -364,15 +387,19 @@ CREATE TABLE series_cache (
 - Fetched from Audiobookshelf during verification (if match score ≥100)
 - Fallback to Hardcover API for additional metadata (optional)
 - Updates both history.db and covers.db
-- Displayed in showcase view with expand/collapse
+- Displayed in Discover view detail panel with expand/collapse
 - Source tracking: 'abs', 'hardcover', or 'none'
 
-### Showcase View
-- Groups search results by normalized title (removes articles "The", "A", "An" and punctuation)
-- Card-based grid layout with covers and descriptions
-- Detail view shows all versions/editions per title
-- URL state management (?detail=title-slug)
-- Responsive layout with @vueuse/core breakpoints
+### Discover View (Unified Search)
+- **Single API Architecture:** One `/api/showcase` call populates both view modes
+- **Cards Mode:** Groups results by normalized title, card grid with covers
+- **Table Mode:** Flattened list of all editions with sorting (seeders, date, size)
+- **Instant View Switching:** No re-fetch needed when toggling modes
+- **Unified Limits:** 25/50/100 results (MAM's supported values)
+- Detail view shows all versions/editions per title with metadata enrichment
+- URL state management (?view=cards|table, ?detail=title-slug)
+- View preference persisted to localStorage
+- Responsive layout with centralized breakpoints
 
 ### Multi-Disc Flattening
 - Auto-detects Disc/Disk/CD/Part patterns in folder structure
@@ -742,13 +769,19 @@ DevTools (F12) → Console for errors, Network tab for API calls, Vue DevTools e
 
 ## Security
 
-**⚠️ WARNING: ZERO AUTHENTICATION**
+**Optional ABS-Based Authentication:**
+- When `ABS_BASE_URL` is configured, login is required using Audiobookshelf credentials
+- Credentials validated against ABS server (POST /login), tokens stored in localStorage
+- All routes protected via Vue Router navigation guards
+- If ABS not configured, app shows setup message with option to continue without auth
+
+**⚠️ WARNING: Still intended for trusted networks**
 
 **Safe Usage Only:**
 - Behind VPN (Tailscale, WireGuard, Headscale)
 - Behind authenticated reverse proxy (Authelia, Authentik, Caddy with auth)
 - Trusted local network only (with firewall rules)
-- **NEVER exposed to public internet**
+- **NEVER exposed to public internet** (ABS auth is convenience, not security hardening)
 
 **Credentials:** MAM_COOKIE, qBittorrent credentials, API keys stored in env vars only (never committed to git)
 

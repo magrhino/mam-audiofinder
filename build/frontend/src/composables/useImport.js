@@ -4,6 +4,7 @@
  */
 
 import { ref, reactive, computed, watch } from 'vue'
+import { useMessage } from 'naive-ui'
 import { useApi } from './useApi'
 
 /**
@@ -13,6 +14,7 @@ import { useApi } from './useApi'
  */
 export function useImport(historyItem) {
   const api = useApi()
+  const message = useMessage()
 
   const loading = ref(false)
   const torrents = ref([])
@@ -134,6 +136,7 @@ export function useImport(historyItem) {
         title: form.title.trim(),
         hash: form.selectedHash,
         history_id: historyItem?.id,
+        mam_id: historyItem?.mam_id,
         flatten: form.flatten
       })
 
@@ -162,6 +165,9 @@ export function useImport(historyItem) {
 
       statusMessage.value = statusParts.join('\n')
 
+      // Show toast notification
+      message.success(`✓ Imported "${form.title}"`)
+
       // Dispatch event for live status updates
       if (historyItem?.id) {
         window.dispatchEvent(new CustomEvent('importCompleted', {
@@ -174,9 +180,11 @@ export function useImport(historyItem) {
 
       return { success: true, result }
     } catch (err) {
-      const message = `Import failed: ${err.message}`
-      statusMessage.value = `❌ ${message}`
-      return { success: false, message, error: err }
+      const errorMsg = `Import failed: ${err.message}`
+      statusMessage.value = `❌ ${errorMsg}`
+      // Show toast notification
+      message.error(`❌ ${errorMsg}`)
+      return { success: false, message: errorMsg, error: err }
     } finally {
       loading.value = false
     }

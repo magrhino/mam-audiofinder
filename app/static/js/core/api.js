@@ -4,15 +4,52 @@
  */
 
 /**
+ * Get auth token from localStorage
+ * @returns {string|null}
+ */
+function getAuthToken() {
+  return localStorage.getItem('abs_token')
+}
+
+/**
+ * Build headers with auth token if available
+ * @param {Object} extra - Additional headers to include
+ * @returns {Object}
+ */
+function buildHeaders(extra = {}) {
+  const headers = { ...extra }
+  const token = getAuthToken()
+  if (token) {
+    headers['X-ABS-Token'] = token
+  }
+  return headers
+}
+
+/**
  * API client with methods for all backend endpoints
  */
 export const api = {
+  /**
+   * Generic GET request helper
+   * @param {string} url - URL to fetch
+   * @returns {Promise<Object>}
+   */
+  async get(url) {
+    const r = await fetch(url, {
+      headers: buildHeaders()
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  },
+
   /**
    * Health check endpoint
    * @returns {Promise<{ok: boolean}>}
    */
   async health() {
-    const r = await fetch('/health');
+    const r = await fetch('/health', {
+      headers: buildHeaders()
+    });
     return r.json();
   },
 
@@ -21,7 +58,9 @@ export const api = {
    * @returns {Promise<Object>}
    */
   async getConfig() {
-    const r = await fetch('/config');
+    const r = await fetch('/config', {
+      headers: buildHeaders()
+    });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   },
@@ -38,7 +77,7 @@ export const api = {
   async search(payload) {
     const resp = await fetch('/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload)
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -53,7 +92,7 @@ export const api = {
   async addTorrent(params) {
     const resp = await fetch('/add', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(params)
     });
     if (!resp.ok) {
@@ -74,10 +113,10 @@ export const api = {
   async getHistory() {
     const r = await fetch('/api/history', {
       cache: 'no-cache',
-      headers: {
+      headers: buildHeaders({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache'
-      }
+      })
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
@@ -100,7 +139,8 @@ export const api = {
    */
   async deleteHistoryItem(id) {
     const resp = await fetch(`/api/history/${encodeURIComponent(id)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: buildHeaders()
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
@@ -114,7 +154,7 @@ export const api = {
   async verifyHistoryItem(id) {
     const resp = await fetch(`/api/history/${encodeURIComponent(id)}/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: buildHeaders({ 'Content-Type': 'application/json' })
     });
     if (!resp.ok) {
       let msg = `HTTP ${resp.status}`;
@@ -132,7 +172,9 @@ export const api = {
    * @returns {Promise<{items: Array}>}
    */
   async getCompletedTorrents() {
-    const r = await fetch('/qb/torrents');
+    const r = await fetch('/qb/torrents', {
+      headers: buildHeaders()
+    });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   },
@@ -143,7 +185,9 @@ export const api = {
    * @returns {Promise<Object>}
    */
   async getTorrentTree(hash) {
-    const r = await fetch(`/qb/torrent/${encodeURIComponent(hash)}/tree`);
+    const r = await fetch(`/qb/torrent/${encodeURIComponent(hash)}/tree`, {
+      headers: buildHeaders()
+    });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   },
@@ -161,7 +205,7 @@ export const api = {
   async importTorrent(params) {
     const r = await fetch('/import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(params)
     });
     if (!r.ok) {
@@ -187,7 +231,9 @@ export const api = {
       lines: params.lines.toString(),
       level: params.level || ''
     });
-    const resp = await fetch(`/api/logs?${queryParams}`);
+    const resp = await fetch(`/api/logs?${queryParams}`, {
+      headers: buildHeaders()
+    });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
   },
@@ -208,7 +254,9 @@ export const api = {
       author: params.author || '',
       max_retries: params.max_retries || '2'
     });
-    const resp = await fetch(`/api/covers/fetch?${queryParams}`);
+    const resp = await fetch(`/api/covers/fetch?${queryParams}`, {
+      headers: buildHeaders()
+    });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
   },
@@ -225,7 +273,9 @@ export const api = {
       query: params.query || '',
       limit: params.limit.toString()
     });
-    const resp = await fetch(`/api/showcase?${queryParams}`);
+    const resp = await fetch(`/api/showcase?${queryParams}`, {
+      headers: buildHeaders()
+    });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
   },
@@ -242,7 +292,7 @@ export const api = {
   async searchSeries(params) {
     const resp = await fetch('/api/series/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         title: params.title,
         author: params.author || '',
@@ -287,7 +337,9 @@ export const api = {
     if (per_page) params.append('per_page', String(per_page));
     if (page) params.append('page', String(page));
 
-    const resp = await fetch(`/api/series/${seriesId}/books?${params}`);
+    const resp = await fetch(`/api/series/${seriesId}/books?${params}`, {
+      headers: buildHeaders()
+    });
     if (!resp.ok) {
       let msg = `HTTP ${resp.status}`;
       try {
@@ -309,7 +361,7 @@ export const api = {
   async fetchSeriesAudioMetadata(seriesId, bookIndices = null) {
     const resp = await fetch(`/api/series/${seriesId}/books/fetch-audio`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ book_indices: bookIndices })
     });
     if (!resp.ok) {
@@ -337,7 +389,7 @@ export const api = {
   async enrichMetadata(params) {
     const resp = await fetch('/api/covers/enrich', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         title: params.title,
         author: params.author || '',
@@ -353,5 +405,69 @@ export const api = {
       throw new Error(msg);
     }
     return resp.json();
+  },
+
+  // ======================== Settings API ========================
+
+  /**
+   * Get all application settings
+   * @returns {Promise<Object>}
+   */
+  async getSettings() {
+    const r = await fetch('/api/settings', {
+      headers: buildHeaders()
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  },
+
+  /**
+   * Update application settings
+   * @param {Object} settings - Settings to update
+   * @param {boolean} settings.auto_import_enabled - Enable auto-import
+   * @param {boolean} settings.auto_import_flatten - Flatten during auto-import
+   * @param {number} settings.auto_import_poll_interval - Poll interval in seconds
+   * @returns {Promise<{ok: boolean, updated: Array}>}
+   */
+  async updateSettings(settings) {
+    const resp = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(settings)
+    });
+    if (!resp.ok) {
+      let msg = `HTTP ${resp.status}`;
+      try {
+        const j = await resp.json();
+        if (j?.detail) msg += ` — ${j.detail}`;
+      } catch {}
+      throw new Error(msg);
+    }
+    return resp.json();
+  },
+
+  /**
+   * Reset all settings to defaults
+   * @returns {Promise<{ok: boolean}>}
+   */
+  async resetSettings() {
+    const resp = await fetch('/api/settings/reset', {
+      method: 'POST',
+      headers: buildHeaders()
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+  },
+
+  /**
+   * Get auto-import service status
+   * @returns {Promise<Object>}
+   */
+  async getAutoImportStatus() {
+    const r = await fetch('/api/settings/auto-import/status', {
+      headers: buildHeaders()
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
   }
 };

@@ -1,38 +1,49 @@
 <template>
-  <div class="showcase-view" :class="{ 'detail-active': detailGroup }">
-    <!-- Hero Panel - Audible/Jellyseerr Style -->
+  <div class="discover-view" :class="{ 'detail-active': detailGroup }">
+    <!-- Hero Panel -->
     <n-card class="hero-panel" :bordered="false">
       <n-space vertical :size="24">
-        <!-- Hero Header -->
+        <!-- Header -->
         <div class="hero-header">
           <GlassTitle tag="h1">
-            Audiobook Showcase
+            Discover Audiobooks
           </GlassTitle>
           <GlassSubtitle>
-            Discover audiobooks grouped by title with advanced search powered by Naive UI components
+            Search and explore audiobooks from MAM
           </GlassSubtitle>
         </div>
 
         <!-- Search Form -->
-        <n-space :size="12" align="end" :wrap="true">
+        <n-space :size="12" align="end" :wrap="true" class="search-form">
           <div class="search-input-wrapper">
             <GlassSearchBar
               v-model="form.q"
-              placeholder="Search audiobooks..."
+              placeholder="Search title/author/narrator..."
               @search="runSearch"
               @clear="clearSearch"
             />
           </div>
 
+          <!-- View Toggle -->
+          <ViewToggle :model-value="viewMode" @update:model-value="setViewMode" />
+
+          <!-- Limit Dropdown -->
           <GlassSelect
             v-model="form.limit"
-            :options="limitOptions"
+            :options="currentLimitOptions"
             width="140px"
+          />
+
+          <!-- Sort Dropdown (table mode only) -->
+          <GlassSelect
+            v-if="isTableMode"
+            v-model="form.sort"
+            :options="SORT_OPTIONS"
+            width="160px"
           />
 
           <n-button
             type="primary"
-            size="medium"
             @click="runSearch"
             :loading="loading"
             :disabled="!form.q.trim()"
@@ -47,24 +58,29 @@
       </n-space>
     </n-card>
 
-    <!-- Status Text with Naive UI Typography -->
+    <!-- Status -->
     <n-card v-if="status" class="status-card" :bordered="false">
       <n-text :depth="2">{{ status }}</n-text>
     </n-card>
 
-    <!-- Showcase Grid -->
-    <div v-if="!detailGroup && groups.length" class="showcase-grid">
-      <ShowcaseCard v-for="group in groups" :key="group.mam_id" :group="group" @select="showDetail" />
+    <!-- Cards Mode: Showcase Grid -->
+    <div v-if="isCardsMode && !detailGroup && cardGroups.length" class="showcase-grid">
+      <ShowcaseCard
+        v-for="group in cardGroups"
+        :key="group.mam_id"
+        :group="group"
+        @select="showDetail"
+      />
     </div>
 
-    <!-- Detail View with Naive UI Cards -->
-    <n-card v-if="detailGroup" class="detail-card" :bordered="false" ref="detailElement">
+    <!-- Cards Mode: Detail View -->
+    <n-card v-if="isCardsMode && detailGroup" class="detail-card" :bordered="false" ref="detailElement">
       <template #header>
         <n-space justify="space-between" align="center">
           <GlassTitle tag="h2" class="word-wrap-title">{{ detailGroup.display_title }}</GlassTitle>
           <n-space :size="8">
-            <n-button secondary @click="searchThisTitle" title="Search MAM for this title (25 results)">
-              🔍 Search MAM
+            <n-button secondary @click="searchInTableMode" title="Search all editions in table view">
+              ≡ View All Editions
             </n-button>
             <n-button @click="closeDetail" quaternary circle>
               <template #icon>
@@ -76,9 +92,8 @@
       </template>
 
       <div class="detail-content">
-        <!-- Cover and Info Section -->
+        <!-- Cover and Info -->
         <n-space :size="24" align="start">
-          <!-- Cover Image using CoverImage component -->
           <div v-if="detailGroup.mam_id" class="detail-cover-wrapper">
             <CoverImage
               :mam-id="detailGroup.mam_id"
@@ -90,7 +105,6 @@
             />
           </div>
 
-          <!-- Info Section -->
           <n-space vertical :size="12" class="detail-info">
             <div v-if="detailGroup.author">
               <n-text :depth="3" strong>Author:</n-text>
@@ -114,14 +128,12 @@
               </n-space>
             </div>
 
-            <!-- Description - Lazy Loading Card -->
+            <!-- Description -->
             <div class="description-section">
               <n-card :bordered="false" embedded class="description-card">
                 <template #header>
                   <n-skeleton v-if="descriptionLoading" text width="40%" />
-                  <n-text v-else tag="strong" :depth="2">
-                    Description
-                  </n-text>
+                  <n-text v-else tag="strong" :depth="2">Description</n-text>
                 </template>
 
                 <n-skeleton v-if="descriptionLoading" text :repeat="4" />
@@ -159,7 +171,6 @@
           Available Versions ({{ detailGroup.total_versions }})
         </n-text>
 
-        <!-- Table Wrapper with NDataTable -->
         <n-data-table
           ref="versionsTableRef"
           :columns="versionsColumns"
@@ -172,13 +183,26 @@
         />
       </div>
     </n-card>
+
+    <!-- Table Mode: Data Table -->
+    <div v-if="isTableMode" class="glass-table-wrapper w-full max-w-full overflow-x-hidden">
+      <n-data-table
+        ref="tableRef"
+        :columns="columns"
+        :data="tableData"
+        :pagination="pagination"
+        :bordered="false"
+        :loading="loading"
+        :single-line="false"
+        striped
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch, computed, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useBreakpoints } from '@vueuse/core'
 import {
   NCard,
   NSpace,
@@ -186,17 +210,23 @@ import {
   NButton,
   NTag,
   NDivider,
-  NSpin,
   NDataTable,
   NSkeleton
 } from 'naive-ui'
-import ShowcaseCard from '@components/ShowcaseCard.vue'
-import CoverImage from '@components/CoverImage.vue'
+
+// Components
 import GlassSearchBar from '@components/GlassSearchBar.vue'
 import GlassSelect from '@components/GlassSelect.vue'
 import GlassTitle from '@components/GlassTitle.vue'
 import GlassSubtitle from '@components/GlassSubtitle.vue'
+import ViewToggle from '@components/ViewToggle.vue'
+import ShowcaseCard from '@components/ShowcaseCard.vue'
+import CoverImage from '@components/CoverImage.vue'
+
+// Composables
 import { useApi } from '@composables/useApi'
+import { useViewToggle, VIEW_MODES } from '@composables/useViewToggle'
+import { useDiscoverSearch, SORT_OPTIONS } from '@composables/useDiscoverSearch'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 import { useAddTorrentFlow } from '@composables/useAddTorrentFlow'
 import { sanitizeDescription } from '@/utils/sanitize'
@@ -205,72 +235,64 @@ const api = useApi()
 const route = useRoute()
 const router = useRouter()
 
+// View toggle
+const {
+  viewMode,
+  isCardsMode,
+  isTableMode,
+  initFromRoute: initViewFromRoute,
+  setViewMode
+} = useViewToggle({ defaultMode: VIEW_MODES.CARDS })
+
+// Search state - unified API: both cardGroups and tableResults populated from single call
+const {
+  form,
+  loading,
+  status,
+  tableResults,
+  cardGroups,
+  totalGroups,
+  totalResults,
+  detailGroup,
+  currentLimitOptions,
+  syncFromRoute,
+  runSearch: doSearch,
+  clearSearch,
+  showDetail: doShowDetail,
+  closeDetail: doCloseDetail,
+  restoreDetailFromUrl
+} = useDiscoverSearch({ viewMode })
+
 // Unified add torrent flow
 const { addTorrent, isItemLoading } = useAddTorrentFlow()
 
-// Responsive breakpoints for dynamic input width
-const breakpoints = useBreakpoints({
-  mobile: 0,
-  tablet: 768,
-  desktop: 1024
+// Table mode: data table
+const {
+  tableRef,
+  data: tableData,
+  columns,
+  pagination,
+  setData: setTableData,
+  clearData: clearTableData,
+  sort
+} = useMAMSearchDataTable({
+  viewType: 'search',
+  defaultPageSize: 25,
+  onAdd: handleAddTorrent,
+  isItemLoading
 })
 
-// Dynamic input width based on screen size
-const inputWidth = computed(() => {
-  if (breakpoints.greater('desktop').value) {
-    return '500px'
-  } else if (breakpoints.greater('tablet').value) {
-    return '350px'
-  } else {
-    return '100%'
-  }
-})
+// Keep the data-table source in sync with search results.
+// This prevents the table view from looking empty/stale when switching modes.
+watch(
+  tableResults,
+  (results) => {
+    setTableData(results)
+  },
+  { immediate: true }
+)
 
-// Description source label
-const descriptionSourceLabel = computed(() => {
-  const sourceMap = {
-    'audible': 'via Audible',
-    'google': 'via Google Books',
-    'openlibrary': 'via Open Library',
-    'abs': 'via Audiobookshelf',
-    'hardcover': 'via Hardcover',
-    'none': 'No metadata available',
-    'error': 'Failed to load metadata'
-  }
-  return sourceMap[descriptionSource.value] || 'Unknown source'
-})
-
-// Sanitized description for safe HTML rendering
-const sanitizedDescription = computed(() => {
-  return sanitizeDescription(detailDescription.value)
-})
-
-const formRef = ref(null)
-const form = reactive({ q: '', limit: '100' })
-const limitOptions = [
-  { label: '50 results', value: '50' },
-  { label: '100 results', value: '100' },
-  { label: '200 results', value: '200' },
-  { label: '500 results', value: '500' }
-]
-
-const status = ref('Enter a search query to find audiobooks.')
-const loading = ref(false)
-const groups = ref([])
-const detailGroup = ref(null)
-const detailElement = ref(null)
-const detailDescription = ref('')
-const descriptionSource = ref('none')
-const descriptionLoading = ref(false)
-const descriptionCollapsed = ref(true)
-
-// Add torrent handler using shared composable
-const handleAddTorrent = async (rowState) => {
-  const result = await addTorrent(rowState)
-  status.value = result.message
-}
-
-// Initialize versions data table with search configuration
+// Detail mode: versions table
 const {
   tableRef: versionsTableRef,
   data: versionsData,
@@ -285,99 +307,70 @@ const {
   isItemLoading
 })
 
-const normalizeQuery = (values) => {
-  const query = {}
-  Object.entries(values).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      query[key] = value
-    }
-  })
-  return query
+// Detail state
+const detailElement = ref(null)
+const detailDescription = ref('')
+const descriptionSource = ref('none')
+const descriptionLoading = ref(false)
+const descriptionCollapsed = ref(true)
+
+// Computed
+const descriptionSourceLabel = computed(() => {
+  const sourceMap = {
+    'audible': 'via Audible',
+    'google': 'via Google Books',
+    'openlibrary': 'via Open Library',
+    'abs': 'via Audiobookshelf',
+    'hardcover': 'via Hardcover',
+    'none': 'No metadata available',
+    'error': 'Failed to load metadata'
+  }
+  return sourceMap[descriptionSource.value] || 'Unknown source'
+})
+
+const sanitizedDescription = computed(() => {
+  return sanitizeDescription(detailDescription.value)
+})
+
+// Methods
+async function handleAddTorrent(rowState) {
+  const result = await addTorrent(rowState)
+  status.value = result.message
 }
 
-const syncForm = () => {
-  const getValue = (key, fallback) => {
-    const value = route.query[key]
-    if (Array.isArray(value)) {
-      return value[value.length - 1] ?? fallback
+async function runSearch(options = {}) {
+  const { silent = false } = options
+
+  await doSearch({ silent })
+
+  // Apply sort for table view after search completes
+  if (isTableMode.value) {
+    await nextTick()
+
+    if (form.sort === 'seedersDesc') {
+      sort('seeders', 'descend')
+    } else if (form.sort === 'dateDesc') {
+      sort('added', 'descend')
+    } else if (form.sort === 'sizeDesc') {
+      sort('size', 'descend')
     }
-    return value ?? fallback
-  }
-
-  form.q = getValue('q', '')
-  form.limit = getValue('limit', '100')
-}
-
-const runSearch = async () => {
-  if (!form.q.trim()) {
-    status.value = 'Enter a search query to find audiobooks.'
-    groups.value = []
-    detailGroup.value = null
-    return
-  }
-  loading.value = true
-  status.value = 'Loading audiobooks…'
-  groups.value = []
-  detailGroup.value = null
-
-  try {
-    const data = await api.getShowcase({ query: form.q.trim(), limit: parseInt(form.limit, 10) })
-    groups.value = data.groups || []
-    status.value = groups.value.length ? `Showing ${data.total_groups} titles (${data.total_results} versions)` : 'No audiobooks found.'
-
-    // Update URL with search params (preserve detail if exists)
-    router.replace({
-      query: normalizeQuery({
-        q: form.q.trim(),
-        limit: form.limit,
-        detail: route.query.detail // Preserve detail parameter
-      })
-    })
-
-    // Restore detail view if detail parameter exists in URL
-    if (route.query.detail) {
-      restoreDetailFromUrl()
-    }
-  } catch (err) {
-    status.value = `Failed to load showcase: ${err.message}`
-  } finally {
-    loading.value = false
   }
 }
 
-const clearSearch = () => {
-  form.q = ''
-  groups.value = []
-  detailGroup.value = null
-  status.value = 'Enter a search query to find audiobooks.'
-}
-
-const showDetail = async (group) => {
-  console.log('showDetail called with:', group)
-  detailGroup.value = group
-  detailDescription.value = ''
-  descriptionCollapsed.value = true
-
-  // Populate versions table with group versions
+async function showDetail(group) {
+  doShowDetail(group)
   setVersionsData(group.versions || [])
 
-  // Update URL with detail parameter
-  router.push({
-    query: {
-      ...route.query,
-      detail: group.normalized_title || group.display_title?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
-    }
-  })
-
-  // Scroll to detail view after DOM updates
+  // Scroll to detail
   await nextTick()
   if (detailElement.value?.$el) {
     detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Fetch description using on-demand enrichment (CoverImage component handles cover loading)
+  // Fetch description
   if (group.display_title) {
     descriptionLoading.value = true
+    descriptionCollapsed.value = true
 
     try {
       const data = await api.enrichMetadata({
@@ -385,8 +378,6 @@ const showDetail = async (group) => {
         author: group.author || '',
         mam_id: group.mam_id || ''
       })
-
-      // Always set description and source (even if empty)
       detailDescription.value = data.description || ''
       descriptionSource.value = data.source || 'none'
     } catch (err) {
@@ -399,124 +390,102 @@ const showDetail = async (group) => {
   }
 }
 
-const closeDetail = () => {
-  detailGroup.value = null
+function closeDetail() {
+  doCloseDetail()
   detailDescription.value = ''
   descriptionSource.value = 'none'
   descriptionLoading.value = false
   clearVersionsData()
-
-  // Remove detail parameter from URL
-  const query = { ...route.query }
-  delete query.detail
-  router.replace({ query })
 }
 
-const searchThisTitle = () => {
+async function searchInTableMode() {
   if (!detailGroup.value?.display_title) return
 
-  // Capture title before closing detail view
   const titleToSearch = detailGroup.value.display_title
 
-  // Close detail view
-  detailGroup.value = null
-  detailDescription.value = ''
+  // Close detail
+  closeDetail()
 
-  // Set search parameters
+  // Switch to table mode and search for this specific title
   form.q = titleToSearch
-  form.limit = '25'
+  setViewMode(VIEW_MODES.TABLE)
 
-  // Run the search
-  runSearch()
+  // Trigger search with the specific title
+  await runSearch()
 }
 
-const restoreDetailFromUrl = async () => {
-  const detailId = route.query.detail
-  if (!detailId || !groups.value.length) return
+// Watch view mode changes
+// With unified search, both result sets are always populated - no re-search needed
+watch(viewMode, (newMode, oldMode) => {
+  if (newMode === oldMode) return
 
-  // Find matching group by normalized_title
-  const group = groups.value.find(g =>
-    g.normalized_title === detailId ||
-    g.display_title?.toLowerCase().replace(/\s+/g, '-') === detailId
-  )
-
-  if (group) {
-    // Show detail without updating URL (already in URL)
-    detailGroup.value = group
-    detailDescription.value = ''
-    descriptionCollapsed.value = true
-
-    // Populate versions table with group versions
-    setVersionsData(group.versions || [])
-
-    // Scroll to detail view after DOM updates
-    await nextTick()
-    if (detailElement.value?.$el) {
-      detailElement.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-
-    // Fetch description using on-demand enrichment (CoverImage component handles cover loading)
-    if (group.display_title) {
-      descriptionLoading.value = true
-
-      api.enrichMetadata({
-        title: group.display_title,
-        author: group.author || '',
-        mam_id: group.mam_id || ''
-      }).then(data => {
-        // Always set description and source (even if empty)
-        detailDescription.value = data.description || ''
-        descriptionSource.value = data.source || 'none'
-      }).catch(err => {
-        console.warn('Failed to load enriched metadata:', err)
-        detailDescription.value = ''
-        descriptionSource.value = 'error'
-      }).finally(() => {
-        descriptionLoading.value = false
-      })
-    }
-  }
-}
-
-onMounted(() => {
-  syncForm()
-  if (form.q) {
-    runSearch()
-  }
-})
-
-// Watch for search parameter changes
-watch(() => [route.query.q, route.query.limit], () => {
-  const previous = form.q
-  syncForm()
-  if (form.q && form.q !== previous) {
-    runSearch()
-  }
-  if (!form.q) {
-    groups.value = []
-    detailGroup.value = null
-    status.value = 'Enter a search query to find audiobooks.'
-  }
-})
-
-// Watch for detail parameter changes (browser back/forward)
-watch(() => route.query.detail, (newDetail, oldDetail) => {
-  if (newDetail && newDetail !== oldDetail) {
-    // Detail parameter added or changed - show detail view
-    restoreDetailFromUrl()
-  } else if (!newDetail && oldDetail) {
-    // Detail parameter removed - close detail view
-    detailGroup.value = null
-    detailDescription.value = ''
-    descriptionSource.value = 'none'
-    descriptionLoading.value = false
+  // Clear mode-specific UI state only
+  if (newMode === VIEW_MODES.TABLE) {
     clearVersionsData()
+    detailDescription.value = ''
+  }
+  // Note: Don't clear tableData - it's derived from cardGroups and already populated
+  // No re-search needed - tableResults and cardGroups are always in sync
+})
+
+// Watch for detail parameter changes
+watch(() => route.query.detail, async (newDetail, oldDetail) => {
+  if (!isCardsMode.value) return
+
+  if (newDetail && newDetail !== oldDetail && cardGroups.value.length) {
+    // Find and show the group
+    const group = cardGroups.value.find(g =>
+      g.normalized_title === newDetail ||
+      g.display_title?.toLowerCase().replace(/\s+/g, '-') === newDetail
+    )
+    if (group) {
+      await showDetail(group)
+    }
+  } else if (!newDetail && oldDetail) {
+    closeDetail()
+  }
+})
+
+// Initialize on mount
+onMounted(async () => {
+  initViewFromRoute()
+  syncFromRoute()
+
+  if (form.q) {
+    await runSearch({ silent: true })
+
+    // Restore detail if in URL
+    if (isCardsMode.value && route.query.detail) {
+      restoreDetailFromUrl()
+      if (detailGroup.value) {
+        await showDetail(detailGroup.value)
+      }
+    }
+  }
+})
+
+// Watch for URL query changes
+watch(() => [route.query.q, route.query.limit, route.query.sort], () => {
+  // Skip if we're in the middle of a search - prevents race condition
+  // where updateUrl() triggers this watcher and interferes with results
+  if (loading.value) return
+
+  const previousQuery = form.q
+  syncFromRoute()
+
+  if (form.q && form.q !== previousQuery) {
+    runSearch({ silent: true })
+  }
+
+  if (!form.q) {
+    clearTableData()
+    status.value = 'Enter a search query to get started.'
   }
 })
 </script>
 
 <style scoped>
-.showcase-view {
+.discover-view {
   width: 100%;
   max-width: 1400px;
   overflow-x: hidden;
@@ -525,20 +494,18 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   transition: max-width 0.3s ease;
 }
 
-/* Full-width detail view */
-.showcase-view.detail-active {
+.discover-view.detail-active {
   max-width: 100%;
   padding-left: 0;
   padding-right: 0;
 }
 
-/* Keep padding on hero panel when detail is active */
-.showcase-view.detail-active .hero-panel {
+.discover-view.detail-active .hero-panel {
   margin-left: var(--spacing-md, 1rem);
   margin-right: var(--spacing-md, 1rem);
 }
 
-/* Hero Panel - Audible/Jellyseerr Inspired */
+/* Hero Panel */
 .hero-panel {
   background: linear-gradient(135deg, rgba(80, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.8) 100%);
   border-radius: 16px;
@@ -555,19 +522,13 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   gap: var(--spacing-sm, 0.5rem);
 }
 
-/* Title styles now handled by GlassTitle/GlassSubtitle components */
+.search-form {
+  width: 100%;
+}
 
-/* Make search input responsive */
 .search-input-wrapper {
   flex: 1;
   min-width: 200px;
-}
-
-@media (max-width: 768px) {
-  .search-input-wrapper {
-    min-width: 150px;
-    width: 100%;
-  }
 }
 
 /* Status Card */
@@ -594,8 +555,6 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
-/* Detail title styles now handled by GlassTitle component */
-
 .detail-content {
   padding: var(--spacing-md, 1rem);
 }
@@ -608,37 +567,6 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
   background: var(--bg-primary, #1a1a1a);
   flex-shrink: 0;
-}
-
-.detail-cover {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.cover-skeleton {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(
-    90deg,
-    rgba(36, 36, 36, 0.5) 0%,
-    rgba(42, 42, 42, 0.5) 50%,
-    rgba(36, 36, 36, 0.5) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
 }
 
 .detail-info {
@@ -662,24 +590,28 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
   text-overflow: ellipsis;
 }
 
-/* Description text styling for v-html content */
 .description-text {
   color: var(--text-secondary, #e8e8e8);
   line-height: 1.6;
   word-wrap: break-word;
 }
 
-.description-text br {
-  margin-bottom: 0.5em;
-}
-
-/* Versions Data Table */
 .versions-data-table {
   margin-top: var(--spacing-md, 1rem);
 }
 
+/* Table wrapper */
+.glass-table-wrapper {
+  margin-top: var(--spacing-lg, 1.5rem);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+  .search-input-wrapper {
+    min-width: 150px;
+    width: 100%;
+  }
+
   .showcase-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: var(--spacing-md, 1rem);
@@ -691,16 +623,18 @@ watch(() => route.query.detail, (newDetail, oldDetail) => {
     align-self: center;
   }
 
-  /* Detail Mode: Remove card max-width on mobile, keep page padding */
   .detail-card {
     width: 100%;
     max-width: none;
   }
+
+  .glass-table-wrapper {
+    margin-left: calc(-1 * var(--spacing-md, 1rem));
+    margin-right: calc(-1 * var(--spacing-md, 1rem));
+  }
 }
 
-/* Tablet responsive */
 @media (min-width: 769px) and (max-width: 1023px) {
-  /* Detail Mode: Remove card max-width on tablet, keep page padding */
   .detail-card {
     width: 100%;
     max-width: none;

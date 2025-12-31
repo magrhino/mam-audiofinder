@@ -91,7 +91,6 @@ def test_deduplication_logic():
     assert unique_titles == expected_order, f"Order not preserved correctly. Expected {expected_order}, got {unique_titles}"
 
     print("\n✅ All assertions passed!")
-    return True
 
 
 def test_omnibus_detection():
@@ -129,7 +128,6 @@ def test_omnibus_detection():
 
     assert all_passed, "Some omnibus detection tests failed"
     print("   ✅ All omnibus detection tests passed!")
-    return True
 
 
 def test_deduplication_edge_cases():
@@ -226,7 +224,6 @@ def test_deduplication_edge_cases():
     print("   ✅ Empty string handling works")
 
     print("\n✅ All edge case tests passed!")
-    return True
 
 
 def main():

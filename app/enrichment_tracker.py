@@ -6,7 +6,7 @@ allowing immediate response with basic data while enrichment happens in backgrou
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 import logging
 
@@ -22,7 +22,7 @@ class EnrichmentJob:
         self.completed_books = 0
         self.enriched_books: List[Dict[str, Any]] = []
         self.status = "pending"  # pending, in_progress, complete, failed
-        self.started_at = datetime.utcnow()
+        self.started_at = datetime.now(timezone.utc)
         self.completed_at: Optional[datetime] = None
         self.error: Optional[str] = None
         self._lock = asyncio.Lock()
@@ -35,7 +35,7 @@ class EnrichmentJob:
 
             if self.completed_books >= self.total_books:
                 self.status = "complete"
-                self.completed_at = datetime.utcnow()
+                self.completed_at = datetime.now(timezone.utc)
                 duration = (self.completed_at - self.started_at).total_seconds()
                 logger.info(f"✅ Enrichment complete for series {self.series_id}: "
                           f"{self.completed_books}/{self.total_books} books in {duration:.1f}s")
@@ -50,7 +50,7 @@ class EnrichmentJob:
 
     def is_expired(self, ttl_seconds: int = 300) -> bool:
         """Check if job is expired (default: 5 minutes)."""
-        age = (datetime.utcnow() - self.started_at).total_seconds()
+        age = (datetime.now(timezone.utc) - self.started_at).total_seconds()
         return age > ttl_seconds
 
 
@@ -143,7 +143,7 @@ class EnrichmentTracker:
             if job:
                 job.status = "failed"
                 job.error = error
-                job.completed_at = datetime.utcnow()
+                job.completed_at = datetime.now(timezone.utc)
                 logger.error(f"❌ Enrichment failed for series {series_id}: {error}")
 
     async def get_status(self, series_id: str) -> Optional[Dict[str, Any]]:

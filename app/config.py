@@ -46,16 +46,18 @@ QB_INNER_DL_PREFIX = os.getenv("QB_INNER_DL_PREFIX", "/downloads")  # qB contain
 
 # ---------------------------- Audiobookshelf Configuration ----------------------------
 ABS_BASE_URL = os.getenv("ABS_BASE_URL", "").rstrip("/")
-ABS_API_KEY = os.getenv("ABS_API_KEY", "")
-ABS_LIBRARY_ID = os.getenv("ABS_LIBRARY_ID", "")
+ABS_ADMIN_USER = os.getenv("ABS_ADMIN_USER", "")  # Username that can modify library settings
 MAX_COVERS_SIZE_MB = int(os.getenv("MAX_COVERS_SIZE_MB", "500"))  # 0 = direct fetch only (not recommended)
 ABS_VERIFY_TIMEOUT = int(os.getenv("ABS_VERIFY_TIMEOUT", "10"))  # Timeout in seconds for import verification
 
 # Library visibility feature - check if search results exist in ABS library
-# Default to True if ABS is fully configured, False otherwise
-_abs_fully_configured = bool(ABS_BASE_URL and ABS_API_KEY and ABS_LIBRARY_ID)
-ABS_CHECK_LIBRARY = os.getenv("ABS_CHECK_LIBRARY", str(_abs_fully_configured)).lower() in ("true", "1", "yes")
+# Default to True if ABS is configured, False otherwise
+ABS_CHECK_LIBRARY = os.getenv("ABS_CHECK_LIBRARY", str(bool(ABS_BASE_URL))).lower() in ("true", "1", "yes")
 ABS_LIBRARY_CACHE_TTL = int(os.getenv("ABS_LIBRARY_CACHE_TTL", "300"))  # Cache duration in seconds (default: 5 minutes)
+
+# ---------------------------- Debug Configuration ----------------------------
+DEBUG_MODE = os.getenv("DEBUG_MODE", "0") == "1"  # Enable debug logging globally
+DEBUG_MATCHING = os.getenv("DEBUG_MATCHING", "0") == "1"  # Enable verbose matching debug logs
 
 # ---------------------------- Hardcover API Configuration ----------------------------
 HARDCOVER_API_TOKEN = os.getenv("HARDCOVER_API_TOKEN", "")
@@ -70,6 +72,16 @@ LIB_DIR = os.getenv("LIB_DIR", "/media/Books/Audiobooks")
 IMPORT_MODE = os.getenv("IMPORT_MODE", "link")  # link|copy|move
 FLATTEN_DISCS = os.getenv("FLATTEN_DISCS", "true").lower() in ("true", "1", "yes")  # flatten multi-disc to sequential files
 AUDIO_EXTS = None  # copy everything except .cue
+IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'}  # Image file extensions (preserved, not renamed)
+# Cover source priority: "shelfarr" (use Shelfarr cache first) or "torrent" (use torrent image first)
+# Falls back to the other source if preferred is unavailable
+COVER_SOURCE_PRIORITY = os.getenv("COVER_SOURCE_PRIORITY", "torrent").lower()  # shelfarr|torrent
+
+# ---------------------------- Auto-Import Configuration ----------------------------
+# These are default values that can be overridden at runtime via the Settings page
+AUTO_IMPORT_ENABLED = os.getenv("AUTO_IMPORT_ENABLED", "false").lower() in ("true", "1", "yes")
+AUTO_IMPORT_POLL_INTERVAL = int(os.getenv("AUTO_IMPORT_POLL_INTERVAL", "30"))  # Polling interval in seconds (15-300)
+AUTO_IMPORT_FLATTEN = os.getenv("AUTO_IMPORT_FLATTEN", "true").lower() in ("true", "1", "yes")  # Flatten multi-disc during auto-import
 
 # ---------------------------- Apply UMASK ----------------------------
 def apply_umask():

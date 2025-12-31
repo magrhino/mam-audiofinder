@@ -5,10 +5,10 @@ Handles cover caching, downloading, and serving.
 import logging
 import httpx
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text
 
-from config import COVERS_DIR, MAX_COVERS_SIZE_MB, ABS_BASE_URL, ABS_API_KEY
+from config import COVERS_DIR, MAX_COVERS_SIZE_MB
 from db import covers_engine, engine
 
 logger = logging.getLogger("mam-audiofinder")
@@ -90,12 +90,9 @@ class CoverService:
             logger.info(f"⬇️  Downloading cover from: {url}")
 
             async with httpx.AsyncClient(timeout=30) as client:
-                # Add auth header if it's an ABS URL
-                headers = {}
-                if ABS_BASE_URL and url.startswith(ABS_BASE_URL):
-                    headers["Authorization"] = f"Bearer {ABS_API_KEY}"
-
-                r = await client.get(url, headers=headers, follow_redirects=True)
+                # Note: Cover URLs from ABS should be accessible without auth
+                # If auth is needed, the caller should use a signed URL or proxy endpoint
+                r = await client.get(url, follow_redirects=True)
 
                 if r.status_code != 200:
                     logger.warning(f"⚠️  Failed to download cover: HTTP {r.status_code}")
@@ -210,6 +207,36 @@ class CoverService:
             logger.error(f"❌ CRITICAL: Failed to get cached cover for MAM ID {mam_id}: {type(e).__name__}: {e}")
             logger.exception("Get cached cover traceback:")
             return {}
+
+    def get_local_cover_path(self, mam_id: str) -> Path | None:
+        """
+        Get the local file path for a cached cover by MAM ID.
+        Returns Path if exists, None otherwise.
+
+        This is primarily used for importing covers to the library.
+        """
+        if not mam_id:
+            return None
+
+        try:
+            with covers_engine.begin() as cx:
+                row = cx.execute(text("""
+                    SELECT local_file
+                    FROM covers
+                    WHERE mam_id = :mam_id
+                    LIMIT 1
+                """), {"mam_id": mam_id}).fetchone()
+
+                if row and row[0]:
+                    local_path = Path(row[0])
+                    if local_path.exists():
+                        logger.debug(f"📷 Found local cover for MAM ID {mam_id}: {local_path}")
+                        return local_path
+
+            return None
+        except Exception as e:
+            logger.error(f"❌ Failed to get local cover path for MAM ID {mam_id}: {e}")
+            return None
 
     def resolve_cover_url(self, mam_id: str, current_url: str = None) -> dict:
         """
@@ -422,10 +449,10 @@ class CoverService:
                     "item_id": item_id,
                     "local_file": local_file,
                     "file_size": file_size,
-                    "fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                    "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
                     "description": description if description else None,
                     "metadata": metadata_json_str,
-                    "metadata_fetched_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if metadata_json else None,
+                    "metadata_fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if metadata_json else None,
                     "has_audiobook": has_audiobook,
                     "duration": duration_minutes
                 })
@@ -462,7 +489,7 @@ class CoverService:
                         "mam_id": mam_id,
                         "cover_url": final_cover_url,  # Use local URL if available
                         "item_id": item_id,
-                        "cached_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                        "cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                     })
                     if result.rowcount > 0:
                         logger.info(f"✅ Updated {result.rowcount} history row(s) with cover for MAM ID {mam_id}")

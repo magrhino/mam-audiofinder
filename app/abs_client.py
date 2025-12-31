@@ -5,7 +5,12 @@ This module provides backward compatibility for existing code that imports
 from abs_client. It wraps the new app.abs.AbsClient and converts Pydantic
 models to the legacy dict format.
 
-DEPRECATED: New code should import from app.abs instead.
+DEPRECATED: New code should import from app.abs instead and use token-based auth.
+
+ARCHITECTURE NOTE:
+- User tokens are now required for ABS API calls (replaces static API key)
+- Library IDs are stored in settings and managed dynamically
+- Routes should use AbsClient.from_env(user_token=token) for authenticated calls
 """
 
 import logging
@@ -17,13 +22,24 @@ from abs.config import AbsConfig
 # Import config values for backward compatibility with tests that monkeypatch
 from config import (
     ABS_BASE_URL,
-    ABS_API_KEY,
-    ABS_LIBRARY_ID,
     ABS_VERIFY_TIMEOUT,
     ABS_LIBRARY_CACHE_TTL,
 )
 
 logger = logging.getLogger("mam-audiofinder")
+
+
+def get_enabled_library_ids() -> List[str]:
+    """Get enabled library IDs from settings.
+
+    Returns list of library IDs that should be searched.
+    This is populated when admin configures libraries in Settings.
+    """
+    try:
+        from settings_service import settings_service
+        return settings_service.get_enabled_libraries()
+    except Exception:
+        return []
 
 
 class AudiobookshelfClient:
@@ -32,29 +48,40 @@ class AudiobookshelfClient:
 
     This class wraps the new AbsClient and provides the same interface
     as the old AudiobookshelfClient for backward compatibility.
+
+    NOTE: Methods now accept an optional `user_token` parameter for auth.
+    Without a token, most API calls will fail.
     """
 
-    def __init__(self):
+    def __init__(self, user_token: Optional[str] = None):
         """Initialize wrapped client from environment or module-level variables."""
-        # For backward compatibility with tests that monkeypatch module-level variables,
-        # we read from the module namespace instead of config directly
-        import abs_client as self_module
         config = AbsConfig(
-            base_url=self_module.ABS_BASE_URL,
-            api_key=self_module.ABS_API_KEY,
-            library_id=self_module.ABS_LIBRARY_ID,
-            verify_timeout=self_module.ABS_VERIFY_TIMEOUT,
-            cache_ttl=self_module.ABS_LIBRARY_CACHE_TTL,
+            base_url=ABS_BASE_URL,
+            verify_timeout=ABS_VERIFY_TIMEOUT,
+            cache_ttl=ABS_LIBRARY_CACHE_TTL,
         )
-        self._client = AbsClient(config)
+        self._client = AbsClient(config, user_token=user_token)
+        self._user_token = user_token
         self.base_url = self._client.config.base_url
-        self.api_key = self._client.config.api_key
-        self.library_id = self._client.config.library_id
+
+    def with_token(self, token: str) -> "AudiobookshelfClient":
+        """Create a new client instance with the given token."""
+        return AudiobookshelfClient(user_token=token)
+
+    @property
+    def config(self):
+        """Expose the inner client's config for routes that need direct access."""
+        return self._client.config
 
     @property
     def is_configured(self) -> bool:
-        """Check if Audiobookshelf is configured."""
+        """Check if Audiobookshelf is configured (base URL set)."""
         return self._client.is_configured
+
+    @property
+    def has_token(self) -> bool:
+        """Check if a user token is available."""
+        return self._client.has_token
 
     async def test_connection(self) -> bool:
         """
@@ -64,6 +91,10 @@ class AudiobookshelfClient:
         """
         if not self.is_configured:
             logger.info("ℹ️  Audiobookshelf integration not configured (skipping connectivity test)")
+            return False
+
+        if not self.has_token:
+            logger.warning("⚠️  No user token available for connection test")
             return False
 
         try:
@@ -81,20 +112,32 @@ class AudiobookshelfClient:
             logger.error(f"❌ Audiobookshelf API test failed with exception: {e}")
             return False
 
-    async def check_library_items(self, items: List[Tuple[str, str]]) -> Dict[str, bool]:
+    async def check_library_items(
+        self,
+        items: List[Tuple[str, str]],
+        library_ids: Optional[List[str]] = None
+    ) -> Dict[str, bool]:
         """
         Check which items exist in the Audiobookshelf library.
 
         Args:
             items: List of (title, author) tuples to check
+            library_ids: Optional list of library IDs to check (uses settings if not provided)
 
         Returns:
             Dict mapping "{title}||{author}" to boolean (True if in library, False otherwise)
 
         Maps to: AbsClient.check_library_presence()
         """
-        if not self.is_configured or not self.library_id:
+        if library_ids is None:
+            library_ids = get_enabled_library_ids()
+
+        if not self.is_configured or not library_ids:
             logger.debug("📚 ABS not fully configured, skipping library check")
+            return {f"{title}||{author}": False for title, author in items}
+
+        if not self.has_token:
+            logger.debug("📚 No user token available, skipping library check")
             return {f"{title}||{author}": False for title, author in items}
 
         if not items:
@@ -103,7 +146,7 @@ class AudiobookshelfClient:
         logger.info(f"📚 Checking {len(items)} items against ABS library")
 
         try:
-            results = await self._client.check_library_presence(items)
+            results = await self._client.check_library_presence(items, library_ids)
             logger.info(f"✅ Library check complete: {sum(results.values())}/{len(results)} items found in library")
             return results
         except Exception as e:
@@ -115,7 +158,8 @@ class AudiobookshelfClient:
         title: str,
         author: str = "",
         mam_id: str = "",
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        library_ids: Optional[List[str]] = None
     ) -> dict:
         """
         Fetch cover image URL from Audiobookshelf.
@@ -134,12 +178,16 @@ class AudiobookshelfClient:
             logger.warning(f"⚠️  No title provided, skipping cover fetch")
             return {}
 
+        if library_ids is None:
+            library_ids = get_enabled_library_ids()
+
         try:
             result = await self._client.fetch_cover(
                 title=title,
                 author=author,
                 mam_id=mam_id,
                 force_refresh=force_refresh,
+                library_ids=library_ids,
             )
 
             # Convert Pydantic model to dict
@@ -171,7 +219,8 @@ class AudiobookshelfClient:
         title: str,
         author: str = "",
         library_path: str = "",
-        metadata: dict = None
+        metadata: dict = None,
+        library_ids: Optional[List[str]] = None
     ) -> dict:
         """
         Verify that an imported item exists in Audiobookshelf library.
@@ -181,6 +230,7 @@ class AudiobookshelfClient:
             author: Author name (from torrent or metadata.json)
             library_path: Path where book was imported
             metadata: Optional dict from metadata.json with enhanced matching data
+            library_ids: Optional list of library IDs to search (uses settings if not provided)
 
         Returns dict with:
             - status: 'verified', 'mismatch', 'not_found', 'unreachable', or 'not_configured'
@@ -199,11 +249,22 @@ class AudiobookshelfClient:
                 "abs_item_id": None
             }
 
-        if not self.library_id:
-            logger.warning("⚠️  ABS_LIBRARY_ID not configured, cannot verify import")
+        if not self.has_token:
+            logger.warning("⚠️  No user token available for verification")
             return {
                 "status": "not_configured",
-                "note": "ABS_LIBRARY_ID not configured",
+                "note": "No authentication token available",
+                "abs_item_id": None
+            }
+
+        if library_ids is None:
+            library_ids = get_enabled_library_ids()
+
+        if not library_ids:
+            logger.warning("⚠️  No libraries enabled for search")
+            return {
+                "status": "not_configured",
+                "note": "No libraries enabled for search",
                 "abs_item_id": None
             }
 
@@ -221,6 +282,7 @@ class AudiobookshelfClient:
                 author=author,
                 library_path=library_path,
                 metadata=metadata,
+                library_ids=library_ids,
             )
 
             # Convert Pydantic model to dict
@@ -269,6 +331,123 @@ class AudiobookshelfClient:
             logger.error(f"❌ Error fetching item details: {e}")
             return {}
 
+    async def get_all_libraries(self):
+        """
+        Fetch all libraries accessible to the user.
+
+        Returns:
+            List of Library objects
+        """
+        return await self._client.get_all_libraries()
+
+    async def sync_library(self, library_id: str) -> int:
+        """Force sync a specific library."""
+        return await self._client.sync_library(library_id)
+
+    async def sync_all_libraries(self, library_ids: Optional[List[str]] = None) -> int:
+        """Force sync all enabled libraries."""
+        if library_ids is None:
+            library_ids = get_enabled_library_ids()
+        return await self._client.sync_all_libraries(library_ids)
+
+    async def get_series_list(self, library_ids: Optional[List[str]] = None) -> List[Dict]:
+        """
+        Fetch series list from specified libraries.
+
+        If library_ids is None, uses enabled libraries from settings.
+
+        Args:
+            library_ids: Optional list of library IDs to query
+
+        Returns:
+            List of series dicts with name, book_count, author, etc.
+
+        Maps to: AbsClient.get_series_list()
+        """
+        if library_ids is None:
+            library_ids = get_enabled_library_ids()
+
+        if not library_ids:
+            logger.debug("📚 No libraries enabled, skipping series list")
+            return []
+
+        if not self.has_token:
+            logger.debug("📚 No user token available, skipping series list")
+            return []
+
+        try:
+            return await self._client.get_series_list(library_ids)
+        except Exception as e:
+            logger.error(f"❌ Failed to get series list: {e}")
+            return []
+
+    async def get_books_in_series(
+        self,
+        series_name: str,
+        library_ids: Optional[List[str]] = None
+    ) -> List:
+        """
+        Get all books in a specific series from specified libraries.
+
+        If library_ids is None, uses enabled libraries from settings.
+
+        Args:
+            series_name: Name of the series to query
+            library_ids: Optional list of library IDs to query
+
+        Returns:
+            List of LibraryItem objects for books in the series
+
+        Maps to: AbsClient.get_books_in_series()
+        """
+        if library_ids is None:
+            library_ids = get_enabled_library_ids()
+
+        if not library_ids:
+            logger.debug("📚 No libraries enabled, skipping series books")
+            return []
+
+        if not self.has_token:
+            logger.debug("📚 No user token available, skipping series books")
+            return []
+
+        try:
+            return await self._client.get_books_in_series(series_name, library_ids)
+        except Exception as e:
+            logger.error(f"❌ Failed to get books in series '{series_name}': {e}")
+            return []
+
+    async def _fetch_from_provider(
+        self,
+        provider: str,
+        item_id: str,
+        title: str,
+        author: str = "",
+        fallback_title_only: bool = True
+    ) -> dict:
+        """
+        Fetch enhanced metadata from external provider via ABS.
+
+        Args:
+            provider: Provider name (audible, google, openlibrary)
+            item_id: ABS library item ID (optional)
+            title: Book title
+            author: Author name (optional)
+            fallback_title_only: Use title-only search if author search fails
+
+        Returns:
+            Dict with enhanced metadata fields, or empty dict on error
+
+        Maps to: AbsClient.fetch_from_provider()
+        """
+        return await self._client.fetch_from_provider(
+            provider=provider,
+            title=title,
+            author=author,
+            item_id=item_id,
+            fallback_title_only=fallback_title_only,
+        )
+
     async def _update_description_after_verification(
         self,
         item_id: str,
@@ -286,8 +465,19 @@ class AudiobookshelfClient:
         return await self.fetch_item_details(item_id)
 
 
-# Global singleton instance for backward compatibility
+def get_abs_client(user_token: Optional[str] = None) -> AudiobookshelfClient:
+    """
+    Factory function to create an ABS client with optional token.
+
+    This is the preferred way to get an ABS client in routes that have
+    access to the user's token from the request context.
+    """
+    return AudiobookshelfClient(user_token=user_token)
+
+
+# Global singleton instance for backward compatibility (no token - limited functionality)
+# Routes that need full functionality should use get_abs_client(token) instead
 abs_client = AudiobookshelfClient()
 
 # Re-export for legacy imports
-__all__ = ["abs_client", "AudiobookshelfClient", "AbsClient"]
+__all__ = ["abs_client", "AudiobookshelfClient", "AbsClient", "get_abs_client"]
