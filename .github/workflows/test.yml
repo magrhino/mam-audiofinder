@@ -14,6 +14,17 @@ jobs:
   test:
     name: Mock Tests (Python 3.12)
     runs-on: ubuntu-latest
+    # Only run on feat:/fix: commits for pushes, skip release-please bot PRs
+    if: |
+      (github.event_name == 'push' && (
+        startsWith(github.event.head_commit.message, 'feat:') ||
+        startsWith(github.event.head_commit.message, 'feat!:') ||
+        startsWith(github.event.head_commit.message, 'feat(') ||
+        startsWith(github.event.head_commit.message, 'fix:') ||
+        startsWith(github.event.head_commit.message, 'fix!:') ||
+        startsWith(github.event.head_commit.message, 'fix(')
+      )) ||
+      (github.event_name == 'pull_request' && github.actor != 'github-actions[bot]')
 
     steps:
       - name: Checkout code

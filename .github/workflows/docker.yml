@@ -3,7 +3,8 @@ name: Build and Publish Docker Image
 on:
   push:
     branches: [dev]
-    tags: ["v*"]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -33,9 +34,9 @@ jobs:
         with:
           images: ghcr.io/magrhino/shelfarr
           tags: |
-            # For version tags (v1.2.3) -> :v1.2.3 and :latest
-            type=semver,pattern=v{{version}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            # For releases -> :v1.2.3 and :latest
+            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
             # For dev branch -> :dev
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
 
