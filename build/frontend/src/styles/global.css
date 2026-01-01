@@ -72,6 +72,17 @@
   --warning: #b87333;
   --error: #a83232;
 
+  /* Completion status colors (for series progress) */
+  --completion-full: rgba(45, 122, 62, 0.9);
+  --completion-partial: rgba(180, 140, 50, 0.9);
+  --completion-low: rgba(180, 70, 70, 0.9);
+
+  /* Hardcover link status colors */
+  --link-verified: rgba(45, 122, 62, 0.9);
+  --link-auto: rgba(100, 140, 180, 0.9);
+  --link-unlinked: rgba(100, 100, 100, 0.7);
+  --link-verify: rgba(180, 140, 50, 0.9);
+
   /* Spacing */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;

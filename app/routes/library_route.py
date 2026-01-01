@@ -1,5 +1,6 @@
 """Library browsing and series diff endpoints."""
 
+import asyncio
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Query, HTTPException, Header
@@ -38,6 +39,11 @@ class SeriesListItem(BaseModel):
     source: str = "abs"
     abs_series_id: Optional[str] = None
     hardcover_series_id: Optional[int] = None
+    # New fields for UI enhancement
+    hardcover_link_confidence: float = 0.0
+    hardcover_series_name: Optional[str] = None
+    missing_count: int = 0
+    completion_percentage: int = 100
 
 
 class SeriesListResponse(BaseModel):
@@ -77,6 +83,81 @@ class WishlistAddRequest(BaseModel):
     cover_url: Optional[str] = None
 
 
+class SeriesLinkRequest(BaseModel):
+    """Request to link a series to a Hardcover series."""
+    hardcover_series_id: int
+    hardcover_series_name: Optional[str] = None
+    hardcover_author_name: Optional[str] = None
+    hardcover_book_count: Optional[int] = None
+    confidence: float = 1.0  # 1.0 = manual override
+
+
+class SeriesLinkResponse(BaseModel):
+    """Response after linking a series."""
+    success: bool
+    series_name: str
+    hardcover_series_id: int
+    hardcover_series_name: Optional[str] = None
+    link_confidence: float
+    linked_by: str
+
+
+# ============================================================================
+# Background Auto-Link Helper
+# ============================================================================
+
+async def _background_auto_link(unlinked_series: List[dict]):
+    """Background task to auto-link series to Hardcover.
+
+    Searches Hardcover for each unlinked series and persists the link.
+    Rate-limited to avoid hammering the Hardcover API.
+    """
+    from sqlalchemy import text
+    from db.db import covers_engine
+
+    for s in unlinked_series:
+        name = s["name"]
+        name_norm = s["name_normalized"]
+
+        try:
+            # Search Hardcover for this series
+            hc_results = await hardcover_client.search_series(title=name, limit=1)
+            if not hc_results:
+                logger.debug(f"🔍 No Hardcover match for '{name}'")
+                continue
+
+            best = hc_results[0]
+            hc_series_id = best["series_id"]
+            hc_series_name = best["series_name"]
+            hc_author = best.get("author_name", "")
+            hc_book_count = best.get("book_count", 0)
+
+            # Persist link
+            with covers_engine.begin() as conn:
+                conn.execute(text("""
+                    INSERT INTO series_hardcover_link
+                    (series_name, series_name_normalized, library_id,
+                     hardcover_series_id, hardcover_series_name, hardcover_author_name,
+                     hardcover_book_count, link_confidence, linked_by)
+                    VALUES (:name, :name_norm, NULL, :hc_id, :hc_name, :hc_author,
+                            :hc_count, 0.7, 'auto')
+                    ON CONFLICT(series_name_normalized, library_id) DO NOTHING
+                """), {
+                    "name": name,
+                    "name_norm": name_norm,
+                    "hc_id": hc_series_id,
+                    "hc_name": hc_series_name,
+                    "hc_author": hc_author,
+                    "hc_count": hc_book_count,
+                })
+            logger.info(f"🔗 Background auto-linked '{name}' → HC ID {hc_series_id} ({hc_book_count} books)")
+        except Exception as e:
+            logger.warning(f"Failed to auto-link '{name}': {e}")
+
+        # Rate limit to avoid hammering Hardcover API
+        await asyncio.sleep(0.5)
+
+
 # ============================================================================
 # Endpoints
 # ============================================================================
@@ -93,8 +174,12 @@ async def list_series(
     List series from ABS library.
 
     Returns series from your Audiobookshelf library, optionally filtered by
-    search query or specific library ID.
+    search query or specific library ID. Includes Hardcover linking status
+    and missing book counts when available.
     """
+    from sqlalchemy import text
+    from db.db import covers_engine
+
     logger.info(f"[LIBRARY] GET /api/library/series - q={q!r}, library_id={library_id}, page={page}, limit={limit}")
     results: List[SeriesInfo] = []
 
@@ -121,20 +206,66 @@ async def list_series(
     abs_series = await abs_client.get_series_list(library_ids)
     logger.info(f"[LIBRARY] ABS returned {len(abs_series)} series")
 
+    # Fetch all Hardcover links for efficient lookup
+    hardcover_links = {}
+    try:
+        with covers_engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT series_name_normalized, hardcover_series_id, hardcover_series_name,
+                       hardcover_book_count, link_confidence, linked_by
+                FROM series_hardcover_link
+                WHERE library_id IS NULL OR library_id IN ({})
+            """.format(','.join(f"'{lid}'" for lid in library_ids)))).fetchall()
+
+            for row in rows:
+                hardcover_links[row.series_name_normalized] = {
+                    'hardcover_series_id': row.hardcover_series_id,
+                    'hardcover_series_name': row.hardcover_series_name,
+                    'hardcover_book_count': row.hardcover_book_count or 0,
+                    'link_confidence': row.link_confidence or 0.0,
+                    'linked_by': row.linked_by,
+                }
+            logger.info(f"[LIBRARY] Loaded {len(hardcover_links)} Hardcover links")
+    except Exception as e:
+        logger.warning(f"[LIBRARY] Failed to load Hardcover links: {e}")
+
     for s in abs_series:
         name = s.get("name", "")
         author = s.get("author")
         book_count = s.get("book_count", 0)
+        name_norm = normalize_series_name(name)
+
+        # Look up Hardcover link
+        link = hardcover_links.get(name_norm, {})
+        hc_series_id = link.get('hardcover_series_id')
+        hc_series_name = link.get('hardcover_series_name')
+        hc_book_count = link.get('hardcover_book_count', 0)
+        link_confidence = link.get('link_confidence', 0.0)
+
+        # Calculate missing count and completion percentage
+        series_book_count = hc_book_count if hc_book_count > 0 else book_count
+        missing_count = max(0, series_book_count - book_count)
+        completion_pct = int((book_count / series_book_count * 100)) if series_book_count > 0 else 100
+
         results.append(SeriesInfo(
             id=generate_series_id(name, author or ""),
             name=name,
-            name_normalized=normalize_series_name(name),
+            name_normalized=name_norm,
             author=author,
             book_count=book_count,
             abs_book_count=book_count,
-            series_book_count=book_count,
+            series_book_count=series_book_count,
             source=SeriesSource.ABS,
+            hardcover_series_id=hc_series_id,
         ))
+
+        # Store extra fields for later conversion
+        results[-1]._extra = {
+            'hardcover_link_confidence': link_confidence,
+            'hardcover_series_name': hc_series_name,
+            'missing_count': missing_count,
+            'completion_percentage': completion_pct,
+        }
 
     # Filter by search query if provided
     if q:
@@ -150,12 +281,31 @@ async def list_series(
     paginated = results[start:start + limit]
     logger.info(f"[LIBRARY] Returning {len(paginated)} series (page {page}/{pages}, total={total})")
 
-    # Convert SeriesInfo to SeriesListItem
+    # Convert SeriesInfo to SeriesListItem with extra fields
     series_items = []
     for s in paginated:
-        item_dict = {k: v for k, v in s.__dict__.items() if k != 'source'}
+        item_dict = {k: v for k, v in s.__dict__.items() if k not in ('source', '_extra')}
         item_dict['source'] = s.source.value
+
+        # Add extra fields from link data
+        extra = getattr(s, '_extra', {})
+        item_dict['hardcover_link_confidence'] = extra.get('hardcover_link_confidence', 0.0)
+        item_dict['hardcover_series_name'] = extra.get('hardcover_series_name')
+        item_dict['missing_count'] = extra.get('missing_count', 0)
+        item_dict['completion_percentage'] = extra.get('completion_percentage', 100)
+
         series_items.append(SeriesListItem(**item_dict))
+
+    # Launch background auto-link for unlinked series (if Hardcover is configured)
+    if hardcover_client.is_configured:
+        unlinked = [
+            {"name": s.name, "name_normalized": s.name_normalized}
+            for s in results
+            if not getattr(s, '_extra', {}).get('hardcover_link_confidence', 0)
+        ]
+        if unlinked:
+            asyncio.create_task(_background_auto_link(unlinked))
+            logger.info(f"🚀 Launched background auto-link for {len(unlinked)} unlinked series")
 
     return SeriesListResponse(
         series=series_items,
@@ -256,6 +406,32 @@ async def diff_series(
                 hc_series_name = hc_result.get("series_name", series_name)
                 hc_author_name = hc_result.get("author_name", "")
 
+            # Auto-link series when found via name search (not when ID was provided)
+            if hc_series_id:
+                from db.db import covers_engine
+                name_norm = normalize_series_name(series_name)
+                try:
+                    with covers_engine.begin() as conn:
+                        conn.execute(text("""
+                            INSERT INTO series_hardcover_link
+                            (series_name, series_name_normalized, library_id,
+                             hardcover_series_id, hardcover_series_name, hardcover_author_name,
+                             hardcover_book_count, link_confidence, linked_by)
+                            VALUES (:name, :name_norm, NULL, :hc_id, :hc_name, :hc_author,
+                                    :hc_count, 0.8, 'auto')
+                            ON CONFLICT(series_name_normalized, library_id) DO NOTHING
+                        """), {
+                            "name": series_name,
+                            "name_norm": name_norm,
+                            "hc_id": hc_series_id,
+                            "hc_name": hc_series_name,
+                            "hc_author": hc_author_name,
+                            "hc_count": len(hardcover_books_raw),
+                        })
+                    logger.info(f"🔗 Auto-linked '{series_name}' to Hardcover ID {hc_series_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to auto-link series: {e}")
+
     # Apply edition resolution to filter out international editions
     hardcover_books = []
     if hardcover_books_raw and hc_series_id:
@@ -333,6 +509,11 @@ async def diff_series(
     result = match_books_across_sources(abs_books, hardcover_books)
     result.series_name = series_name
     result.series_name_normalized = normalize_series_name(series_name)
+
+    # Include Hardcover metadata in response for frontend linking
+    result.hardcover_series_id = hc_series_id
+    result.hardcover_series_name = hc_series_name
+    result.hardcover_book_count = len(hardcover_books)
 
     return result
 
@@ -500,6 +681,132 @@ async def list_wishlist(
         "total": total,
         "page": page,
         "pages": (total + limit - 1) // limit,
+    }
+
+
+@router.post("/series/{series_name}/link", response_model=SeriesLinkResponse)
+async def link_series_to_hardcover(
+    series_name: str,
+    request: SeriesLinkRequest,
+    library_id: Optional[str] = Query(None, description="Scope link to specific library"),
+):
+    """
+    Link a library series to a specific Hardcover series.
+
+    This creates a persistent mapping that will be used for future diff operations,
+    avoiding repeated searches. Manual links (confidence=1.0) take precedence over
+    auto-links.
+    """
+    from sqlalchemy import text
+    from db.db import covers_engine
+
+    name_normalized = normalize_series_name(series_name)
+    linked_by = "manual" if request.confidence >= 1.0 else "auto"
+
+    with covers_engine.begin() as conn:
+        # Upsert the link
+        conn.execute(text("""
+            INSERT INTO series_hardcover_link
+            (series_name, series_name_normalized, library_id, hardcover_series_id,
+             hardcover_series_name, hardcover_author_name, hardcover_book_count,
+             link_confidence, linked_by)
+            VALUES (:name, :name_norm, :lib_id, :hc_id, :hc_name, :hc_author, :hc_count, :conf, :by)
+            ON CONFLICT(series_name_normalized, library_id)
+            DO UPDATE SET
+                hardcover_series_id = :hc_id,
+                hardcover_series_name = :hc_name,
+                hardcover_author_name = :hc_author,
+                hardcover_book_count = :hc_count,
+                link_confidence = :conf,
+                linked_by = :by,
+                linked_at = datetime('now')
+        """), {
+            "name": series_name,
+            "name_norm": name_normalized,
+            "lib_id": library_id,
+            "hc_id": request.hardcover_series_id,
+            "hc_name": request.hardcover_series_name,
+            "hc_author": request.hardcover_author_name,
+            "hc_count": request.hardcover_book_count,
+            "conf": request.confidence,
+            "by": linked_by,
+        })
+
+    logger.info(f"🔗 Linked series '{series_name}' to Hardcover ID {request.hardcover_series_id} ({linked_by})")
+
+    return SeriesLinkResponse(
+        success=True,
+        series_name=series_name,
+        hardcover_series_id=request.hardcover_series_id,
+        hardcover_series_name=request.hardcover_series_name,
+        link_confidence=request.confidence,
+        linked_by=linked_by,
+    )
+
+
+@router.delete("/series/{series_name}/link")
+async def unlink_series(
+    series_name: str,
+    library_id: Optional[str] = Query(None, description="Scope to specific library"),
+):
+    """Remove the Hardcover link for a series."""
+    from sqlalchemy import text
+    from db.db import covers_engine
+
+    name_normalized = normalize_series_name(series_name)
+
+    with covers_engine.begin() as conn:
+        if library_id:
+            result = conn.execute(text("""
+                DELETE FROM series_hardcover_link
+                WHERE series_name_normalized = :name_norm AND library_id = :lib_id
+            """), {"name_norm": name_normalized, "lib_id": library_id})
+        else:
+            result = conn.execute(text("""
+                DELETE FROM series_hardcover_link
+                WHERE series_name_normalized = :name_norm AND library_id IS NULL
+            """), {"name_norm": name_normalized})
+
+    deleted = result.rowcount > 0
+    logger.info(f"🔗 Unlinked series '{series_name}' (deleted={deleted})")
+
+    return {"success": deleted, "series_name": series_name}
+
+
+@router.get("/series/{series_name}/link")
+async def get_series_link(
+    series_name: str,
+    library_id: Optional[str] = Query(None, description="Scope to specific library"),
+):
+    """Get the current Hardcover link for a series."""
+    from sqlalchemy import text
+    from db.db import covers_engine
+
+    name_normalized = normalize_series_name(series_name)
+
+    with covers_engine.connect() as conn:
+        # Try library-specific first, then global
+        row = conn.execute(text("""
+            SELECT * FROM series_hardcover_link
+            WHERE series_name_normalized = :name_norm
+              AND (library_id = :lib_id OR library_id IS NULL)
+            ORDER BY library_id DESC NULLS LAST
+            LIMIT 1
+        """), {"name_norm": name_normalized, "lib_id": library_id}).fetchone()
+
+    if not row:
+        return {"linked": False, "series_name": series_name}
+
+    return {
+        "linked": True,
+        "series_name": row.series_name,
+        "hardcover_series_id": row.hardcover_series_id,
+        "hardcover_series_name": row.hardcover_series_name,
+        "hardcover_author_name": row.hardcover_author_name,
+        "hardcover_book_count": row.hardcover_book_count,
+        "link_confidence": row.link_confidence,
+        "linked_by": row.linked_by,
+        "linked_at": row.linked_at,
     }
 
 

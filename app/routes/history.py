@@ -3,7 +3,8 @@ History routes for MAM Audiobook Finder.
 """
 import httpx
 from pathlib import Path
-from fastapi import APIRouter
+from typing import Optional
+from fastapi import APIRouter, Header
 from sqlalchemy import text
 
 from db import engine
@@ -194,7 +195,10 @@ def delete_history(row_id: int):
 
 
 @router.post("/api/history/{row_id}/verify")
-async def verify_history_item(row_id: int):
+async def verify_history_item(
+    row_id: int,
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+):
     """Manually trigger verification for a history item."""
     import logging
     from pathlib import Path
@@ -261,7 +265,9 @@ async def verify_history_item(row_id: int):
             logger.warning(f"⚠️  Failed to read metadata.json: {e}")
 
     # Perform verification
-    from abs_client import abs_client
+    from abs_client import get_abs_client
+
+    client = get_abs_client(user_token=x_abs_token)
 
     verify_title = metadata.get("title", title) if metadata else title
     verify_authors = metadata.get("authors", [author]) if metadata else [author]
@@ -269,7 +275,7 @@ async def verify_history_item(row_id: int):
 
     logger.info(f"🔍 Re-verifying '{verify_title}' by '{verify_author}'")
 
-    verification_result = await abs_client.verify_import(
+    verification_result = await client.verify_import(
         title=verify_title,
         author=verify_author,
         library_path=str(dest_dir),

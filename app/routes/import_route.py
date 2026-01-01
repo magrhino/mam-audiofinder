@@ -7,7 +7,8 @@ import shutil
 import httpx
 from pathlib import Path
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -18,7 +19,7 @@ from config import (
 from db import engine
 from qb_client import qb_login_sync
 from utils import sanitize, next_available, extract_disc_track, try_hardlink
-from abs_client import abs_client
+from abs_client import get_abs_client
 from dependencies.qb import map_qb_content_path
 from settings_service import settings_service
 from covers import CoverService
@@ -282,7 +283,10 @@ class MultiBookImportBody(BaseModel):
 
 
 @router.post("/import")
-async def do_import(body: ImportBody):
+async def do_import(
+    body: ImportBody,
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+):
     """Import completed torrent to library."""
     author = sanitize(body.author)
     title = sanitize(body.title)
@@ -507,6 +511,7 @@ async def do_import(body: ImportBody):
     # --- Verify import in Audiobookshelf ---
     # Don't fail the import if verification fails, just log it
     verification_result = None
+    abs_client = get_abs_client(user_token=x_abs_token)
     try:
         # Use metadata.json if available, otherwise use torrent metadata
         verify_title = metadata.get("title", title) if metadata else title
@@ -617,7 +622,10 @@ async def do_import(body: ImportBody):
 
 
 @router.post("/import/multi-book")
-async def do_multi_book_import(body: MultiBookImportBody):
+async def do_multi_book_import(
+    body: MultiBookImportBody,
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+):
     """
     Import multiple books from a single torrent to library.
 
@@ -625,6 +633,8 @@ async def do_multi_book_import(body: MultiBookImportBody):
     Disc flattening is applied per book, preserving the helper contracts.
     """
     import asyncio
+
+    abs_client = get_abs_client(user_token=x_abs_token)
 
     torrent_hash = body.torrent_hash
     use_flatten = body.flatten if body.flatten is not None else FLATTEN_DISCS
