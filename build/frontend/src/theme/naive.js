@@ -260,47 +260,102 @@ export const customTheme = {
   },
 
   Button: {
-    // Text colors - white
+    // Text colors - white for maximum visibility
     textColor: '#ffffff',
     textColorHover: '#ffffff',
     textColorPressed: '#ffffff',
     textColorFocus: '#ffffff',
-    textColorDisabled: '#888888',
+    textColorDisabled: '#666666',
 
-    // Secondary/Default buttons - glassmorphic
-    color: 'rgba(42, 42, 42, 0.5)',                // Translucent charcoal
-    colorHover: 'rgba(80, 0, 0, 0.2)',             // Maroon hover overlay
-    colorPressed: 'rgba(80, 0, 0, 0.3)',           // Maroon press overlay
-    colorFocus: 'rgba(80, 0, 0, 0.2)',
-    colorDisabled: 'rgba(36, 36, 36, 0.3)',
+    // Secondary/Default buttons - visible charcoal glass
+    color: 'rgba(60, 60, 60, 0.8)',               // More opaque charcoal
+    colorHover: 'rgba(80, 80, 80, 0.9)',          // Lighter on hover
+    colorPressed: 'rgba(50, 50, 50, 0.95)',       // Darker on press
+    colorFocus: 'rgba(70, 70, 70, 0.85)',
+    colorDisabled: 'rgba(40, 40, 40, 0.4)',
 
-    // Borders - subtle glass with maroon accents
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderHover: '1px solid rgba(106, 0, 0, 0.5)',
-    borderPressed: '1px solid rgba(106, 0, 0, 0.7)',
-    borderFocus: '1px solid rgba(106, 0, 0, 0.5)',
-    borderDisabled: '1px solid rgba(255, 255, 255, 0.03)',
+    // Borders - visible glass borders
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    borderHover: '1px solid rgba(255, 255, 255, 0.25)',
+    borderPressed: '1px solid rgba(255, 255, 255, 0.2)',
+    borderFocus: '1px solid rgba(180, 60, 60, 0.6)',
+    borderDisabled: '1px solid rgba(255, 255, 255, 0.05)',
 
-    rippleColor: 'rgba(106, 0, 0, 0.3)',           // Maroon ripple effect
+    rippleColor: 'rgba(255, 255, 255, 0.15)',     // Visible ripple
 
-    // Primary button - glassmorphic maroon
+    // Primary button - BRIGHT VISIBLE MAROON (key fix for "Add to qBittorrent")
     textColorPrimary: '#ffffff',
     textColorHoverPrimary: '#ffffff',
     textColorPressedPrimary: '#ffffff',
     textColorFocusPrimary: '#ffffff',
     textColorDisabledPrimary: '#888888',
 
-    colorPrimary: 'rgba(80, 0, 0, 0.7)',           // Maroon glass
-    colorHoverPrimary: 'rgba(106, 0, 0, 0.8)',     // Brighter maroon
-    colorPressedPrimary: 'rgba(58, 0, 0, 0.9)',    // Darker maroon
-    colorFocusPrimary: 'rgba(80, 0, 0, 0.7)',
-    colorDisabledPrimary: 'rgba(42, 42, 42, 0.3)',
+    colorPrimary: 'rgba(140, 35, 35, 0.95)',      // Bright, saturated maroon
+    colorHoverPrimary: 'rgba(165, 50, 50, 1)',    // Even brighter on hover
+    colorPressedPrimary: 'rgba(110, 25, 25, 0.95)', // Darker on press
+    colorFocusPrimary: 'rgba(150, 40, 40, 0.95)',
+    colorDisabledPrimary: 'rgba(80, 40, 40, 0.4)',
 
-    borderPrimary: '1px solid rgba(106, 0, 0, 0.6)',
-    borderHoverPrimary: '1px solid rgba(106, 0, 0, 0.8)',
-    borderPressedPrimary: '1px solid rgba(58, 0, 0, 0.9)',
-    borderFocusPrimary: '1px solid rgba(106, 0, 0, 0.6)',
-    borderDisabledPrimary: '1px solid rgba(255, 255, 255, 0.03)'
+    borderPrimary: '1px solid rgba(200, 80, 80, 0.7)',
+    borderHoverPrimary: '1px solid rgba(220, 100, 100, 0.85)',
+    borderPressedPrimary: '1px solid rgba(160, 60, 60, 0.9)',
+    borderFocusPrimary: '1px solid rgba(220, 100, 100, 0.8)',
+    borderDisabledPrimary: '1px solid rgba(100, 50, 50, 0.3)',
+
+    // Info button - visible blue
+    textColorInfo: '#ffffff',
+    textColorHoverInfo: '#ffffff',
+    textColorPressedInfo: '#ffffff',
+    textColorFocusInfo: '#ffffff',
+    colorInfo: 'rgba(70, 100, 160, 0.9)',
+    colorHoverInfo: 'rgba(90, 120, 180, 0.95)',
+    colorPressedInfo: 'rgba(60, 85, 140, 0.95)',
+    borderInfo: '1px solid rgba(120, 160, 220, 0.7)',
+
+    // Success button - visible green
+    textColorSuccess: '#ffffff',
+    textColorHoverSuccess: '#ffffff',
+    textColorPressedSuccess: '#ffffff',
+    textColorFocusSuccess: '#ffffff',
+    colorSuccess: 'rgba(45, 120, 65, 0.9)',
+    colorHoverSuccess: 'rgba(55, 140, 75, 0.95)',
+    colorPressedSuccess: 'rgba(35, 100, 50, 0.95)',
+    borderSuccess: '1px solid rgba(80, 180, 100, 0.7)',
+
+    // Warning button - visible amber
+    textColorWarning: '#ffffff',
+    textColorHoverWarning: '#ffffff',
+    textColorPressedWarning: '#ffffff',
+    textColorFocusWarning: '#ffffff',
+    colorWarning: 'rgba(180, 120, 50, 0.9)',
+    colorHoverWarning: 'rgba(200, 140, 60, 0.95)',
+    colorPressedWarning: 'rgba(160, 100, 40, 0.95)',
+    borderWarning: '1px solid rgba(220, 160, 80, 0.7)',
+
+    // Error button - visible red
+    textColorError: '#ffffff',
+    textColorHoverError: '#ffffff',
+    textColorPressedError: '#ffffff',
+    textColorFocusError: '#ffffff',
+    colorError: 'rgba(170, 55, 55, 0.9)',
+    colorHoverError: 'rgba(190, 70, 70, 0.95)',
+    colorPressedError: 'rgba(150, 45, 45, 0.95)',
+    borderError: '1px solid rgba(220, 90, 90, 0.7)',
+
+    // Ghost button text colors - BRIGHT for visibility on dark backgrounds
+    textColorGhost: '#e8e8e8',
+    textColorGhostHover: '#ffffff',
+    textColorGhostPressed: '#d0d0d0',
+    textColorGhostPrimary: '#ff9090',             // Light maroon
+    textColorGhostHoverPrimary: '#ffb0b0',
+    textColorGhostInfo: '#a0c4ff',                // Light blue
+    textColorGhostHoverInfo: '#c0daff',
+    textColorGhostSuccess: '#80e8a0',             // Light green
+    textColorGhostHoverSuccess: '#a0ffb8',
+    textColorGhostWarning: '#ffc870',             // Light amber
+    textColorGhostHoverWarning: '#ffe0a0',
+    textColorGhostError: '#ff8080',               // Light red
+    textColorGhostHoverError: '#ffa0a0'
   },
 
   Card: {

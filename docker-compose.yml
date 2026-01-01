@@ -7,7 +7,7 @@ services:
       args:
         PUID: ${PUID}
         PGID: ${PGID}
-    image: ghcr.io/magrhino/shelfarr:latest
+    image: ghcr.io/magrhino/shelfarr:dev
     container_name: shelfarr
     networks:
       - nginx-network # only had if you want to run on local network

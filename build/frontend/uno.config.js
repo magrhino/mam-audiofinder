@@ -192,6 +192,19 @@ export default defineConfig({
     // Body base with atmospheric gradient (charcoal → maroon)
     // Note: Horizontal padding controlled via --page-padding-x in global.css
     'body-base': 'font-sans bg-gradient-to-b from-[#0a0a0a] to-[#6a0000] text-white leading-relaxed min-h-screen m-0',
+
+    // Button visibility shortcuts - solid backgrounds for high visibility
+    'btn-primary-solid': 'bg-gradient-to-br from-[#8c2323] to-[#5a1515] text-white border border-[rgba(200,80,80,0.7)] rounded-md px-4 py-2 font-medium cursor-pointer transition-all duration-200 hover:from-[#a53232] hover:to-[#702020] hover:border-[rgba(220,100,100,0.85)] hover:-translate-y-px active:translate-y-0',
+
+    'btn-success-solid': 'bg-[rgba(45,120,65,0.9)] text-white border border-[rgba(80,180,100,0.7)] rounded-md px-4 py-2 font-medium cursor-pointer transition-all duration-200 hover:bg-[rgba(55,140,75,0.95)] hover:border-[rgba(100,200,120,0.85)] hover:-translate-y-px active:translate-y-0',
+
+    'btn-danger-solid': 'bg-[rgba(170,55,55,0.9)] text-white border border-[rgba(220,90,90,0.7)] rounded-md px-4 py-2 font-medium cursor-pointer transition-all duration-200 hover:bg-[rgba(190,70,70,0.95)] hover:border-[rgba(240,100,100,0.85)] hover:-translate-y-px active:translate-y-0',
+
+    'btn-info-solid': 'bg-[rgba(70,100,160,0.9)] text-white border border-[rgba(120,160,220,0.7)] rounded-md px-4 py-2 font-medium cursor-pointer transition-all duration-200 hover:bg-[rgba(90,120,180,0.95)] hover:border-[rgba(140,180,240,0.85)] hover:-translate-y-px active:translate-y-0',
+
+    'btn-warning-solid': 'bg-[rgba(180,120,50,0.9)] text-white border border-[rgba(220,160,80,0.7)] rounded-md px-4 py-2 font-medium cursor-pointer transition-all duration-200 hover:bg-[rgba(200,140,60,0.95)] hover:border-[rgba(240,180,100,0.85)] hover:-translate-y-px active:translate-y-0',
+
+    'btn-secondary-solid': 'bg-[rgba(60,60,60,0.8)] text-white border border-[rgba(255,255,255,0.15)] rounded-md px-4 py-2 font-medium cursor-pointer transition-all duration-200 hover:bg-[rgba(80,80,80,0.9)] hover:border-[rgba(255,255,255,0.25)] hover:-translate-y-px active:translate-y-0',
   },
 
   rules: [
@@ -252,5 +265,12 @@ export default defineConfig({
     'cover-image-loaded',
     'glass-panel-hover',
     'glass-overlay',
+    // Button visibility shortcuts
+    'btn-primary-solid',
+    'btn-success-solid',
+    'btn-danger-solid',
+    'btn-info-solid',
+    'btn-warning-solid',
+    'btn-secondary-solid',
   ],
 })
