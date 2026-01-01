@@ -3,9 +3,18 @@ name: Build and Publish Docker Image
 on:
   push:
     branches: [dev]
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version tag to build (e.g., v0.2.0)'
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.2.0). Empty = dev build.'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -34,11 +43,11 @@ jobs:
         with:
           images: ghcr.io/magrhino/shelfarr
           tags: |
-            # For releases -> :v1.2.3 and :latest
-            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
-            # For dev branch -> :dev
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            # For version builds (from workflow_call or workflow_dispatch with version)
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+            type=raw,value=latest,enable=${{ inputs.version != '' }}
+            # For dev branch builds
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' && inputs.version == '' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
