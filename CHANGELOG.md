@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/magrhino/shelfarr/compare/v0.2.1...v0.2.2) (2026-01-01)
+
+
+### Bug Fixes
+
+* **ci:** Tie package creation to release please ([8706c56](https://github.com/magrhino/shelfarr/commit/8706c567c693a685dac5bf7a3a700805a5c580f8))
+
 ## [0.2.1](https://github.com/magrhino/shelfarr/compare/v0.2.0...v0.2.1) (2026-01-01)
 
 
