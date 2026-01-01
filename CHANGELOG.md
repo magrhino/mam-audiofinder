@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/magrhino/shelfarr/compare/v0.2.0...v0.2.1) (2026-01-01)
+
+
+### Bug Fixes
+
+* **ci:** trigger docker builds on release events, ([5cd06e8](https://github.com/magrhino/shelfarr/commit/5cd06e8fd82d7cfb4a968906d47374da503f0b82))
+
 ## [0.2.0](https://github.com/magrhino/shelfarr/compare/v0.1.0...v0.2.0) (2025-12-31)
 
 
