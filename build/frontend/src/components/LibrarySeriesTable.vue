@@ -6,13 +6,14 @@ import SeriesCompletionRing from '@/components/SeriesCompletionRing.vue'
 import HardcoverLinkBadge from '@/components/HardcoverLinkBadge.vue'
 import MissingBooksPopover from '@/components/MissingBooksPopover.vue'
 import SeriesActionsDropdown from '@/components/SeriesActionsDropdown.vue'
+import ExpandedSeriesContent from '@/components/ExpandedSeriesContent.vue'
 import { useBreakpoints } from '@/composables/useBreakpoints'
 
 const props = defineProps({
   series: { type: Array, required: true },
 })
 
-const emit = defineEmits(['diff', 'editLink', 'refresh', 'addToWishlist'])
+const emit = defineEmits(['diff', 'editLink', 'refresh', 'addToWishlist', 'search'])
 const router = useRouter()
 const { isMobile, isTablet } = useBreakpoints()
 
@@ -119,48 +120,31 @@ const columns = computed(() => {
   return cols
 })
 
-// Render expanded row content - shows book grid
+// Navigate to SeriesView for full details
+function navigateToSeriesView(row) {
+  router.push({
+    name: 'series',
+    query: {
+      title: row.name,
+      limit: '20',
+      ...(row.hardcover_series_id && { series_id: row.hardcover_series_id }),
+    },
+  })
+}
+
+// Render expanded row content - shows missing books grid
 function renderExpandedRow(row) {
-  // This will show a grid of books when we have the data
-  // For now, show a placeholder that indicates loading/empty state
-  return h('div', { class: 'expanded-row' }, [
-    h('div', { class: 'expanded-header' }, [
-      h('span', { class: 'expanded-title' }, `Books in ${row.name}`),
-      h(NButton, {
-        size: 'tiny',
-        type: 'primary',
-        onClick: () => {
-          router.push({
-            name: 'series',
-            query: {
-              title: row.name,
-              limit: '20',
-              ...(row.hardcover_series_id && { series_id: row.hardcover_series_id }),
-            },
-          })
-        },
-      }, () => 'View Full Details'),
-    ]),
-    h('div', { class: 'expanded-content' }, [
-      h('p', { class: 'expanded-hint' }, [
-        `${row.abs_book_count ?? 0} books in your library`,
-        row.missing_count > 0
-          ? ` • ${row.missing_count} missing from Hardcover series`
-          : ' • Series complete!',
-      ]),
-      // Mobile-only: show link status
-      isMobile.value && row.hardcover_series_id
-        ? h('div', { class: 'mobile-link-status' }, [
-            h(HardcoverLinkBadge, {
-              linked: true,
-              confidence: row.hardcover_link_confidence ?? 0,
-              seriesName: row.hardcover_series_name,
-              onEdit: () => emit('editLink', row),
-            }),
-          ])
-        : null,
-    ]),
-  ])
+  return h(ExpandedSeriesContent, {
+    seriesName: row.name,
+    hardcoverSeriesId: row.hardcover_series_id,
+    absBookCount: row.abs_book_count ?? row.book_count ?? 0,
+    missingCount: row.missing_count ?? 0,
+    hardcoverLinkConfidence: row.hardcover_link_confidence ?? 0,
+    hardcoverSeriesName: row.hardcover_series_name,
+    onSearch: (book) => emit('search', book),
+    onViewDetails: () => navigateToSeriesView(row),
+    onEditLink: () => emit('editLink', row),
+  })
 }
 </script>
 
@@ -197,50 +181,6 @@ function renderExpandedRow(row) {
   font-family: monospace;
   font-size: 0.9rem;
   color: var(--text-secondary);
-}
-
-/* Expanded row styles */
-.expanded-row {
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  margin: 8px 0;
-}
-
-.expanded-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.expanded-title {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.expanded-content {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-.expanded-hint {
-  margin: 0;
-}
-
-.mobile-link-status {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mobile-link-status::before {
-  content: 'Hardcover:';
-  font-size: 0.85rem;
-  color: var(--text-subtle);
 }
 
 /* Responsive adjustments */

@@ -8,6 +8,7 @@ import LibraryBookGrid from '@/components/LibraryBookGrid.vue'
 import LibrarySeriesTable from '@/components/LibrarySeriesTable.vue'
 import SeriesDiffModal from '@/components/SeriesDiffModal.vue'
 import HardcoverLinkModal from '@/components/HardcoverLinkModal.vue'
+import MissingBookSearchModal from '@/components/MissingBookSearchModal.vue'
 import { useLibraryBooks } from '@/composables/useLibraryBooks'
 import { useLibrarySeries } from '@/composables/useLibrarySeries'
 import { useApi } from '@/composables/useApi'
@@ -92,6 +93,11 @@ function openLinkModal(seriesData) {
   linkModalVisible.value = true
 }
 
+// Missing book search modal state
+const searchModalVisible = ref(false)
+const searchModalBook = ref(null)
+const searchModalSeriesName = ref('')
+
 function handleLinkUpdated(linkInfo) {
   // Refresh series list to reflect new link status
   fetchSeries()
@@ -144,6 +150,20 @@ function handleBookClick(book) {
     },
   })
 }
+
+// Handle search for missing book from expanded series row
+function handleMissingBookSearch(book) {
+  // Open modal instead of navigating - preserves expanded row state
+  searchModalBook.value = book
+  // Series name is passed from ExpandedSeriesContent via _seriesName property
+  searchModalSeriesName.value = book._seriesName || ''
+  searchModalVisible.value = true
+}
+
+// Handle successful add from search modal
+function handleModalTorrentAdded(result) {
+  message.success(`Added "${result.title}" to qBittorrent`)
+}
 </script>
 
 <template>
@@ -180,6 +200,7 @@ function handleBookClick(book) {
             @editLink="openLinkModal"
             @refresh="handleRefresh"
             @addToWishlist="handleAddToWishlist"
+            @search="handleMissingBookSearch"
           />
 
           <NPagination
@@ -234,6 +255,14 @@ function handleBookClick(book) {
       v-model:show="linkModalVisible"
       :series="linkModalSeries"
       @linked="handleLinkUpdated"
+    />
+
+    <!-- Missing Book Search Modal -->
+    <MissingBookSearchModal
+      v-model:show="searchModalVisible"
+      :book="searchModalBook"
+      :series-name="searchModalSeriesName"
+      @added="handleModalTorrentAdded"
     />
   </div>
 </template>
