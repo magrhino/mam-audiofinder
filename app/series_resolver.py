@@ -94,6 +94,10 @@ class SeriesDiffResult:
     hardcover_book_count: int = 0
     match_confidence: float = 0.0
 
+    # Hardcover series metadata (for linking)
+    hardcover_series_id: Optional[int] = None
+    hardcover_series_name: Optional[str] = None
+
 
 def generate_series_id(series_name: str, author: str = "") -> str:
     """Generate stable synthetic series ID."""

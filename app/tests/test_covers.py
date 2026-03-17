@@ -267,6 +267,41 @@ class TestCoverDownload:
         assert file_size == 0
 
     @pytest.mark.asyncio
+    async def test_download_cover_passes_auth_headers(self, temp_dir, monkeypatch):
+        """Test that cover downloads can include auth headers for ABS item covers."""
+        covers_dir = temp_dir / "covers"
+        covers_dir.mkdir()
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"fake_image_data"
+        mock_response.headers = {"Content-Type": "image/jpeg"}
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        monkeypatch.setattr("covers.COVERS_DIR", covers_dir)
+        monkeypatch.setattr("covers.MAX_COVERS_SIZE_MB", 10)
+        monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: mock_client)
+
+        from covers import CoverService
+        service = CoverService()
+
+        await service.download_cover(
+            "https://example.com/cover.jpg",
+            "12345",
+            headers={"Authorization": "Bearer token"},
+        )
+
+        mock_client.get.assert_awaited_once_with(
+            "https://example.com/cover.jpg",
+            headers={"Authorization": "Bearer token"},
+            follow_redirects=True,
+        )
+
+    @pytest.mark.asyncio
     async def test_download_cover_skips_when_max_size_zero(self, temp_dir, monkeypatch):
         """Test that download is skipped when MAX_COVERS_SIZE_MB is 0."""
         covers_dir = temp_dir / "covers"
@@ -369,6 +404,27 @@ class TestCoverCacheLookup:
         assert result.get("needs_heal") is True
         assert result.get("source_cover_url") == "https://example.com/cover.jpg"
 
+    def test_get_cached_cover_suppresses_raw_abs_item_cover_without_local_file(self, mock_covers_db_engine, monkeypatch):
+        """Protected ABS item cover URLs should not be returned directly when uncached."""
+        from sqlalchemy import text
+
+        with mock_covers_db_engine.begin() as cx:
+            cx.execute(text("""
+                INSERT INTO covers (mam_id, title, author, cover_url, abs_item_id, fetched_at)
+                VALUES ('12345', 'Test Book', 'Test Author', 'http://audiobookshelf:80/api/items/item123/cover', 'item123', datetime('now'))
+            """))
+
+        monkeypatch.setattr("covers.covers_engine", mock_covers_db_engine)
+        monkeypatch.setattr("covers.MAX_COVERS_SIZE_MB", 10)
+
+        from covers import CoverService
+        service = CoverService()
+
+        result = service.get_cached_cover("12345")
+
+        assert result.get("cover_url") is None
+        assert result.get("needs_heal") is True
+
 
 class TestCoverInvalidation:
     """Test cover cache invalidation."""
@@ -441,7 +497,7 @@ class TestCoverCacheSave:
         covers_dir.mkdir()
 
         # Mock download
-        async def mock_download(url, mam_id):
+        async def mock_download(url, mam_id, headers=None):
             local_file = covers_dir / f"{mam_id}.jpg"
             local_file.write_bytes(b"fake_image")
             return str(local_file), len(b"fake_image")
@@ -495,6 +551,76 @@ class TestCoverCacheSave:
             row = cx.execute(text("SELECT local_file FROM covers WHERE mam_id = '12345'")).fetchone()
             assert row is not None
             assert row[0] == str(local_file)
+
+    @pytest.mark.asyncio
+    async def test_save_cover_redownloads_when_reused_file_missing(self, mock_covers_db_engine, temp_dir, monkeypatch):
+        """Test stale reused local files are re-downloaded instead of blindly reused."""
+        covers_dir = temp_dir / "covers"
+        covers_dir.mkdir()
+        missing_file = covers_dir / "missing.jpg"
+
+        from sqlalchemy import text
+        with mock_covers_db_engine.begin() as cx:
+            cx.execute(text("""
+                INSERT INTO covers (mam_id, title, cover_url, local_file, file_size, fetched_at)
+                VALUES ('original', 'Original Book', 'https://example.com/cover.jpg', :local_file, 10, datetime('now'))
+            """), {"local_file": str(missing_file)})
+
+        calls = []
+
+        async def mock_download(url, mam_id, headers=None):
+            calls.append((url, mam_id, headers))
+            local_file = covers_dir / f"{mam_id}.jpg"
+            local_file.write_bytes(b"fresh_image")
+            return str(local_file), len(b"fresh_image")
+
+        monkeypatch.setattr("covers.covers_engine", mock_covers_db_engine)
+        monkeypatch.setattr("covers.MAX_COVERS_SIZE_MB", 10)
+
+        from covers import CoverService
+        service = CoverService()
+        service.download_cover = mock_download
+
+        await service.save_cover_to_cache("12345", "https://example.com/cover.jpg", "Test Book", "Test Author")
+
+        assert calls == [("https://example.com/cover.jpg", "12345", None)]
+        with mock_covers_db_engine.begin() as cx:
+            row = cx.execute(text("SELECT local_file FROM covers WHERE mam_id = '12345'")).fetchone()
+            assert row is not None
+            assert Path(row[0]).name == "12345.jpg"
+
+    @pytest.mark.asyncio
+    async def test_save_cover_to_cache_passes_auth_headers(self, mock_covers_db_engine, monkeypatch):
+        """Test that save_cover_to_cache forwards auth headers to download_cover."""
+        received = {}
+
+        async def mock_download(url, mam_id, headers=None):
+            received["url"] = url
+            received["mam_id"] = mam_id
+            received["headers"] = headers
+            return None, 0
+
+        monkeypatch.setattr("covers.covers_engine", mock_covers_db_engine)
+        monkeypatch.setattr("covers.MAX_COVERS_SIZE_MB", 10)
+
+        from covers import CoverService
+        service = CoverService()
+        service.download_cover = mock_download
+
+        await service.save_cover_to_cache(
+            "12345",
+            "http://audiobookshelf:80/api/items/item123/cover",
+            "Test Book",
+            "Test Author",
+            "item123",
+            auth_headers={"Authorization": "Bearer token"},
+        )
+
+        assert received == {
+            "url": "http://audiobookshelf:80/api/items/item123/cover",
+            "mam_id": "12345",
+            "headers": {"Authorization": "Bearer token"},
+        }
 
 
 if __name__ == "__main__":

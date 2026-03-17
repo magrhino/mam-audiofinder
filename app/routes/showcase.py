@@ -6,12 +6,13 @@ import re
 import logging
 import httpx
 from typing import Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from fastapi.responses import JSONResponse
 from collections import defaultdict
 
 from config import MAM_BASE, MAM_COOKIE, ABS_CHECK_LIBRARY
 from abs_client import get_abs_client
+from dependencies.abs import require_authenticated_user_if_configured
 from mam_cache import get_cached_mam_search, cache_mam_search
 from dependencies.mam import normalize_mam_result
 from utils import normalize_title as normalize_title_match, normalize_author as normalize_author_match
@@ -49,7 +50,8 @@ def normalize_title(title: str) -> str:
 async def showcase(
     query: str = Query("", description="Search query (optional, defaults to recent audiobooks)"),
     limit: int = Query(100, description="Maximum number of results to fetch", ge=1, le=500),
-    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     Search MAM and return results grouped by normalized title for showcase grid view.

@@ -229,11 +229,15 @@ import { useViewToggle, VIEW_MODES } from '@composables/useViewToggle'
 import { useDiscoverSearch, SORT_OPTIONS } from '@composables/useDiscoverSearch'
 import { useMAMSearchDataTable } from '@composables/naive/useMAMSearchDataTable'
 import { useAddTorrentFlow } from '@composables/useAddTorrentFlow'
+import { useMAMErrorDialog } from '@composables/useMAMErrorDialog'
 import { sanitizeDescription } from '@/utils/sanitize'
 
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
+
+// MAM error dialog
+const { showMAM502Dialog } = useMAMErrorDialog()
 
 // View toggle
 const {
@@ -261,7 +265,7 @@ const {
   showDetail: doShowDetail,
   closeDetail: doCloseDetail,
   restoreDetailFromUrl
-} = useDiscoverSearch({ viewMode })
+} = useDiscoverSearch({ viewMode, onMAM502Error: showMAM502Dialog })
 
 // Unified add torrent flow
 const { addTorrent, isItemLoading } = useAddTorrentFlow()

@@ -1,9 +1,11 @@
 """
 Logs viewing endpoint
 """
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from pathlib import Path
 import logging
+
+from dependencies.abs import require_admin_if_configured
 
 logger = logging.getLogger("mam-audiofinder")
 router = APIRouter()
@@ -11,7 +13,8 @@ router = APIRouter()
 @router.get("/api/logs")
 async def get_logs(
     lines: int = Query(default=100, ge=1, le=10000, description="Number of lines to return"),
-    level: str = Query(default="", description="Filter by log level (INFO, WARNING, ERROR)")
+    level: str = Query(default="", description="Filter by log level (INFO, WARNING, ERROR)"),
+    _admin: dict | None = Depends(require_admin_if_configured),
 ):
     """
     Read application logs from /data/logs/app.log and rotated logs

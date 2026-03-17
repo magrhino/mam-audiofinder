@@ -8,10 +8,36 @@
 
 import { ref, computed, readonly } from 'vue'
 
+const STORAGE_KEYS = {
+  token: 'abs_token',
+  user: 'abs_user',
+  isAdmin: 'abs_is_admin',
+  skipped: 'auth_skipped'
+}
+
+const sessionStore = typeof window !== 'undefined' ? window.sessionStorage : null
+const legacyStore = typeof window !== 'undefined' ? window.localStorage : null
+
+function readStoredValue(key) {
+  return sessionStore?.getItem(key) ?? legacyStore?.getItem(key) ?? null
+}
+
+function writeStoredValue(key, value) {
+  sessionStore?.setItem(key, value)
+  legacyStore?.removeItem(key)
+}
+
+function removeStoredValue(key) {
+  sessionStore?.removeItem(key)
+  legacyStore?.removeItem(key)
+}
+
+const coverObjectUrls = new Map()
+
 // Module-level singleton state (shared across all component instances)
-const token = ref(localStorage.getItem('abs_token') || null)
-const user = ref(JSON.parse(localStorage.getItem('abs_user') || 'null'))
-const isAdminUser = ref(localStorage.getItem('abs_is_admin') === 'true')
+const token = ref(readStoredValue(STORAGE_KEYS.token))
+const user = ref(JSON.parse(readStoredValue(STORAGE_KEYS.user) || 'null'))
+const isAdminUser = ref(readStoredValue(STORAGE_KEYS.isAdmin) === 'true')
 const authStatus = ref({
   requires_auth: false,
   abs_configured: false,
@@ -57,9 +83,35 @@ export function useAuth() {
    */
   function absCoverProxyUrl(absItemId) {
     if (!absItemId) return null
-    const base = `/api/library/cover/${encodeURIComponent(absItemId)}`
-    if (!token.value) return base
-    return `${base}?token=${encodeURIComponent(token.value)}`
+    return `/api/library/cover/${encodeURIComponent(absItemId)}`
+  }
+
+  async function fetchAbsCoverObjectUrl(absItemId) {
+    const proxyUrl = absCoverProxyUrl(absItemId)
+    if (!proxyUrl) return null
+
+    if (coverObjectUrls.has(absItemId)) {
+      return coverObjectUrls.get(absItemId)
+    }
+
+    const resp = await fetch(proxyUrl, {
+      headers: absAuthHeaders(),
+      cache: 'force-cache'
+    })
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`)
+    }
+
+    const blob = await resp.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    coverObjectUrls.set(absItemId, objectUrl)
+    return objectUrl
+  }
+
+  function clearCoverObjectUrls() {
+    coverObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl))
+    coverObjectUrls.clear()
   }
 
   /**
@@ -127,9 +179,9 @@ export function useAuth() {
       token.value = data.token
       user.value = data.user
       isAdminUser.value = data.isAdmin || false
-      localStorage.setItem('abs_token', data.token)
-      localStorage.setItem('abs_user', JSON.stringify(data.user))
-      localStorage.setItem('abs_is_admin', data.isAdmin ? 'true' : 'false')
+      writeStoredValue(STORAGE_KEYS.token, data.token)
+      writeStoredValue(STORAGE_KEYS.user, JSON.stringify(data.user))
+      writeStoredValue(STORAGE_KEYS.isAdmin, data.isAdmin ? 'true' : 'false')
 
       // Update auth status
       authStatus.value.authenticated = true
@@ -164,9 +216,10 @@ export function useAuth() {
     token.value = null
     user.value = null
     isAdminUser.value = false
-    localStorage.removeItem('abs_token')
-    localStorage.removeItem('abs_user')
-    localStorage.removeItem('abs_is_admin')
+    removeStoredValue(STORAGE_KEYS.token)
+    removeStoredValue(STORAGE_KEYS.user)
+    removeStoredValue(STORAGE_KEYS.isAdmin)
+    clearCoverObjectUrls()
     authStatus.value.authenticated = false
   }
 
@@ -176,7 +229,7 @@ export function useAuth() {
    */
   function skipAuth() {
     authStatus.value.authenticated = true
-    localStorage.setItem('auth_skipped', 'true')
+    writeStoredValue(STORAGE_KEYS.skipped, 'true')
   }
 
   /**
@@ -210,6 +263,7 @@ export function useAuth() {
     skipAuth,
     getToken,
     absAuthHeaders,
-    absCoverProxyUrl
+    absCoverProxyUrl,
+    fetchAbsCoverObjectUrl
   }
 }

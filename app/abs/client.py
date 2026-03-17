@@ -6,6 +6,7 @@ from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 import httpx
 
 from abs.config import AbsConfig
+from covers import is_abs_item_cover_url
 from abs.models import LibraryItem, VerificationResult, CoverResult, LibrarySyncStatus, Library
 from abs.library_cache import LibraryCache
 from abs.matching import determine_verification_status
@@ -376,9 +377,11 @@ class AbsClient:
     ) -> CoverResult:
         """Fetch cover image from ABS."""
 
+        cover_service = _get_cover_service()
+
         # Check cache first
         if mam_id and not force_refresh:
-            cached = _get_cover_service().get_cached_cover(mam_id)
+            cached = cover_service.get_cached_cover(mam_id)
             if cached and cached.get("cover_url"):
                 return CoverResult(
                     cover_url=cached.get("cover_url"),
@@ -387,6 +390,33 @@ class AbsClient:
                     description=cached.get("description"),
                     metadata=cached.get("metadata"),
                 )
+            if cached:
+                if cached.get("needs_heal"):
+                    record = cover_service.get_cover_record(mam_id)
+                    source_cover_url = cached.get("source_cover_url") or record.get("cover_url")
+                    heal_title = record.get("title") or title
+                    heal_author = record.get("author") or author
+                    heal_item_id = cached.get("item_id") or record.get("item_id")
+                    if source_cover_url:
+                        await cover_service.save_cover_to_cache(
+                            mam_id,
+                            source_cover_url,
+                            heal_title,
+                            heal_author,
+                            heal_item_id,
+                            description=record.get("description") or "",
+                            metadata_json=record.get("metadata"),
+                            auth_headers=self._get_headers(),
+                        )
+                        healed = cover_service.get_cached_cover(mam_id)
+                        if healed and healed.get("cover_url"):
+                            return CoverResult(
+                                cover_url=healed.get("cover_url"),
+                                item_id=healed.get("item_id"),
+                                is_local=healed.get("is_local", False),
+                                description=healed.get("description"),
+                                metadata=healed.get("metadata"),
+                            )
 
         if not self.is_configured or not self.has_token:
             return CoverResult()
@@ -403,17 +433,25 @@ class AbsClient:
                 data = r.json()
                 results = data.get("results", [])
                 if results:
-                    cover_url = results[0] if isinstance(results[0], str) else results[0].get("cover")
+                    first_result = results[0]
+                    cover_url = first_result if isinstance(first_result, str) else first_result.get("cover")
                     if cover_url and mam_id:
-                        await _get_cover_service().save_cover_to_cache(mam_id, cover_url, title, author)
-                        cached = _get_cover_service().get_cached_cover(mam_id)
-                        if cached:
+                        await cover_service.save_cover_to_cache(
+                            mam_id,
+                            cover_url,
+                            title,
+                            author,
+                            auth_headers=self._get_headers(),
+                        )
+                        cached = cover_service.get_cached_cover(mam_id)
+                        if cached and cached.get("cover_url"):
                             return CoverResult(
                                 cover_url=cached.get("cover_url"),
                                 item_id=cached.get("item_id"),
                                 is_local=cached.get("is_local", False),
                             )
-                    return CoverResult(cover_url=cover_url)
+                    if cover_url and not is_abs_item_cover_url(cover_url, None):
+                        return CoverResult(cover_url=cover_url)
 
             # Fallback to library search if library IDs provided
             if library_ids:
@@ -428,15 +466,23 @@ class AbsClient:
                     if match and match.id:
                         cover_url = f"{self.config.base_url}/api/items/{match.id}/cover"
                         if mam_id:
-                            await _get_cover_service().save_cover_to_cache(mam_id, cover_url, title, author, match.id)
-                            cached = _get_cover_service().get_cached_cover(mam_id)
-                            if cached:
+                            await cover_service.save_cover_to_cache(
+                                mam_id,
+                                cover_url,
+                                title,
+                                author,
+                                match.id,
+                                auth_headers=self._get_headers(),
+                            )
+                            cached = cover_service.get_cached_cover(mam_id)
+                            if cached and cached.get("cover_url"):
                                 return CoverResult(
                                     cover_url=cached.get("cover_url"),
                                     item_id=match.id,
                                     is_local=cached.get("is_local", False),
                                 )
-                        return CoverResult(cover_url=cover_url, item_id=match.id)
+                        if not is_abs_item_cover_url(cover_url, match.id):
+                            return CoverResult(cover_url=cover_url, item_id=match.id)
 
         return CoverResult()
 

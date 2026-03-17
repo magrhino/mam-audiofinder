@@ -124,7 +124,8 @@ def run_migrations():
             "create table if not exists covers",
             "insert into covers",
             "create index if not exists idx_covers",
-            "series_cache"  # Series cache table belongs in covers.db
+            "series_cache",  # Series cache table belongs in covers.db
+            "series_hardcover_link"  # Hardcover linking table belongs in covers.db
         ])
 
         targets_series = any(pattern in sql_content for pattern in [

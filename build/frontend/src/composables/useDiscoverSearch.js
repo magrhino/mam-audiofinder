@@ -34,10 +34,11 @@ export const DEFAULT_LIMIT = '50'
  * Unified search composable for Discover view
  * @param {object} options - Configuration
  * @param {import('vue').Ref<string>} options.viewMode - Reactive view mode ref
+ * @param {Function} options.onMAM502Error - Callback when MAM returns HTTP 502
  * @returns {object} Search state and methods
  */
 export function useDiscoverSearch(options = {}) {
-  const { viewMode } = options
+  const { viewMode, onMAM502Error } = options
 
   const api = useApi()
   const route = useRoute()
@@ -172,6 +173,15 @@ export function useDiscoverSearch(options = {}) {
     } catch (err) {
       console.error('Search failed:', err)
       status.value = `Search failed: ${err.message}`
+
+      // Trigger MAM 502 error callback
+      console.log('[DiscoverSearch] Error message:', err.message)
+      console.log('[DiscoverSearch] Has callback:', !!onMAM502Error)
+      console.log('[DiscoverSearch] Starts with HTTP 502:', err.message?.startsWith('HTTP 502'))
+      if (onMAM502Error && err.message?.startsWith('HTTP 502')) {
+        console.log('[DiscoverSearch] Calling onMAM502Error callback')
+        onMAM502Error()
+      }
     } finally {
       loading.value = false
     }

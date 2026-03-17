@@ -55,6 +55,19 @@ def validate_env():
     # Check logging configuration
     log_max_mb = os.getenv("LOG_MAX_MB")
     log_max_files = os.getenv("LOG_MAX_FILES")
+    qb_user = (os.getenv("QB_USER") or "").strip()
+    qb_pass = (os.getenv("QB_PASS") or "").strip()
+
+    if not qb_user or not qb_pass:
+        errors.append(
+            "ERROR: QB_USER and QB_PASS must both be set explicitly.\n"
+            "       Refusing to start with implicit qBittorrent credentials."
+        )
+    elif qb_user == "admin" and qb_pass == "adminadmin":
+        errors.append(
+            "ERROR: QB_USER/QB_PASS are set to the insecure default admin/adminadmin.\n"
+            "       Choose unique qBittorrent credentials before starting Shelfarr."
+        )
 
     if log_max_mb:
         try:

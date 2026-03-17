@@ -14,6 +14,7 @@ from config import (
     DL_DIR, QB_INNER_DL_PREFIX
 )
 from db import engine
+from dependencies.abs import require_authenticated_user_if_configured
 from dependencies.qb import get_qb_async_client, map_qb_content_path
 from torrent_helpers import extract_mam_id_from_tags
 from utils import extract_disc_track
@@ -34,7 +35,10 @@ class AddBody(BaseModel):
 
 
 @router.get("/qb/torrents")
-async def qb_torrents(c: httpx.AsyncClient = Depends(get_qb_async_client)):
+async def qb_torrents(
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+    c: httpx.AsyncClient = Depends(get_qb_async_client),
+):
     """List completed torrents from qBittorrent."""
     # completed in our category
     r = await c.get(f"{QB_URL}/api/v2/torrents/info",
@@ -80,7 +84,11 @@ async def qb_torrents(c: httpx.AsyncClient = Depends(get_qb_async_client)):
 
 
 @router.post("/add")
-async def add_to_qb(body: AddBody, client: httpx.AsyncClient = Depends(get_qb_async_client)):
+async def add_to_qb(
+    body: AddBody,
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+    client: httpx.AsyncClient = Depends(get_qb_async_client),
+):
     """Add torrent to qBittorrent."""
     mam_id = ("" if body.id is None else str(body.id)).strip()
     title = (body.title or "").strip()
@@ -290,7 +298,11 @@ def detect_multi_disc_structure(files_data: list, root_path: Path = None) -> dic
 
 
 @router.get("/qb/torrent/{hash}/tree")
-async def get_torrent_tree(hash: str, client: httpx.AsyncClient = Depends(get_qb_async_client)):
+async def get_torrent_tree(
+    hash: str,
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+    client: httpx.AsyncClient = Depends(get_qb_async_client),
+):
     """
     Get file structure for a torrent with multi-disc detection.
 

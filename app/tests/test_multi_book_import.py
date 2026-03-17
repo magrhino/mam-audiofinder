@@ -14,7 +14,12 @@ import json
 # Add app to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from routes.import_route import insert_torrent_book, BookPayload, MultiBookImportBody
+from routes.import_route import (
+    BookPayload,
+    MultiBookImportBody,
+    insert_torrent_book,
+    resolve_book_source_path,
+)
 
 
 def create_httpx_context_manager_mock(response_data):
@@ -198,6 +203,14 @@ class TestMultiBookImportEndpoint:
             "book2_dir": book2_dir,
         }
 
+    def test_resolve_book_source_path_rejects_traversal(self, temp_torrent_structure):
+        with pytest.raises(ValueError, match="within the torrent root"):
+            resolve_book_source_path(temp_torrent_structure["root"], "../outside")
+
+    def test_resolve_book_source_path_rejects_absolute_paths(self, temp_torrent_structure):
+        with pytest.raises(ValueError, match="Absolute paths"):
+            resolve_book_source_path(temp_torrent_structure["root"], "/tmp/outside")
+
     @pytest.fixture
     def mock_qb_response(self):
         """Create mock qBittorrent API responses."""
@@ -302,7 +315,7 @@ class TestMultiBookImportEndpoint:
         with patch('routes.import_route.httpx.Client', mock_httpx_context_manager), \
              patch('routes.import_route.qb_login_sync'), \
              patch('routes.import_route.engine', engine), \
-             patch('routes.import_route.abs_client.verify_import', mock_abs_verify), \
+             patch('routes.import_route.get_abs_client', return_value=MagicMock(verify_import=mock_abs_verify)), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
              patch('dependencies.qb.DL_DIR', str(temp_torrent_structure["root"].parent)), \
@@ -381,7 +394,7 @@ class TestMultiBookImportEndpoint:
         with patch('routes.import_route.httpx.Client', mock_httpx_client), \
              patch('routes.import_route.qb_login_sync'), \
              patch('routes.import_route.engine', engine), \
-             patch('routes.import_route.abs_client.verify_import', AsyncMock(return_value={"status": "verified", "note": "Match"})), \
+             patch('routes.import_route.get_abs_client', return_value=MagicMock(verify_import=AsyncMock(return_value={"status": "verified", "note": "Match"}))), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
              patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
@@ -461,6 +474,62 @@ class TestMultiBookImportEndpoint:
             assert "not found" in result["results"][0]["error"].lower()
 
     @pytest.mark.asyncio
+    async def test_multi_book_import_rejects_path_traversal(self, temp_torrent_structure, tmp_path):
+        """Test that multi-book import rejects traversal outside the torrent root."""
+        lib_dir = tmp_path / "library"
+        lib_dir.mkdir()
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        (outside_dir / "secret.mp3").write_text("audio")
+
+        engine = create_engine("sqlite:///:memory:")
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE history (id INTEGER PRIMARY KEY, title TEXT, qb_status TEXT, imported_at TEXT)"))
+            conn.execute(text("INSERT INTO history (id, title) VALUES (1, 'Test')"))
+            conn.execute(text("""
+                CREATE TABLE torrent_books (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    torrent_hash TEXT, history_id INTEGER, position INTEGER,
+                    subdirectory TEXT, book_title TEXT, book_author TEXT,
+                    series_name TEXT, imported_at TEXT, abs_item_id TEXT,
+                    abs_verify_status TEXT, abs_verify_note TEXT
+                )
+            """))
+
+        mock_httpx_client = create_httpx_context_manager_mock([{
+            "content_path": str(temp_torrent_structure["root"])
+        }])
+
+        body = MultiBookImportBody(
+            torrent_hash="abc123",
+            history_id=1,
+            books=[
+                BookPayload(
+                    title="Traversal Attempt",
+                    author="Test Author",
+                    subdirectory="../outside",
+                    position=1,
+                ),
+            ],
+            flatten=True,
+        )
+
+        with patch('routes.import_route.httpx.Client', mock_httpx_client), \
+             patch('routes.import_route.qb_login_sync'), \
+             patch('routes.import_route.engine', engine), \
+             patch('routes.import_route.LIB_DIR', str(lib_dir)), \
+             patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
+
+            from routes.import_route import do_multi_book_import
+
+            result = await do_multi_book_import(body)
+
+            assert result["ok"] is True
+            assert result["books_failed"] == 1
+            assert result["results"][0]["ok"] is False
+            assert "within the torrent root" in result["results"][0]["error"]
+
+    @pytest.mark.asyncio
     async def test_multi_book_import_partial_verification(self, temp_torrent_structure, tmp_path):
         """Test multi-book import where one book verifies and one mismatches."""
         lib_dir = tmp_path / "library"
@@ -505,7 +574,7 @@ class TestMultiBookImportEndpoint:
         with patch('routes.import_route.httpx.Client', mock_httpx_client), \
              patch('routes.import_route.qb_login_sync'), \
              patch('routes.import_route.engine', engine), \
-             patch('routes.import_route.abs_client.verify_import', mock_abs_verify), \
+             patch('routes.import_route.get_abs_client', return_value=MagicMock(verify_import=mock_abs_verify)), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
              patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):
@@ -558,7 +627,7 @@ class TestMultiBookImportEndpoint:
         with patch('routes.import_route.httpx.Client', mock_httpx_client), \
              patch('routes.import_route.qb_login_sync'), \
              patch('routes.import_route.engine', engine), \
-             patch('routes.import_route.abs_client.verify_import', AsyncMock(return_value={"status": "verified", "note": "Match", "abs_item_id": "abs-123"})), \
+             patch('routes.import_route.get_abs_client', return_value=MagicMock(verify_import=AsyncMock(return_value={"status": "verified", "note": "Match", "abs_item_id": "abs-123"}))), \
              patch('routes.import_route.read_metadata_json', return_value={}), \
              patch('routes.import_route.LIB_DIR', str(lib_dir)), \
              patch('dependencies.qb.QB_INNER_DL_PREFIX', "/downloads"):

@@ -3,15 +3,29 @@ Cover management service for MAM Audiobook Finder.
 Handles cover caching, downloading, and serving.
 """
 import logging
+from urllib.parse import urlparse
 import httpx
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import text
 
 from config import COVERS_DIR, MAX_COVERS_SIZE_MB
 from db import covers_engine, engine
 
 logger = logging.getLogger("mam-audiofinder")
+
+
+def is_abs_item_cover_url(cover_url: Optional[str], item_id: Optional[str]) -> bool:
+    """Return True when the cover URL points at an ABS item cover endpoint."""
+    if not cover_url or not item_id:
+        return False
+
+    try:
+        parsed_url = urlparse(cover_url)
+        return parsed_url.path.endswith(f"/api/items/{item_id}/cover")
+    except Exception:
+        return False
 
 
 class CoverService:
@@ -76,7 +90,12 @@ class CoverService:
         if removed_count > 0:
             logger.info(f"✅ Cleaned up {removed_count} covers, freed {removed_size / 1024 / 1024:.1f}MB")
 
-    async def download_cover(self, url: str, mam_id: str) -> tuple[str | None, int]:
+    async def download_cover(
+        self,
+        url: str,
+        mam_id: str,
+        headers: Optional[dict[str, str]] = None,
+    ) -> tuple[str | None, int]:
         """
         Download cover image and save to local storage.
         Returns tuple of (local_file_path, file_size) or (None, 0) on failure.
@@ -90,9 +109,8 @@ class CoverService:
             logger.info(f"⬇️  Downloading cover from: {url}")
 
             async with httpx.AsyncClient(timeout=30) as client:
-                # Note: Cover URLs from ABS should be accessible without auth
-                # If auth is needed, the caller should use a signed URL or proxy endpoint
-                r = await client.get(url, follow_redirects=True)
+                request_headers = headers or {}
+                r = await client.get(url, headers=request_headers, follow_redirects=True)
 
                 if r.status_code != 200:
                     logger.warning(f"⚠️  Failed to download cover: HTTP {r.status_code}")
@@ -173,6 +191,8 @@ class CoverService:
                     if metadata:
                         result["metadata"] = metadata
 
+                    is_abs_cover = is_abs_item_cover_url(cover_url, item_id)
+
                     # Check if local file exists
                     if local_file and Path(local_file).exists():
                         # Return local cover path
@@ -187,6 +207,19 @@ class CoverService:
                         logger.info(f"📦 Cache HIT (direct) for MAM ID {mam_id}: {cover_url} (title: '{row[3]}', fetched: {row[2]})")
                         result["cover_url"] = cover_url
                         result["is_local"] = False
+                        return result
+                    elif is_abs_cover:
+                        logger.warning(
+                            f"⚠️  Cache HIT for protected ABS cover without local file for MAM ID {mam_id}; suppressing raw URL"
+                        )
+                        result.update({
+                            "cover_url": None,
+                            "is_local": False,
+                            "needs_heal": True,
+                            "source_cover_url": cover_url,
+                            "title": title,
+                            "author": author,
+                        })
                         return result
                     else:
                         # Local file missing but should exist - signal healing
@@ -237,6 +270,45 @@ class CoverService:
         except Exception as e:
             logger.error(f"❌ Failed to get local cover path for MAM ID {mam_id}: {e}")
             return None
+
+    def get_cover_record(self, mam_id: str) -> dict:
+        """Return raw cover record fields for healing and diagnostics."""
+        if not mam_id:
+            return {}
+
+        try:
+            with covers_engine.begin() as cx:
+                row = cx.execute(text("""
+                    SELECT cover_url, abs_item_id, title, author, local_file, abs_description, abs_metadata
+                    FROM covers
+                    WHERE mam_id = :mam_id
+                    LIMIT 1
+                """), {"mam_id": mam_id}).fetchone()
+
+                if not row:
+                    return {}
+
+                import json
+
+                metadata = None
+                if row[6]:
+                    try:
+                        metadata = json.loads(row[6])
+                    except Exception:
+                        metadata = None
+
+                return {
+                    "cover_url": row[0],
+                    "item_id": row[1],
+                    "title": row[2],
+                    "author": row[3],
+                    "local_file": row[4],
+                    "description": row[5],
+                    "metadata": metadata,
+                }
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to load raw cover record for {mam_id}: {e}")
+            return {}
 
     def resolve_cover_url(self, mam_id: str, current_url: str = None) -> dict:
         """
@@ -354,7 +426,17 @@ class CoverService:
             'source': 'cache_miss'
         }
 
-    async def save_cover_to_cache(self, mam_id: str, cover_url: str, title: str = "", author: str = "", item_id: str = None, description: str = "", metadata_json: dict = None):
+    async def save_cover_to_cache(
+        self,
+        mam_id: str,
+        cover_url: str,
+        title: str = "",
+        author: str = "",
+        item_id: Optional[str] = None,
+        description: str = "",
+        metadata_json: Optional[dict] = None,
+        auth_headers: Optional[dict[str, str]] = None,
+    ):
         """
         Save cover URL to covers database and download the image to local storage.
         Uses INSERT OR REPLACE to handle duplicates.
@@ -395,19 +477,33 @@ class CoverService:
 
             # Process the result AFTER closing the connection
             if existing and existing[2]:
-                # Reuse existing downloaded cover
-                local_file = existing[2]
-                file_size = existing[3] or 0
-                logger.info(f"ℹ️  Cover URL already cached for MAM ID {existing[0]} ('{existing[1]}'). Reusing local file: {Path(local_file).name}")
-            elif MAX_COVERS_SIZE_MB > 0:
+                candidate_local_file = Path(existing[2])
+                if candidate_local_file.exists():
+                    # Reuse existing downloaded cover
+                    local_file = str(candidate_local_file)
+                    file_size = existing[3] or 0
+                    logger.info(f"ℹ️  Cover URL already cached for MAM ID {existing[0]} ('{existing[1]}'). Reusing local file: {candidate_local_file.name}")
+                else:
+                    logger.warning(
+                        f"⚠️  Cached reusable cover file missing for MAM ID {existing[0]}: {candidate_local_file}. Re-downloading."
+                    )
+
+            if not local_file and MAX_COVERS_SIZE_MB > 0:
                 # Download the cover (no DB connection held during this async operation)
-                local_file, file_size = await self.download_cover(cover_url, mam_id)
+                local_file, file_size = await self.download_cover(cover_url, mam_id, headers=auth_headers)
+
+            is_abs_cover = is_abs_item_cover_url(cover_url, item_id)
 
             # Get the final cover URL (local or remote)
             final_cover_url = cover_url
             if local_file and Path(local_file).exists():
                 filename = Path(local_file).name
                 final_cover_url = f"/covers/{filename}"
+            elif is_abs_cover:
+                logger.warning(
+                    f"⚠️  Could not cache ABS cover for MAM ID {mam_id}; not returning raw ABS URL to browser"
+                )
+                final_cover_url = None
 
             # Prepare metadata JSON string
             import json
@@ -457,7 +553,7 @@ class CoverService:
                     "duration": duration_minutes
                 })
 
-                logger.info(f"✅ Cached cover for MAM ID {mam_id}: {final_cover_url}")
+                logger.info(f"✅ Cached cover for MAM ID {mam_id}: {final_cover_url or '[unavailable]'}")
 
             # Propagate local file info to other rows sharing this cover URL
             if local_file and Path(local_file).exists():
@@ -487,7 +583,7 @@ class CoverService:
                         WHERE mam_id = :mam_id
                     """), {
                         "mam_id": mam_id,
-                        "cover_url": final_cover_url,  # Use local URL if available
+                            "cover_url": final_cover_url,  # Use local URL if available
                         "item_id": item_id,
                         "cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                     })
