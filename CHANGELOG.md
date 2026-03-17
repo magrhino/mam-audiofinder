@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/magrhino/shelfarr/compare/v0.2.2...v0.2.3) (2026-03-17)
+
+
+### Features
+
+* ship token-auth library and discovery workflows ([019dc53](https://github.com/magrhino/shelfarr/commit/019dc5365b922d28391305b0ba344129666b213e))
+
 ## [0.2.2](https://github.com/magrhino/shelfarr/compare/v0.2.1...v0.2.2) (2026-01-01)
 
 
