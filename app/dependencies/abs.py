@@ -20,11 +20,26 @@ import logging
 from fastapi import HTTPException, Header, Depends
 import httpx
 
-from config import ABS_BASE_URL, ABS_ADMIN_USER
+import config
 from abs_client import abs_client
 from utils import sanitize, next_available
 
 logger = logging.getLogger("mam-audiofinder")
+
+
+def is_abs_auth_enabled() -> bool:
+    """Return True when ABS-backed auth should be enforced."""
+    return bool(config.ABS_BASE_URL)
+
+
+def get_abs_base_url() -> str:
+    """Return the configured ABS base URL."""
+    return config.ABS_BASE_URL
+
+
+def get_abs_admin_username() -> str:
+    """Return the configured ABS admin username."""
+    return config.ABS_ADMIN_USER
 
 
 # --- Token and Auth Dependencies ---
@@ -74,7 +89,8 @@ async def get_current_user(
         HTTPException: 401 if token invalid
         HTTPException: 503 if ABS not configured
     """
-    if not ABS_BASE_URL:
+    abs_base_url = get_abs_base_url()
+    if not abs_base_url:
         raise HTTPException(
             status_code=503,
             detail="Audiobookshelf is not configured."
@@ -83,7 +99,7 @@ async def get_current_user(
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(
-                f"{ABS_BASE_URL}/api/authorize",
+                f"{abs_base_url}/api/authorize",
                 headers={"Authorization": f"Bearer {token}"}
             )
 
@@ -131,14 +147,17 @@ async def require_admin(
         HTTPException: 403 if not admin
     """
     username = user.get("username", "")
+    abs_admin_user = get_abs_admin_username()
 
     # Check if user matches configured admin
-    if not ABS_ADMIN_USER:
-        # No admin configured - allow all authenticated users
-        logger.warning("⚠️ ABS_ADMIN_USER not set - all users have admin access")
-        return user
+    if not abs_admin_user:
+        logger.error("❌ ABS_ADMIN_USER not set - admin routes are unavailable")
+        raise HTTPException(
+            status_code=503,
+            detail="Admin routes require ABS_ADMIN_USER to be configured"
+        )
 
-    if username.lower() != ABS_ADMIN_USER.lower():
+    if username.lower() != abs_admin_user.lower():
         raise HTTPException(
             status_code=403,
             detail="Admin access required"
@@ -157,9 +176,43 @@ def is_admin_user(username: str) -> bool:
     Returns:
         True if admin, False otherwise
     """
-    if not ABS_ADMIN_USER:
-        return True  # No admin configured - all users are admin
-    return username.lower() == ABS_ADMIN_USER.lower()
+    abs_admin_user = get_abs_admin_username()
+    if not abs_admin_user:
+        return False
+    return username.lower() == abs_admin_user.lower()
+
+
+async def require_authenticated_user_if_configured(
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+) -> Optional[Dict[str, Any]]:
+    """Require ABS auth only when ABS is configured."""
+    if not is_abs_auth_enabled():
+        return None
+
+    if not x_abs_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please login."
+        )
+
+    return await get_current_user(x_abs_token)
+
+
+async def require_admin_if_configured(
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+) -> Optional[Dict[str, Any]]:
+    """Require admin access only when ABS auth is enabled."""
+    if not is_abs_auth_enabled():
+        return None
+
+    if not x_abs_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please login."
+        )
+
+    user = await get_current_user(x_abs_token)
+    return await require_admin(user)
 
 
 # --- ABS Config Guards ---
@@ -171,7 +224,7 @@ def require_abs_config() -> None:
     Raises:
         HTTPException: 503 if ABS_BASE_URL not set
     """
-    if not ABS_BASE_URL:
+    if not get_abs_base_url():
         raise HTTPException(
             status_code=503,
             detail="Audiobookshelf is not configured. Set ABS_BASE_URL."
@@ -245,7 +298,7 @@ async def abs_import_verifier(
         HTTPException: Only for critical errors (not for verification failures)
     """
     # Check if ABS is configured
-    if not ABS_BASE_URL:
+    if not get_abs_base_url():
         return {
             "status": "not_configured",
             "note": "Audiobookshelf not configured",

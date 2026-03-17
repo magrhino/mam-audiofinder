@@ -1,4 +1,5 @@
 <script setup>
+import { ref, watch } from 'vue'
 import { NCard, NText, NImage } from 'naive-ui'
 import { useAuth } from '@composables/useAuth'
 
@@ -8,15 +9,66 @@ const props = defineProps({
 
 const emit = defineEmits(['bookClick'])
 
-const { absCoverProxyUrl } = useAuth()
+const { fetchAbsCoverObjectUrl, token } = useAuth()
+const coverUrls = ref({})
+const retryCounts = ref({})
 
 const getCoverUrl = (book) => {
-  return absCoverProxyUrl(book?.id)
+  return coverUrls.value[book?.id] || ''
 }
 
 const handleBookClick = (book) => {
   emit('bookClick', book)
 }
+
+async function loadCover(bookId) {
+  if (!bookId || coverUrls.value[bookId] !== undefined) {
+    return
+  }
+
+  try {
+    const coverUrl = await fetchAbsCoverObjectUrl(bookId)
+    coverUrls.value = {
+      ...coverUrls.value,
+      [bookId]: coverUrl || ''
+    }
+    retryCounts.value = {
+      ...retryCounts.value,
+      [bookId]: 0
+    }
+  } catch {
+    const attempts = retryCounts.value[bookId] || 0
+    if (attempts >= 2) {
+      coverUrls.value = {
+        ...coverUrls.value,
+        [bookId]: ''
+      }
+      return
+    }
+
+    retryCounts.value = {
+      ...retryCounts.value,
+      [bookId]: attempts + 1
+    }
+
+    window.setTimeout(() => {
+      loadCover(bookId)
+    }, 1500)
+  }
+}
+
+watch(
+  () => ({
+    bookIds: props.books.map((book) => book?.id).filter(Boolean),
+    authToken: token.value
+  }),
+  ({ bookIds }) => {
+    bookIds.forEach((bookId) => {
+      loadCover(bookId)
+    })
+  },
+  { immediate: true }
+)
 </script>
 
 <template>

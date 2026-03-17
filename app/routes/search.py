@@ -6,11 +6,12 @@ import logging
 import random
 import httpx
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from fastapi.responses import JSONResponse
 
 from config import MAM_BASE, MAM_COOKIE, ABS_BASE_URL, ABS_CHECK_LIBRARY
 from abs_client import get_abs_client
+from dependencies.abs import require_authenticated_user_if_configured
 from mam_cache import get_cached_mam_search, cache_mam_search
 from dependencies.mam import normalize_mam_result, flatten, detect_format
 from utils import normalize_title, normalize_author
@@ -22,7 +23,8 @@ logger = logging.getLogger("mam-audiofinder")
 @router.post("/search")
 async def search(
     payload: dict,
-    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """Search MAM for audiobooks with 5-minute caching."""
     if not MAM_COOKIE:
@@ -131,7 +133,8 @@ async def fetch_cover(
     title: str = Query("", description="Book title"),
     author: str = Query("", description="Book author"),
     max_retries: int = Query(2, description="Maximum number of retries"),
-    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     Fetch cover for a specific MAM ID with retry logic.

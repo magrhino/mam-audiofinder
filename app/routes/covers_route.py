@@ -3,17 +3,18 @@ Cover image serving routes for MAM Audiobook Finder.
 """
 import asyncio
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Header
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import text
 from typing import Optional
 
 from config import COVERS_DIR
-from abs_client import abs_client
+from abs_client import abs_client, get_abs_client
 from db import engine
 from covers import get_cover_service
 from abs.matching import best_title_score, best_author_score
+from dependencies.abs import require_authenticated_user_if_configured
 import logging
 
 router = APIRouter()
@@ -63,13 +64,19 @@ async def serve_cover(filename: str):
 
 
 @router.post("/covers/refresh/{mam_id}")
-async def refresh_cover(mam_id: str):
+async def refresh_cover(
+    mam_id: str,
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+):
     """Force refresh of a cached cover for a specific MAM ID."""
+
+    client = get_abs_client(user_token=x_abs_token)
 
     if not mam_id:
         raise HTTPException(status_code=400, detail="Missing MAM ID")
 
-    if not abs_client.is_configured:
+    if not client.is_configured:
         raise HTTPException(status_code=400, detail="Audiobookshelf not configured")
 
     with engine.begin() as cx:
@@ -86,7 +93,7 @@ async def refresh_cover(mam_id: str):
     # Remove any stale cache entries/files before fetching again
     get_cover_service().invalidate_cover(mam_id)
 
-    result = await abs_client.fetch_cover(row.title or "", row.author or "", mam_id, force_refresh=True)
+    result = await client.fetch_cover(row.title or "", row.author or "", mam_id, force_refresh=True)
     if not result or not result.get("cover_url"):
         raise HTTPException(status_code=404, detail="Unable to refresh cover")
 
@@ -105,7 +112,11 @@ class EnrichRequest(BaseModel):
 
 
 @router.post("/api/covers/enrich")
-async def enrich_metadata(request: EnrichRequest):
+async def enrich_metadata(
+    request: EnrichRequest,
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+):
     """
     On-demand metadata enrichment for detail views.
 
@@ -143,6 +154,8 @@ async def enrich_metadata(request: EnrichRequest):
     logger.info(f"🔍 On-demand enrichment for: '{request.title}' by '{request.author}'")
 
     try:
+        client = get_abs_client(user_token=x_abs_token)
+
         # Call all 3 providers in parallel
         providers = ['audible', 'google', 'openlibrary']
 
@@ -150,7 +163,7 @@ async def enrich_metadata(request: EnrichRequest):
             """Fetch from a single provider, returning (provider_name, result)."""
             try:
                 logger.debug(f"🌐 Calling provider {provider} for '{request.title}'")
-                result = await abs_client._fetch_from_provider(
+                result = await client._fetch_from_provider(
                     provider=provider,
                     item_id='',
                     title=request.title,

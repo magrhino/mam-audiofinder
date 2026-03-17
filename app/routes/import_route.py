@@ -8,7 +8,7 @@ import httpx
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -20,6 +20,7 @@ from db import engine
 from qb_client import qb_login_sync
 from utils import sanitize, next_available, extract_disc_track, try_hardlink
 from abs_client import get_abs_client
+from dependencies.abs import require_authenticated_user_if_configured
 from dependencies.qb import map_qb_content_path
 from settings_service import settings_service
 from covers import CoverService
@@ -282,10 +283,31 @@ class MultiBookImportBody(BaseModel):
     flatten: bool | None = None  # If None, uses global FLATTEN_DISCS setting
 
 
+def resolve_book_source_path(torrent_root: Path, subdirectory: str) -> Path:
+    """Resolve a multi-book source path and keep it contained inside the torrent root."""
+    raw_subdirectory = (subdirectory or "").strip()
+    candidate = Path(raw_subdirectory)
+
+    if not raw_subdirectory:
+        raise ValueError("Subdirectory is required")
+
+    if candidate.is_absolute():
+        raise ValueError("Absolute paths are not allowed")
+
+    resolved_root = torrent_root.resolve(strict=True)
+    resolved_candidate = (resolved_root / candidate).resolve(strict=False)
+
+    if resolved_candidate != resolved_root and resolved_root not in resolved_candidate.parents:
+        raise ValueError("Subdirectory must stay within the torrent root")
+
+    return resolved_candidate
+
+
 @router.post("/import")
 async def do_import(
     body: ImportBody,
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """Import completed torrent to library."""
     author = sanitize(body.author)
@@ -625,6 +647,7 @@ async def do_import(
 async def do_multi_book_import(
     body: MultiBookImportBody,
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     Import multiple books from a single torrent to library.
@@ -721,8 +744,14 @@ async def do_multi_book_import(
             author = sanitize(book.author)
             title = sanitize(book.title)
 
-            # Source: torrent_root / subdirectory
-            src_root = torrent_root / book.subdirectory
+            # Source: validated torrent_root / subdirectory
+            try:
+                src_root = resolve_book_source_path(torrent_root, book.subdirectory)
+            except ValueError as exc:
+                book_result["error"] = str(exc)
+                results.append(book_result)
+                logger.warning(f"⚠️  Rejected book subdirectory '{book.subdirectory}': {exc}")
+                continue
 
             if not src_root.exists():
                 book_result["error"] = f"Subdirectory not found: {book.subdirectory}"

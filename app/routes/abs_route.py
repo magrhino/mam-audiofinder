@@ -10,7 +10,13 @@ from pydantic import BaseModel
 
 from abs_client import get_abs_client
 from abs import AbsClient
-from dependencies.abs import get_abs_token, require_admin, is_admin_user, get_current_user
+from dependencies.abs import (
+    get_abs_token,
+    get_current_user,
+    is_admin_user,
+    require_admin,
+    require_authenticated_user_if_configured,
+)
 from settings_service import settings_service
 from config import ABS_BASE_URL
 
@@ -262,7 +268,8 @@ async def sync_library(
 
 @router.get("/api/abs/status")
 async def get_sync_status(
-    token: Optional[str] = Depends(get_abs_token)
+    token: Optional[str] = Depends(get_abs_token),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     Get the current library sync status.

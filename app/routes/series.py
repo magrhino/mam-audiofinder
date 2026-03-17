@@ -5,13 +5,14 @@ Handles series discovery and book listings.
 import logging
 import asyncio
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Literal
 
 from hardcover_client import hardcover_client
 from abs_client import get_abs_client
+from dependencies.abs import require_authenticated_user_if_configured
 from utils import normalize_title, normalize_author
 from enrichment_tracker import get_tracker
 from covers import CoverService
@@ -85,7 +86,10 @@ class SeriesSearchRequest(BaseModel):
 
 
 @router.post("/api/series/search")
-async def search_series(request: SeriesSearchRequest):
+async def search_series(
+    request: SeriesSearchRequest,
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+):
     """
     Search for series on Hardcover by title and/or author.
 
@@ -495,7 +499,8 @@ async def get_series_books(
                     "If False (default), return only canonical English primary editions. "
                     "Each book will have an 'is_canonical' field indicating canonical status."
     ),
-    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token")
+    x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     Get books in a series from Hardcover with progressive enrichment support.
@@ -808,7 +813,8 @@ class FetchAudioRequest(BaseModel):
 @router.post("/api/series/{series_id}/books/fetch-audio")
 async def fetch_series_audio_metadata(
     series_id: int,
-    request: FetchAudioRequest
+    request: FetchAudioRequest,
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     Fetch audiobook metadata for specific books in a series (or all books).

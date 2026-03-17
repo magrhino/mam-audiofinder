@@ -4,7 +4,7 @@ History routes for MAM Audiobook Finder.
 import httpx
 from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, Depends
 from sqlalchemy import text
 
 from db import engine
@@ -19,12 +19,13 @@ from torrent_helpers import (
     extract_mam_id_from_tags,
     match_torrent_to_history
 )
+from dependencies.abs import require_authenticated_user_if_configured
 
 router = APIRouter()
 
 
 @router.get("/api/history")
-def history():
+def history(_user: dict | None = Depends(require_authenticated_user_if_configured)):
     """Get history of added torrents with live torrent states."""
     import logging
     logger = logging.getLogger("mam-audiofinder")
@@ -187,7 +188,10 @@ def history():
 
 
 @router.delete("/api/history/{row_id}")
-def delete_history(row_id: int):
+def delete_history(
+    row_id: int,
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+):
     """Delete a history entry."""
     with engine.begin() as cx:
         cx.execute(text("DELETE FROM history WHERE id = :id"), {"id": row_id})
@@ -198,6 +202,7 @@ def delete_history(row_id: int):
 async def verify_history_item(
     row_id: int,
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """Manually trigger verification for a history item."""
     import logging

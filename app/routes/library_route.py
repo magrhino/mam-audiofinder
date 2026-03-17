@@ -3,12 +3,18 @@
 import asyncio
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, Query, HTTPException, Header
+from fastapi import APIRouter, Query, HTTPException, Header, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 
+from sqlalchemy import bindparam, text
+
 from abs_client import get_abs_client
+from dependencies.abs import (
+    require_admin_if_configured,
+    require_authenticated_user_if_configured,
+)
 from settings_service import settings_service
 from hardcover_client import hardcover_client
 from series_resolver import (
@@ -169,6 +175,7 @@ async def list_series(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     List series from ABS library.
@@ -210,12 +217,13 @@ async def list_series(
     hardcover_links = {}
     try:
         with covers_engine.connect() as conn:
-            rows = conn.execute(text("""
+            stmt = text("""
                 SELECT series_name_normalized, hardcover_series_id, hardcover_series_name,
                        hardcover_book_count, link_confidence, linked_by
                 FROM series_hardcover_link
-                WHERE library_id IS NULL OR library_id IN ({})
-            """.format(','.join(f"'{lid}'" for lid in library_ids)))).fetchall()
+                WHERE library_id IS NULL OR library_id IN :library_ids
+            """).bindparams(bindparam("library_ids", expanding=True))
+            rows = conn.execute(stmt, {"library_ids": library_ids}).fetchall()
 
             for row in rows:
                 hardcover_links[row.series_name_normalized] = {
@@ -320,6 +328,7 @@ async def list_series(
 async def get_series_books(
     series_name: str,
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """Get all ABS library books in a specific series."""
     logger.info(f"[LIBRARY] GET /api/library/series/{series_name}/books")
@@ -347,6 +356,7 @@ async def diff_series(
     series_name: str,
     hardcover_series_id: Optional[int] = Query(None, description="Hardcover series ID if known"),
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """
     Compare series between ABS library and Hardcover.
@@ -526,6 +536,7 @@ async def list_books(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """Paginated book browser from ABS library cache."""
     logger.info(f"[LIBRARY] GET /api/library/books - q={q!r}, series={series!r}, library_id={library_id}, page={page}, limit={limit}")
@@ -610,7 +621,10 @@ async def list_books(
 
 
 @router.post("/wishlist")
-async def add_to_wishlist(request: WishlistAddRequest):
+async def add_to_wishlist(
+    request: WishlistAddRequest,
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
+):
     """Add a missing book to the acquisition wishlist."""
     from sqlalchemy import text
     from db.db import history_engine
@@ -644,6 +658,7 @@ async def list_wishlist(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """List wishlist items."""
     from sqlalchemy import text
@@ -689,6 +704,7 @@ async def link_series_to_hardcover(
     series_name: str,
     request: SeriesLinkRequest,
     library_id: Optional[str] = Query(None, description="Scope link to specific library"),
+    _admin: dict | None = Depends(require_admin_if_configured),
 ):
     """
     Link a library series to a specific Hardcover series.
@@ -748,6 +764,7 @@ async def link_series_to_hardcover(
 async def unlink_series(
     series_name: str,
     library_id: Optional[str] = Query(None, description="Scope to specific library"),
+    _admin: dict | None = Depends(require_admin_if_configured),
 ):
     """Remove the Hardcover link for a series."""
     from sqlalchemy import text
@@ -777,6 +794,7 @@ async def unlink_series(
 async def get_series_link(
     series_name: str,
     library_id: Optional[str] = Query(None, description="Scope to specific library"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """Get the current Hardcover link for a series."""
     from sqlalchemy import text
@@ -813,19 +831,18 @@ async def get_series_link(
 @router.get("/cover/{item_id}")
 async def get_library_item_cover(
     item_id: str,
-    token: Optional[str] = Query(None),
     x_abs_token: Optional[str] = Header(None, alias="X-ABS-Token"),
+    _user: dict | None = Depends(require_authenticated_user_if_configured),
 ):
     """Proxy ABS item cover to avoid CORS issues.
 
-    Accepts token via query param (for img src) or header (for fetch requests).
+    Requires ABS auth via X-ABS-Token header.
     """
-    auth_token = token or x_abs_token
-    if not ABS_BASE_URL or not auth_token:
+    if not ABS_BASE_URL or not x_abs_token:
         raise HTTPException(503, "ABS not configured or missing token")
 
     cover_url = f"{ABS_BASE_URL}/api/items/{item_id}/cover"
-    headers = {"Authorization": f"Bearer {auth_token}"}
+    headers = {"Authorization": f"Bearer {x_abs_token}"}
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:

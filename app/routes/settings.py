@@ -4,11 +4,12 @@ Provides API endpoints for runtime-configurable application settings.
 """
 import logging
 from typing import Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, field_validator
 
 from settings_service import settings_service
 from auto_import import get_auto_import_service
+from dependencies.abs import require_admin_if_configured
 
 router = APIRouter()
 logger = logging.getLogger("mam-audiofinder")
@@ -29,7 +30,7 @@ class SettingsUpdateBody(BaseModel):
 
 
 @router.get("/api/settings")
-def get_settings():
+def get_settings(_admin: dict | None = Depends(require_admin_if_configured)):
     """
     Get all application settings.
 
@@ -40,7 +41,10 @@ def get_settings():
 
 
 @router.put("/api/settings")
-async def update_settings(body: SettingsUpdateBody):
+async def update_settings(
+    body: SettingsUpdateBody,
+    _admin: dict | None = Depends(require_admin_if_configured),
+):
     """
     Update multiple settings at once.
 
@@ -73,7 +77,7 @@ async def update_settings(body: SettingsUpdateBody):
 
 
 @router.post("/api/settings/reset")
-async def reset_settings():
+async def reset_settings(_admin: dict | None = Depends(require_admin_if_configured)):
     """
     Reset all settings to their default values.
     """
@@ -90,7 +94,7 @@ async def reset_settings():
 
 
 @router.get("/api/settings/auto-import/status")
-def get_auto_import_status():
+def get_auto_import_status(_admin: dict | None = Depends(require_admin_if_configured)):
     """
     Get auto-import service status and recent activity.
 
